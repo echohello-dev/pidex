@@ -44,7 +44,7 @@ run = [
 
 [tasks."test:e2e"]
 description = "Run e2e tests against the live Electron app"
-run = "bunx vitest run --project e2e"
+run = "bunx vitest run --config vitest.e2e.config.ts"
 
 [settings]
 experimental = true
