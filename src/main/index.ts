@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { listSessions, listWorkspaces, SESSIONS_ROOT } from './sessions';
@@ -8,6 +8,27 @@ const isDev = !app.isPackaged;
 const sessions = new Map<string, RpcSession>();
 let sessionSeq = 0;
 let mainWindow: BrowserWindow | null = null;
+
+function customWorkspacesFile(): string {
+  return path.join(app.getPath('userData'), 'workspaces.json');
+}
+
+function readCustomWorkspaces(): string[] {
+  try {
+    const raw = fs.readFileSync(customWorkspacesFile(), 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function addCustomWorkspace(cwd: string): void {
+  const existing = readCustomWorkspaces();
+  if (!existing.includes(cwd)) {
+    fs.writeFileSync(customWorkspacesFile(), JSON.stringify([...existing, cwd], null, 2));
+  }
+}
 
 function sendToRenderer(channel: string, payload: unknown) {
   mainWindow?.webContents.send(channel, payload);
@@ -42,7 +63,19 @@ function createWindow() {
   });
 }
 
-ipcMain.handle('openpi:workspaces', () => listWorkspaces());
+ipcMain.handle('openpi:workspaces', () => listWorkspaces(readCustomWorkspaces()));
+
+ipcMain.handle('openpi:workspace:add', async () => {
+  if (!mainWindow) return { error: 'no window' };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Add workspace',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return { error: 'cancelled' };
+  const cwd = result.filePaths[0];
+  addCustomWorkspace(cwd);
+  return { cwd };
+});
 
 ipcMain.handle('openpi:sessions', (_e, dirName: string) => {
   if (typeof dirName !== 'string') return [];
@@ -88,6 +121,14 @@ ipcMain.handle(
 
 ipcMain.handle('openpi:session/abort', (_e, sessionId: string) => {
   sessions.get(sessionId)?.abort();
+});
+
+ipcMain.handle('openpi:session/commands', async (_e, sessionId: string) => {
+  const session = sessions.get(sessionId);
+  if (!session) return { commands: [] };
+  const response = await session.getCommands();
+  const data = response.data as { commands?: unknown[] } | undefined;
+  return { commands: response.success ? data?.commands ?? [] : [] };
 });
 
 ipcMain.handle('openpi:session/close', (_e, sessionId: string) => {

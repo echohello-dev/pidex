@@ -110,6 +110,10 @@ class RpcSession {
     return this.command({ type: 'get_messages' });
   }
 
+  getCommands() {
+    return this.command({ type: 'get_commands' });
+  }
+
   prompt(text: string, streaming: boolean) {
     const cmd: Record<string, unknown> = { type: 'prompt', message: text };
     if (streaming) cmd.streamingBehavior = 'steer';

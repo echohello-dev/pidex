@@ -12,12 +12,15 @@ contextBridge.exposeInMainWorld('openpi', {
     node: process.versions.node,
   },
   workspaces: () => ipcRenderer.invoke('openpi:workspaces'),
+  addWorkspace: () => ipcRenderer.invoke('openpi:workspace:add'),
   sessions: (dirName: string) => ipcRenderer.invoke('openpi:sessions', dirName),
   openSession: (req: { cwd: string; sessionFile?: string }) =>
     ipcRenderer.invoke('openpi:session/open', req),
   sendPrompt: (req: { sessionId: string; text: string; streaming: boolean }) =>
     ipcRenderer.invoke('openpi:session/send', req),
   abortSession: (sessionId: string) => ipcRenderer.invoke('openpi:session/abort', sessionId),
+  sessionCommands: (sessionId: string) =>
+    ipcRenderer.invoke('openpi:session/commands', sessionId),
   closeSession: (sessionId: string) => ipcRenderer.invoke('openpi:session/close', sessionId),
   onSessionEvent: (cb: (payload: SessionEventPayload) => void) => {
     const listener = (_event: unknown, payload: SessionEventPayload) => cb(payload);

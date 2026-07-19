@@ -1,0 +1,21 @@
+{
+  "categories": {
+    "correctness": "error",
+    "suspicious": "allow",
+    "perf": "allow",
+    "style": "allow",
+    "restriction": "allow",
+    "nursery": "allow"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2022": true
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    ".vite/**",
+    "src/renderer/assets/fonts/**"
+  ]
+}

@@ -3,9 +3,11 @@ import { prepare, layout } from '@chenglou/pretext';
 import { PiMark } from './components/PiMark';
 import { FigureFrame } from './components/FigureFrame';
 import { BracketButton } from './components/BracketButton';
+import { Markdown } from './components/Markdown';
+import { PierreDiff } from './components/PierreDiff';
 import { applyEvent, entriesFromMessages } from './timeline';
 import type { Entry } from './timeline';
-import type { SessionInfo, WorkspaceInfo } from './api';
+import type { SessionInfo, SlashCommand, WorkspaceInfo } from './api';
 
 type SessionTab = {
   runtimeId: string;
@@ -14,6 +16,7 @@ type SessionTab = {
   title: string;
   model: string;
   entries: Entry[];
+  commands: SlashCommand[];
   running: boolean;
   exited: boolean;
 };
@@ -45,6 +48,41 @@ function ToolOutput({ text }: { text: string }) {
   );
 }
 
+const PIERRE_DIFF_SAMPLE = {
+  filename: 'src/renderer/components/Markdown.tsx',
+  oldFile: `import MarkdownIt from 'markdown-it';
+
+const md = new MarkdownIt({ html: false });
+
+type MarkdownProps = { text: string };
+
+function Markdown({ text }: MarkdownProps) {
+  return <div dangerouslySetInnerHTML={{ __html: md.render(text) }} />;
+}
+
+export { Markdown };
+`,
+  newFile: `import MarkdownIt from 'markdown-it';
+import { useMemo } from 'react';
+
+const md = new MarkdownIt({ html: false, breaks: true, linkify: true });
+
+type MarkdownProps = { text: string; className?: string };
+
+function Markdown({ text, className }: MarkdownProps) {
+  const html = useMemo(() => md.render(text), [text]);
+  return (
+    <div
+      className={['md', className].filter(Boolean).join(' ')}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+export { Markdown };
+`,
+};
+
 function App() {
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
   const [wsSessions, setWsSessions] = useState<Record<string, SessionInfo[]>>({});
@@ -53,12 +91,33 @@ function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [opening, setOpening] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const bootstrapped = useRef(false);
+  const openSessionRef = useRef<(ws: WorkspaceInfo, info?: SessionInfo) => Promise<void>>(
+    async () => {},
+  );
 
   const activeTab = tabs.find(t => t.runtimeId === activeId) ?? null;
 
   useEffect(() => {
-    window.openpi.workspaces().then(setWorkspaces);
+    window.openpi.workspaces().then(async list => {
+      setWorkspaces(list);
+      const entries = await Promise.all(
+        list.map(ws => window.openpi.sessions(ws.dirName).then(s => [ws.dirName, s] as const)),
+      );
+      const map: Record<string, SessionInfo[]> = {};
+      for (const [dirName, s] of entries) map[dirName] = s;
+      setWsSessions(map);
+      const first = list[0];
+      if (first && !bootstrapped.current) {
+        bootstrapped.current = true;
+        setExpanded(first.dirName);
+        const firstSession = map[first.dirName]?.[0];
+        if (firstSession) openSessionRef.current(first, firstSession);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -104,9 +163,24 @@ function App() {
   const expandWorkspace = async (ws: WorkspaceInfo) => {
     const next = expanded === ws.dirName ? null : ws.dirName;
     setExpanded(next);
-    if (next && !wsSessions[next]) {
-      const sessions = await window.openpi.sessions(next);
+    if (!next) return;
+    let sessions = wsSessions[next];
+    if (!sessions) {
+      sessions = await window.openpi.sessions(next);
       setWsSessions(prev => ({ ...prev, [next]: sessions }));
+    }
+    if (sessions[0]) openSession(ws, sessions[0]);
+  };
+
+  const addWorkspace = async () => {
+    const result = await window.openpi.addWorkspace();
+    if (result.error || !result.cwd) return;
+    const list = await window.openpi.workspaces();
+    setWorkspaces(list);
+    const added = list.find(w => w.cwd === result.cwd);
+    if (added) {
+      setExpanded(added.dirName);
+      setWsSessions(prev => ({ ...prev, [added.dirName]: [] }));
     }
   };
 
@@ -129,6 +203,7 @@ function App() {
       }
       const model =
         result.state?.model?.id ?? result.state?.model?.name ?? info?.model ?? 'default';
+      const { commands } = await window.openpi.sessionCommands(result.sessionId);
       const tab: SessionTab = {
         runtimeId: result.sessionId,
         cwd: ws.cwd,
@@ -136,6 +211,7 @@ function App() {
         title: info?.title ?? 'new session',
         model,
         entries: entriesFromMessages(result.messages ?? []),
+        commands,
         running: Boolean(result.state?.isStreaming),
         exited: false,
       };
@@ -145,6 +221,7 @@ function App() {
       setOpening(false);
     }
   };
+  openSessionRef.current = openSession;
 
   const closeTab = (runtimeId: string) => {
     window.openpi.closeSession(runtimeId);
@@ -155,19 +232,63 @@ function App() {
     });
   };
 
-  const send = async () => {
-    const text = draft.trim();
+  const send = async (raw?: string) => {
+    const text = (raw ?? draft).trim();
     if (!text || !activeTab || activeTab.exited) return;
     const echo: Entry = { key: `local-${Date.now()}`, kind: 'user', text };
     setTabs(prev =>
       prev.map(t => (t.runtimeId === activeTab.runtimeId ? { ...t, entries: [...t.entries, echo] } : t)),
     );
     setDraft('');
+    setSlashIndex(0);
     await window.openpi.sendPrompt({
       sessionId: activeTab.runtimeId,
       text,
       streaming: activeTab.running,
     });
+  };
+
+  const slashQuery = draft.startsWith('/') ? draft.slice(1) : null;
+  const slashMatches = slashQuery !== null && activeTab
+    ? activeTab.commands
+        .filter(c => c.name.toLowerCase().includes(slashQuery.toLowerCase()))
+        .slice(0, 8)
+    : [];
+  const slashOpen = slashQuery !== null && slashMatches.length > 0;
+
+  const onComposerKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (slashOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashIndex(i => (i + 1) % slashMatches.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashIndex(i => (i - 1 + slashMatches.length) % slashMatches.length);
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const cmd = slashMatches[Math.min(slashIndex, slashMatches.length - 1)];
+        setDraft(`/${cmd.name} `);
+        setSlashIndex(0);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setDraft('');
+        setSlashIndex(0);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const cmd = slashMatches[Math.min(slashIndex, slashMatches.length - 1)];
+        send(`/${cmd.name}`);
+        return;
+      }
+    }
+    if (e.key === 'Enter') send();
   };
 
   return (
@@ -211,7 +332,12 @@ function App() {
         <aside className="sidebar">
           <div className="sidebar-head">
             <span className="sidebar-group-label">Workspaces</span>
-            <span className="sidebar-group-label">{workspaces.length}</span>
+            <span className="sidebar-head-actions">
+              <button type="button" className="sidebar-add" aria-label="Add workspace" onClick={addWorkspace}>
+                +
+              </button>
+              <span className="sidebar-group-label">{workspaces.length}</span>
+            </span>
           </div>
           <div className="sidebar-scroll">
             <div className="sidebar-group">
@@ -329,33 +455,58 @@ function App() {
                       </FigureFrame>
                     );
                   }
+                  if (entry.kind === 'assistant') {
+                    return (
+                      <div key={entry.key} className="msg msg--assistant">
+                        <span className="msg-role">
+                          {entry.streaming ? 'pi · streaming' : 'pi'}
+                        </span>
+                        {entry.thinking ? <p className="msg-thinking">{entry.thinking}</p> : null}
+                        {entry.text ? <Markdown text={entry.text} className="msg-text" /> : null}
+                        {entry.streaming && !entry.text ? (
+                          <p className="msg-text msg-text--dim">thinking…</p>
+                        ) : null}
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={entry.key} className={`msg msg--${entry.kind}`}>
-                      <span className="msg-role">
-                        {entry.kind === 'user' ? 'you' : entry.streaming ? 'pi · streaming' : 'pi'}
-                      </span>
-                      {entry.kind === 'assistant' && entry.thinking ? (
-                        <p className="msg-thinking">{entry.thinking}</p>
-                      ) : null}
-                      {entry.text ? <p className="msg-text">{entry.text}</p> : null}
-                      {entry.kind === 'assistant' && entry.streaming && !entry.text ? (
-                        <p className="msg-text msg-text--dim">thinking…</p>
-                      ) : null}
+                    <div key={entry.key} className="msg msg--user">
+                      <span className="msg-role">you</span>
+                      <p className="msg-text">{entry.text}</p>
                     </div>
                   );
                 })}
               </div>
 
               <footer className="composer">
+                {slashOpen ? (
+                  <div className="slash-menu">
+                    {slashMatches.map((cmd, i) => (
+                      <button
+                        key={cmd.name}
+                        type="button"
+                        className={`slash-item${i === Math.min(slashIndex, slashMatches.length - 1) ? ' is-active' : ''}`}
+                        onMouseDown={e => {
+                          e.preventDefault();
+                          send(`/${cmd.name}`);
+                        }}
+                      >
+                        <span className="slash-name">/{cmd.name}</span>
+                        <span className="slash-desc">{cmd.description ?? cmd.source ?? ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="composer-row">
                   <span className="composer-prompt">›</span>
                   <input
                     className="composer-input"
                     value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') send();
+                    onChange={e => {
+                      setDraft(e.target.value);
+                      setSlashIndex(0);
                     }}
+                    onKeyDown={onComposerKey}
                     placeholder={
                       activeTab.exited
                         ? 'session exited'
@@ -368,7 +519,7 @@ function App() {
                   />
                 </div>
                 <div className="composer-hint">
-                  <span>{activeTab.running ? 'enter to steer' : 'enter to send'}</span>
+                  <span>{activeTab.running ? 'enter to steer · / for commands' : 'enter to send · / for commands'}</span>
                   <span>{activeTab.model}</span>
                 </div>
               </footer>
@@ -380,6 +531,17 @@ function App() {
               <p className="empty-copy">
                 Pick a session from the sidebar, or start a new one in the expanded workspace.
               </p>
+              <FigureFrame
+                className="probe"
+                caption="Fig. 02 | Pierre diff probe"
+                live={false}
+              >
+                <PierreDiff
+                  oldFile={PIERRE_DIFF_SAMPLE.oldFile}
+                  newFile={PIERRE_DIFF_SAMPLE.newFile}
+                  filename={PIERRE_DIFF_SAMPLE.filename}
+                />
+              </FigureFrame>
             </div>
           )}
         </main>
