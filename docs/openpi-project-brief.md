@@ -100,6 +100,15 @@ In OpenPi, Pretext is:
 
 [Harnss](https://github.com/OpenSource03/harnss) is an Electron wrapper for Claude Code and Codex that renders agent output as interactive cards. It is the strongest design reference for how OpenPi should present agent activity — rich tool cards, multi-session awareness,24ith explicit repo and task context surfacing.
 
+### Tooling
+
+- **mise** — task runner and version manager for Node and Bun. All dev/build commands go through `mise run`.
+- **Bun** — package manager and runtime.
+- **Vite** — renderer bundler with HMR in dev.
+- **TypeScript** — `tsc` compiles main and preload; Vite handles renderer via esbuild.
+
+See the [README](../README.md) for setup instructions.
+
 ## Competition and Positioning
 
 Tools overlapping with the space:

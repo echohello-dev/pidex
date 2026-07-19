@@ -1,0 +1,35 @@
+[tools]
+node = "22.23.0"
+bun = "1.3.14"
+
+[tasks.dev]
+description = "Start Vite dev server and Electron concurrently"
+run = "bunx concurrently -k 'mise run dev:vite' 'mise run dev:electron'"
+
+[tasks."dev:vite"]
+description = "Vite dev server for renderer HMR"
+run = "bunx vite"
+
+[tasks."dev:electron"]
+description = "Compile main/preload and launch Electron against dev server"
+run = [
+  "bunx wait-on http://localhost:5173",
+  "bunx tsc -p tsconfig.main.json",
+  "bunx tsc -p tsconfig.preload.json",
+  "bunx electron .",
+]
+
+[tasks.build]
+description = "Production build: compile main/preload + bundle renderer"
+run = [
+  "bunx tsc -p tsconfig.main.json",
+  "bunx tsc -p tsconfig.preload.json",
+  "bunx vite build",
+]
+
+[tasks.start]
+description = "Run the production build"
+run = "bunx electron ."
+
+[settings]
+experimental = true

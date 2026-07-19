@@ -1,0 +1,97 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 18px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, #0d111600, var(--bg-deep) 100vh),
+    repeating-linear-gradient(90deg, var(--grid-minor) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(0deg, var(--grid-minor) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(90deg, var(--grid-major) 0 1px, transparent 1px 480px),
+    repeating-linear-gradient(0deg, var(--grid-major) 0 1px, transparent 1px 480px),
+    var(--bg-canvas);
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 450;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--selection);
+  color: var(--text);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2f5f8a47 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2f5f8a47;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #2f5f8a66;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  text-decoration-color: var(--accent-underline-muted);
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+button {
+  font: inherit;
+}
+
+input {
+  font: inherit;
+}

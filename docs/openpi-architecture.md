@@ -243,6 +243,14 @@ const { height, lineCount } = layout(prepared, width, lineHeight)
 - It should not be used for every text node by default
 - It should not become part of IPC or runtime logic
 
+## Build Pipeline
+
+- **mise** manages Node and Bun versions via `.mise.toml`. All commands go through `mise run`.
+- **Development**: `mise run dev` starts Vite (port 5173) and Electron concurrently. Electron loads the dev server in development and `dist/renderer/index.html` in production.
+- **Production build**: `mise run build` compiles `main/` and `preload/` with `tsc`, then bundles the renderer with Vite.
+- **CI**: GitHub Actions uses `jdx/mise-action` to install tools and runs `mise run build` on every PR and push to `main`.
+- **Releases**: push to `main` tags a calendar-versioned release (`YYYY.0M.0D`) via the release workflow.
+
 ## Suggested MVP Slice
 
 1. Workspace dashboard with repo and session state

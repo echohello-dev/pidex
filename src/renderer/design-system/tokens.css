@@ -1,0 +1,85 @@
+:root {
+  color-scheme: dark;
+
+  /* Palette */
+  --parchment: #dacbc2;
+  --moonstone: #ebe7e4;
+  --driftwood: #5c5752;
+  --evening-blue: #252f3d;
+  --terracotta: #844f3b;
+  --terracotta-light: #b86b52;
+  --sunkissed: #e1b06e;
+  --sage: #a3a473;
+  --tidal-blue: #4b607c;
+  --accent-blue: #6a9fcc;
+  --success: #5db87a;
+  --warning: #e8993a;
+  --error: #e8704f;
+
+  /* Surfaces */
+  --bg-deep: #0d1116;
+  --bg-canvas: #161d27;
+  --panel: #212730;
+  --panel-soft: #252f3d;
+  --panel-veil: #212730e6;
+  --surface-tint: #ffffff05;
+  --control-background: #ffffff04;
+  --control-background-hover: #ffffff09;
+
+  /* Lines */
+  --line: #495059;
+  --line-soft: #49505980;
+  --line-strong: #757d89;
+  --line-strong-soft: #757d8975;
+
+  /* Text */
+  --text: #ebe7e4;
+  --copy: #ebe7e4bf;
+  --muted: #9fa4ab;
+  --muted-soft: #9fa4abad;
+  --muted-strong: #d5d8db;
+  --faint: #d5d8db52;
+
+  /* Accent */
+  --accent: #6a9fcc;
+  --accent-rust: #8f3222;
+  --thread-blue: #4b607c;
+  --focus-ring: #6a9fccb8;
+  --selection: #6a9fcc3d;
+  --accent-border-hover: #6a9fcc6b;
+  --accent-underline-muted: #6a9fcc38;
+  --accent-surface-faint: #6a9fcc05;
+  --accent-surface-subtle: #6a9fcc0e;
+  --accent-surface-soft: #6a9fcc13;
+  --accent-border-muted: #6a9fcc24;
+  --accent-fill-soft: #6a9fcc33;
+  --accent-outline-soft: #6a9fcc5c;
+  --accent-border-strong: #6a9fcc66;
+  --accent-border-active: #6a9fcc80;
+
+  /* Blueprint grid */
+  --grid-minor: hsl(218 60% 80% / 0.009375);
+  --grid-major: hsl(218 60% 80% / 0.02625);
+
+  /* Type */
+  --serif: "Plantin MT Pro", "Plantin MT Std", Plantin, Georgia, "Times New Roman", serif;
+  --mono: "Commit Mono", "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  --accent-mono: "Departure Mono", "Commit Mono", "SFMono-Regular", ui-monospace, Menlo, Monaco,
+    Consolas, monospace;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Form */
+  --control-height: 44px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
