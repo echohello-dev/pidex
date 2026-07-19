@@ -20,8 +20,12 @@ run = [
 ]
 
 [tasks.build]
-description = "Production build: compile main/preload + bundle renderer"
+description = "Production build: lint, typecheck, test, bundle"
 run = [
+  "bun run lint",
+  "bun run typecheck",
+  "bun run test:unit",
+  "bun run test:integration",
   "bunx tsc -p tsconfig.main.json",
   "bunx tsc -p tsconfig.preload.json",
   "bunx vite build",
@@ -30,6 +34,17 @@ run = [
 [tasks.start]
 description = "Run the production build"
 run = "bunx electron ."
+
+[tasks.test]
+description = "Run unit + integration tests"
+run = [
+  "bunx vitest run --project unit",
+  "bunx vitest run --project integration",
+]
+
+[tasks."test:e2e"]
+description = "Run e2e tests against the live Electron app"
+run = "bunx vitest run --config vitest.e2e.config.ts"
 
 [settings]
 experimental = true

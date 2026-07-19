@@ -1,7 +1,12 @@
 import { spawn, type ChildProcess } from 'child_process';
 import fs from 'fs';
 
-const PI_CANDIDATES = ['pi', '/opt/homebrew/bin/pi', '/usr/local/bin/pi'];
+const PI_CANDIDATES = [
+  'pi',
+  '/opt/homebrew/bin/pi',
+  '/usr/local/bin/pi',
+  '/usr/bin/pi',
+];
 
 type RpcEvent = Record<string, unknown> & { type: string };
 
@@ -108,6 +113,10 @@ class RpcSession {
 
   getMessages() {
     return this.command({ type: 'get_messages' });
+  }
+
+  getCommands() {
+    return this.command({ type: 'get_commands' });
   }
 
   prompt(text: string, streaming: boolean) {

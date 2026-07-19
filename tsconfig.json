@@ -10,11 +10,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
-    "outDir": "dist/renderer",
-    "rootDir": "src/renderer"
+    "noEmit": true,
+    "types": ["node"]
   },
-  "include": ["src/renderer"]
+  "include": ["src/renderer", "src/shared", "tests"]
 }

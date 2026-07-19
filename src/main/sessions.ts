@@ -17,6 +17,7 @@ type WorkspaceInfo = {
 type SessionInfo = {
   id: string;
   file: string;
+  cwd: string;
   title: string;
   model: string;
   timestamp: string;
@@ -48,6 +49,7 @@ function parseSession(file: string): SessionInfo | null {
   try {
     const lines = readLines(file);
     let id = '';
+    let cwd = '';
     let timestamp = '';
     let title = '';
     let model = '';
@@ -62,6 +64,7 @@ function parseSession(file: string): SessionInfo | null {
       }
       if (entry.type === 'session') {
         id = String(entry.id ?? '');
+        cwd = String(entry.cwd ?? '');
         timestamp = String(entry.timestamp ?? '');
         continue;
       }
@@ -78,7 +81,7 @@ function parseSession(file: string): SessionInfo | null {
       }
     }
     if (!id) return null;
-    return { id, file, title: title || '(empty session)', model, timestamp, messageCount };
+    return { id, file, cwd, title: title || '(empty session)', model, timestamp, messageCount };
   } catch {
     return null;
   }
@@ -97,53 +100,71 @@ function gitBranch(cwd: string): Promise<string> {
   });
 }
 
-async function listWorkspaces(): Promise<WorkspaceInfo[]> {
-  if (!fs.existsSync(SESSIONS_ROOT)) return [];
-  const dirs = fs
-    .readdirSync(SESSIONS_ROOT, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name);
+async function listWorkspaces(extraCwds: string[] = []): Promise<WorkspaceInfo[]> {
+  const byDir = new Map<string, WorkspaceInfo>();
+  if (fs.existsSync(SESSIONS_ROOT)) {
+    const dirs = fs
+      .readdirSync(SESSIONS_ROOT, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
 
-  const workspaces: WorkspaceInfo[] = [];
-  for (const dirName of dirs) {
-    const dirPath = path.join(SESSIONS_ROOT, dirName);
-    const files = fs
-      .readdirSync(dirPath)
-      .filter(f => f.endsWith('.jsonl'))
-      .map(f => path.join(dirPath, f));
-    if (files.length === 0) continue;
+    for (const dirName of dirs) {
+      const dirPath = path.join(SESSIONS_ROOT, dirName);
+      const files = fs
+        .readdirSync(dirPath)
+        .filter(f => f.endsWith('.jsonl'))
+        .map(f => path.join(dirPath, f));
+      if (files.length === 0) continue;
 
-    let cwd = '';
-    let lastActive = '';
-    for (const file of files) {
-      const stat = fs.statSync(file);
-      if (stat.mtime.toISOString() > lastActive) lastActive = stat.mtime.toISOString();
-      if (!cwd) {
-        for (const line of readLines(file, 64 * 1024)) {
-          if (!line) continue;
-          try {
-            const entry = JSON.parse(line);
-            if (entry.type === 'session' && typeof entry.cwd === 'string') {
-              cwd = entry.cwd;
+      let cwd = '';
+      let lastActive = '';
+      for (const file of files) {
+        const stat = fs.statSync(file);
+        if (stat.mtime.toISOString() > lastActive) lastActive = stat.mtime.toISOString();
+        if (!cwd) {
+          for (const line of readLines(file, 64 * 1024)) {
+            if (!line) continue;
+            try {
+              const entry = JSON.parse(line);
+              if (entry.type === 'session' && typeof entry.cwd === 'string') {
+                cwd = entry.cwd;
+                break;
+              }
+            } catch {
               break;
             }
-          } catch {
-            break;
           }
         }
       }
+      if (!cwd) continue;
+      const branch = fs.existsSync(cwd) ? await gitBranch(cwd) : '';
+      byDir.set(dirName, {
+        dirName,
+        name: path.basename(cwd),
+        cwd,
+        branch,
+        sessionCount: files.length,
+        lastActive,
+      });
     }
-    if (!cwd) continue;
-    const branch = fs.existsSync(cwd) ? await gitBranch(cwd) : '';
-    workspaces.push({
+  }
+
+  const knownCwds = new Set([...byDir.values()].map(w => w.cwd));
+  for (const cwd of extraCwds) {
+    if (knownCwds.has(cwd) || !fs.existsSync(cwd)) continue;
+    const dirName = `--${cwd.replace(/\//g, '-')}--`;
+    const branch = await gitBranch(cwd);
+    byDir.set(dirName, {
       dirName,
       name: path.basename(cwd),
       cwd,
       branch,
-      sessionCount: files.length,
-      lastActive,
+      sessionCount: 0,
+      lastActive: '',
     });
   }
+
+  const workspaces = [...byDir.values()];
   workspaces.sort((a, b) => b.lastActive.localeCompare(a.lastActive));
   return workspaces;
 }
@@ -160,5 +181,5 @@ function listSessions(dirName: string): SessionInfo[] {
   return sessions;
 }
 
-export { listWorkspaces, listSessions, SESSIONS_ROOT };
+export { listWorkspaces, listSessions, parseSession, SESSIONS_ROOT };
 export type { WorkspaceInfo, SessionInfo };

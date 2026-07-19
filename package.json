@@ -7,22 +7,38 @@
   "scripts": {
     "dev": "mise run dev",
     "build": "mise run build",
-    "start": "mise run start"
+    "start": "mise run start",
+    "lint": "oxlint src tests",
+    "typecheck": "bunx tsc -p tsconfig.json --noEmit && bunx tsc -p tsconfig.main.json --noEmit && bunx tsc -p tsconfig.preload.json --noEmit",
+    "test": "mise run test",
+    "test:unit": "bunx vitest run --project unit",
+    "test:integration": "bunx vitest run --project integration",
+    "test:e2e": "bunx vitest run --config vitest.e2e.config.ts",
+    "test:all": "bunx vitest run"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.6",
+    "@pierre/diffs": "^1.2.12",
+    "markdown-it": "^14.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^26.1.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",
     "concurrently": "^9.1.0",
     "electron": "^41.0.0",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.74.0",
+    "playwright-core": "^1.61.1",
     "typescript": "^6.0.0",
     "vite": "^8.0.0",
+    "vitest": "^4.1.10",
     "wait-on": "^8.0.0"
   }
 }
