@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/banner.png" alt="OpenPi, a desktop workbench for the Pi coding agent" width="100%">
+<img src="docs/assets/banner.png" alt="pidex, a desktop workbench for the Pi coding agent" width="100%">
 
 **A desktop workbench for the Pi coding agent.**
 **Workspace-first, not chat-first.**
@@ -16,18 +16,24 @@
 
 ## Why this exists
 
-Daily coding-agent work means juggling repos, branches, and sessions, and the current tools are chat-first: the primary screen is a conversation, not your work. OpenPi flips that. It is a kitchen bench where every active repo, its branch, its sessions, and what has gone stale are visible at a glance.
+Daily coding-agent work means juggling repos, branches, and sessions, and the current tools are chat-first: the primary screen is a conversation, not your work. pidex flips that. It is a kitchen bench where every active repo, its branch, its sessions, and what has gone stale are visible at a glance.
 
-| The pain, observed daily | OpenPi's answer |
+| The pain, observed daily | pidex's answer |
 |---|---|
 | Workspace switching takes too many clicks | One dashboard of every repo with Pi sessions, sorted by last activity |
 | Losing the thread when resuming | Repo, branch, and session state as first-class UI, not buried chat history |
 | Long sessions get sluggish | [Pretext](https://github.com/chenglou/pretext) measures multiline text off the DOM hot path, ~600x faster than browser measurement |
 | Worktrees feel unreliable | Git and worktree state surfaced directly, no chatting with the agent to switch branches |
 
-OpenPi is a personal project: learn by building, sharpen day-to-day DX, and share a cleaner local-first harness pattern for coding agents. Not a commercial product, not an OpenCode clone. Install, BYOK, and provider wiring belong to its sibling, Weldable; OpenPi focuses entirely on the daily coding workflow.
+pidex is a personal project: learn by building, sharpen day-to-day DX, and share a cleaner local-first harness pattern for coding agents. Not a commercial product, not an OpenCode clone. Install, BYOK, and provider wiring belong to its sibling, Weldable; pidex focuses entirely on the daily coding workflow.
 
 > A developer's kitchen bench, not a chat pane.
+
+<div align="center">
+
+<img src="docs/assets/screenshot.png" alt="pidex dashboard preview" width="900">
+
+</div>
 
 ## Quick Start
 
@@ -127,6 +133,33 @@ Long term:
 - [ ] Richer git and PR context in the dashboard
 - [ ] Task tracker awareness alongside sessions
 - [ ] Optional adapters for other agent runtimes
+
+## Design tokens
+
+The workbench inherits its palette from the [Pi coding agent](https://pi.dev) so the desktop harness feels like part of the same family as the runtime it drives. Source of truth: [`scripts/_design.py`](scripts/_design.py), hexes pulled from `pi.dev/style.css`.
+
+| Token | Hex | Role |
+|---|---|---|
+| warm-black | `#13110f` | Primary window background |
+| bg-deep | `#0d1116` | Deepest surface |
+| bg-canvas | `#161d27` | Canvas surface |
+| panel | `#212730` | Sidebar / panel surface |
+| panel-soft | `#252f3d` | Card surface |
+| parchment | `#dacbc2` | Named cream, primary mark and text |
+| moonstone | `#ebe7e4` | Lighter cream, lit facet |
+| driftwood | `#5c5752` | Warm mid-gray, shadow facet |
+| terracotta | `#844f3b` | Warm bronze accent |
+| terracotta-light | `#b86b52` | Accent highlight, status dots |
+| sunkissed | `#e1b06e` | Warm gold accent |
+| sage | `#a3a473` | Sage accent |
+| accent-blue | `#6a9fcc` | Links, focus rings |
+
+Regenerate assets after a token edit:
+
+```bash
+uv run --with fonttools python scripts/build-icon.py        # assets/icon, mark
+uv run --with fonttools python scripts/build-screenshot.py   # docs/assets/screenshot
+```
 
 ## Documentation
 
