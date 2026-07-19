@@ -1,7 +1,12 @@
 import { spawn, type ChildProcess } from 'child_process';
 import fs from 'fs';
 
-const PI_CANDIDATES = ['pi', '/opt/homebrew/bin/pi', '/usr/local/bin/pi'];
+const PI_CANDIDATES = [
+  'pi',
+  '/opt/homebrew/bin/pi',
+  '/usr/local/bin/pi',
+  '/usr/bin/pi',
+];
 
 type RpcEvent = Record<string, unknown> & { type: string };
 
