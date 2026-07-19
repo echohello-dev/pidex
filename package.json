@@ -2,13 +2,12 @@
   "name": "openpi",
   "version": "0.0.1",
   "private": true,
+  "repository": "https://github.com/echohello-dev/pidex",
   "main": "dist/main/index.js",
   "scripts": {
-    "dev": "concurrently -k \"bun run dev:vite\" \"bun run dev:electron\"",
-    "dev:vite": "vite",
-    "dev:electron": "wait-on http://localhost:5173 && tsc -p tsconfig.main.json && electron .",
-    "build": "tsc -p tsconfig.main.json && vite build",
-    "start": "electron ."
+    "dev": "mise run dev",
+    "build": "mise run build",
+    "start": "mise run start"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.6",
