@@ -8,6 +8,8 @@ jobs:
   e2e:
     name: electron e2e
     runs-on: macos-latest
+    env:
+      NODE_ENV: development
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
@@ -15,7 +17,11 @@ jobs:
           install: true
       - run: bun install --frozen-lockfile
       - run: npm install -g @earendil-works/pi-coding-agent
-      - run: mise run build
+      - run: bunx tsc -p tsconfig.main.json
+      - run: bunx tsc -p tsconfig.preload.json
+      - run: bunx vite build
+      - run: mise run dev:vite &
+      - run: bunx wait-on http://localhost:5173
       - run: mise run test:e2e
       - name: upload test artefacts
         if: always()
