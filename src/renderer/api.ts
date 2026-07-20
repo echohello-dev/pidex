@@ -43,7 +43,7 @@ type SessionEventPayload = {
   event: Record<string, unknown> & { type: string };
 };
 
-type PidexApi = {
+type OpenPiApi = {
   platform: string;
   versions: { electron: string; node: string };
   workspaces: () => Promise<WorkspaceInfo[]>;
@@ -60,8 +60,8 @@ type PidexApi = {
 
 declare global {
   interface Window {
-    pidex: PidexApi;
+    pidex: OpenPiApi;
   }
 }
 
-export type { WorkspaceInfo, SessionInfo, SessionState, OpenResult, SessionEventPayload, PidexApi, SlashCommand };
+export type { WorkspaceInfo, SessionInfo, SessionState, OpenResult, SessionEventPayload, OpenPiApi, SlashCommand };

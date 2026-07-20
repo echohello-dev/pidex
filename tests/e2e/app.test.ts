@@ -38,7 +38,7 @@ describe('pidex electron app (e2e)', () => {
       env: {
         ...process.env,
         NODE_ENV: 'development',
-        OPENPI_E2E_CWD: tmpCwd,
+        PIDEX_E2E_CWD: tmpCwd,
       },
     });
     win = await findRendererWindow();

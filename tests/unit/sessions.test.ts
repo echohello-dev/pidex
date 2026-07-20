@@ -8,7 +8,7 @@ const SESSIONS_PATH = path.join(os.homedir(), '.pi', 'agent', 'sessions');
 
 describe('session JSONL parsing', () => {
   it('parses a synthetic session record', () => {
-    const tmpFile = path.join(os.tmpdir(), `openpi-test-${Date.now()}.jsonl`);
+    const tmpFile = path.join(os.tmpdir(), `pidex-test-${Date.now()}.jsonl`);
     const lines = [
       JSON.stringify({
         type: 'session',
@@ -59,14 +59,14 @@ describe('session JSONL parsing', () => {
   });
 
   it('returns null for a file with no session header', () => {
-    const tmpFile = path.join(os.tmpdir(), `openpi-empty-${Date.now()}.jsonl`);
+    const tmpFile = path.join(os.tmpdir(), `pidex-empty-${Date.now()}.jsonl`);
     fs.writeFileSync(tmpFile, 'garbage\n' + JSON.stringify({ type: 'model_change', modelId: 'x' }));
     expect(parseSession(tmpFile)).toBeNull();
   });
 
   it('clamps long user titles to 90 chars and collapses whitespace', () => {
     const longText = 'a   b\nc\td    e    '.repeat(50);
-    const tmpFile = path.join(os.tmpdir(), `openpi-long-${Date.now()}.jsonl`);
+    const tmpFile = path.join(os.tmpdir(), `pidex-long-${Date.now()}.jsonl`);
     const lines = [
       JSON.stringify({ type: 'session', id: 'x', timestamp: 't', cwd: '/x' }),
       JSON.stringify({
@@ -81,7 +81,7 @@ describe('session JSONL parsing', () => {
   });
 
   it('falls back to "(empty session)" placeholder when no user text', () => {
-    const tmpFile = path.join(os.tmpdir(), `openpi-notext-${Date.now()}.jsonl`);
+    const tmpFile = path.join(os.tmpdir(), `pidex-notext-${Date.now()}.jsonl`);
     const lines = [
       JSON.stringify({ type: 'session', id: 'y', timestamp: 't', cwd: '/y' }),
       JSON.stringify({
@@ -95,7 +95,7 @@ describe('session JSONL parsing', () => {
   });
 
   it('handles bad JSON lines without crashing', () => {
-    const tmpFile = path.join(os.tmpdir(), `openpi-badjson-${Date.now()}.jsonl`);
+    const tmpFile = path.join(os.tmpdir(), `pidex-badjson-${Date.now()}.jsonl`);
     fs.writeFileSync(
       tmpFile,
       [
