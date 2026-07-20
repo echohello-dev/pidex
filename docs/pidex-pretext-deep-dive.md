@@ -1,4 +1,4 @@
-# Pretext Deep-Dive for OpenPi
+# Pretext Deep-Dive for pidex
 
 ## What Pretext Actually Is
 
@@ -16,7 +16,7 @@ Package name is `@chenglou/pretext`. The npm registry has it under this scoped n
 
 ##Core API
 
-Pretext serves two use cases. Both matter for OpenPi.
+Pretext serves two use cases. Both matter for pidex.
 
 ### Use case 1: Measure a paragraph's height without the DOM
 
@@ -167,11 +167,11 @@ Designed to be narrow: `white-space: normal` only, caller-owned extraWidth for p
 - On every render frame
 - Inside a React render function
 
-## Caveats That Matter for OpenPi
+## Caveats That Matter for pidex
 
 1. **Font loading**: Fonts must be loaded before `prepare()`. Not a problem in Electron since you ship fonts locally.
 
-2. **`system-ui` is unsafe on macOS** for layout() accuracy. Use a named font. OpenPi should bundle Inter and JetBrains Mono.
+2. **`system-ui` is unsafe on macOS** for layout() accuracy. Use a named font. pidex should bundle Inter and JetBrains Mono.
 
 3. **Not a bidi layout engine**. Segment widths are canvas widths for line breaking only. Not precise enough for custom Arabic or mixed-direction text reconstruction. Adequate for most coding-tool UI.
 
@@ -181,7 +181,7 @@ Designed to be narrow: `white-space: normal` only, caller-owned extraWidth for p
 
 6. **Version note**: The API changed significantly between early 2026 previews and the current npm release. The current API uses: `prepare(text, font)` returning opaque handle, `layout(prepared, maxWidth, lineHeight)` with `lineHeight` as a layout-time input (not in prepare).
 
-## Where Pretext Fits in OpenPi
+## Where Pretext Fits in pidex
 
 ### High-impact areas
 
@@ -248,19 +248,19 @@ Key point: **this lives in a view-model layer, not in React render**. Computed o
 | DOM `getBoundingClientRect` | ~0ms (skip prepare) | ~1ms+ | Yes | No | Ground truth (but slow) |
 | Heuristic/guesswork | ~0ms | ~0ms | No | N/A | Unreliable (causes jank) |
 
-For OpenPi's workload (thousands of messages, dozens of workspaces, frequent updates), the one-time prepare cost pays off immediately. The alternative — repeated DOM reads on scroll, resize, or data update — compounds into the exact kind of lag that OpenPi is trying to eliminate.
+For pidex's workload (thousands of messages, dozens of workspaces, frequent updates), the one-time prepare cost pays off immediately. The alternative — repeated DOM reads on scroll, resize, or data update — compounds into the exact kind of lag that pidex is trying to eliminate.
 
 ## What Pretext Enables That CSS Can't
 
 Pretext uniquely enables **shrinkwrap text measurement**: finding the minimum container width that fits a paragraph without changing line count. CSS has `fit-content` which gives the widest line's width, but no equivalent for "find the narrowest width that still produces exactly N lines". Pretext's `walkLineRanges()` + binary search gives you this in pure arithmetic.
 
-In OpenPi, this means:
+In pidex, this means:
 - Workspace status cards that size to content without wasted space
 - Tool output cards that fit text exactly, even with variable-length content
 - Balanced text layout for session summaries
 - Multiline "shrinkwrap" that has been missing from the web
 
-## Recommended Implementation Order for OpenPi
+## Recommended Implementation Order for pidex
 
 1. Session timeline cards (most text, most updates)
 2. Workspace summary list

@@ -22,11 +22,11 @@ async function findRendererWindow(): Promise<Page | null> {
 }
 
 async function seedCustomWorkspace(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'openpi-e2e-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pidex-e2e-'));
   return dir;
 }
 
-describe('OpenPi electron app (e2e)', () => {
+describe('pidex electron app (e2e)', () => {
   let tmpCwd: string;
 
   beforeAll(async () => {
@@ -67,9 +67,9 @@ describe('OpenPi electron app (e2e)', () => {
 
   it('exposes version metadata from the preload bridge', async () => {
     const versions = await win!.evaluate(() => ({
-      electron: window.openpi?.versions?.electron,
-      node: window.openpi?.versions?.node,
-      hasWorkspaces: typeof window.openpi?.workspaces === 'function',
+      electron: window.pidex?.versions?.electron,
+      node: window.pidex?.versions?.node,
+      hasWorkspaces: typeof window.pidex?.workspaces === 'function',
     }));
     expect(versions.electron).toMatch(/^\d+\.\d+\.\d+/);
     expect(versions.node).toMatch(/^\d+\.\d+\.\d+/);

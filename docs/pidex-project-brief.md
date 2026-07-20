@@ -1,17 +1,17 @@
-# OpenPi Project Brief
+# pidex Project Brief
 
-## What is OpenPi
+## What is pidex
 
-OpenPi is an Electron desktop app that wraps the [Pi coding agent runtime](https://pi.dev/) and gives developers a daily workbench. It is not a commercial product or a clone of OpenCode. It is a personal project — learn by building, improve day-to-day DX, and share a stronger local-first desktop harness pattern for coding agents.
+pidex is an Electron desktop app that wraps the [Pi coding agent runtime](https://pi.dev/) and gives developers a daily workbench. It is not a commercial product or a clone of OpenCode. It is a personal project — learn by building, improve day-to-day DX, and share a stronger local-first desktop harness pattern for coding agents.
 
-OpenPi is one half of a two-product split:
+pidex is one half of a two-product split:
 
 | Product | Role |
 |---|---|
-| **OpenPi** | Daily-use coding workbench centred on the Pi runtime |
+| **pidex** | Daily-use coding workbench centred on the Pi runtime |
 | **Weldable** | Installer, launcher, updater, and provider/gateway config utility |
 
-Weldable handles install, BYOK, provider bootstrap, SSO, and enterprise gateway wiring. OpenPi relies on Weldable for setup and focuses entirely on the daily coding workflow.
+Weldable handles install, BYOK, provider bootstrap, SSO, and enterprise gateway wiring. pidex relies on Weldable for setup and focuses entirely on the daily coding workflow.
 
 ## The Mental Model
 
@@ -62,7 +62,7 @@ These are the concrete workflow problems driving the idea, all observed while us
 5. **Local and extensible**
    Pi's minimal runtime philosophy stays intact. Richer UI and orchestration layered on top without bloating the engine.
 
-## What OpenPi is NOT
+## What pidex is NOT
 
 - **Not a multi-runtime orchestrator.** It is Pi-first, with adapters for Claude Code or Codex possible later as optional extensions.
 - **Not a bundler or installer.** That role belongs to Weldable.
@@ -74,7 +74,7 @@ These are the concrete workflow problems driving the idea, all observed while us
 
 - **Main process** owns lifecycle, Pi runtime, workspace registry, persistence, and IPC routing
 - **Renderer** owns presentation only — React UI, virtualized lists, and text measurement via Pretext
-- **Preload** exposes a typed `window.openpi` API as a narrow bridge between processes
+- **Preload** exposes a typed `window.pidex` API as a narrow bridge between processes
 - All agent events are normalized in main before they reach the renderer
 
 ### Pi Runtime Integration
@@ -88,9 +88,9 @@ Initial recommendation: start with **SDK** for the simplest prototype; evaluate 
 
 ### Pretext for Rendering Performance
 
-[Pretext](https://github.com/chenglou/pretext) is a ~15KB TypeScript library by Cheng Lou (ex-Meta React Core, now Midjourney) that measures multiline text dimensions without touching the DOM. It is 600x faster than browser-based text measurement. See the [Pretext deep-dive](./openpi-pretext-deep-dive.md) for details.
+[Pretext](https://github.com/chenglou/pretext) is a ~15KB TypeScript library by Cheng Lou (ex-Meta React Core, now Midjourney) that measures multiline text dimensions without touching the DOM. It is 600x faster than browser-based text measurement. See the [Pretext deep-dive](./pidex-pretext-deep-dive.md) for details.
 
-In OpenPi, Pretext is:
+In pidex, Pretext is:
 
 - Applied to text-heavy virtualised lists (session timelines, workspace summaries, diff previews)
 - Used to precompute row heights, line counts, and text layouts off the DOM hot path
@@ -98,7 +98,7 @@ In OpenPi, Pretext is:
 
 ### Harnss as UX Reference
 
-[Harnss](https://github.com/OpenSource03/harnss) is an Electron wrapper for Claude Code and Codex that renders agent output as interactive cards. It is the strongest design reference for how OpenPi should present agent activity — rich tool cards, multi-session awareness,24ith explicit repo and task context surfacing.
+[Harnss](https://github.com/OpenSource03/harnss) is an Electron wrapper for Claude Code and Codex that renders agent output as interactive cards. It is the strongest design reference for how pidex should present agent activity — rich tool cards, multi-session awareness,24ith explicit repo and task context surfacing.
 
 ### Tooling
 
@@ -113,16 +113,16 @@ See the [README](../README.md) for setup instructions.
 
 Tools overlapping with the space:
 
-| Tool | Strength | How OpenPi relates |
+| Tool | Strength | How pidex relates |
 |---|---|---|
 | OpenCode | Breadth, adoption, IDE integration | Source of the pain points; baseline to surpass in UX quality |
-| Harnss | Multi-agent desktop harness | Strong UI reference; OpenPi aims for stronger workspace visibility and context recovery |
+| Harnss | Multi-agent desktop harness | Strong UI reference; pidex aims for stronger workspace visibility and context recovery |
 | CodePilot | Provider switching, general desktop UX | Reference for provider management |
-| CC Switch | Config management | Weldable’s domain, not OpenPi’s |
+| CC Switch | Config management | Weldable’s domain, not pidex’s |
 | 1Code | Worktree isolation, kanban-style thinking | Reference for operational workbench |
 | Superset | multi-agent orchestration, worktrees | Reference for heavy parallel worktree workflows |
 
-OpenPi does NOT need to compete across every axis. The distinctiveness is:
+pidex does NOT need to compete across every axis. The distinctiveness is:
 
 1. OpenCode's breadth without its friction points
 2. Superset-level worktree awareness without swarm-first complexity

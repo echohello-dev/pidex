@@ -40,7 +40,7 @@ function createWindow() {
     height: 840,
     minWidth: 900,
     minHeight: 600,
-    title: 'OpenPi',
+    title: 'pidex',
     backgroundColor: '#0d1116',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 14 },
@@ -63,9 +63,9 @@ function createWindow() {
   });
 }
 
-ipcMain.handle('openpi:workspaces', () => listWorkspaces(readCustomWorkspaces()));
+ipcMain.handle('pidex:workspaces', () => listWorkspaces(readCustomWorkspaces()));
 
-ipcMain.handle('openpi:workspace:add', async () => {
+ipcMain.handle('pidex:workspace:add', async () => {
   if (!mainWindow) return { error: 'no window' };
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Add workspace',
@@ -77,13 +77,13 @@ ipcMain.handle('openpi:workspace:add', async () => {
   return { cwd };
 });
 
-ipcMain.handle('openpi:sessions', (_e, dirName: string) => {
+ipcMain.handle('pidex:sessions', (_e, dirName: string) => {
   if (typeof dirName !== 'string') return [];
   return listSessions(dirName);
 });
 
 ipcMain.handle(
-  'openpi:session/open',
+  'pidex:session/open',
   async (_e, req: { cwd: string; sessionFile?: string }) => {
     const cwd = typeof req?.cwd === 'string' ? req.cwd : '';
     const sessionFile = typeof req?.sessionFile === 'string' ? req.sessionFile : undefined;
@@ -96,8 +96,8 @@ ipcMain.handle(
 
     const id = `s${++sessionSeq}`;
     const session = new RpcSession(id, cwd, sessionFile);
-    session.onEvent = (sessionId, event) => sendToRenderer('openpi:session:event', { sessionId, event });
-    session.onExit = sessionId => sendToRenderer('openpi:session:exit', { sessionId });
+    session.onEvent = (sessionId, event) => sendToRenderer('pidex:session:event', { sessionId, event });
+    session.onExit = sessionId => sendToRenderer('pidex:session:exit', { sessionId });
     sessions.set(id, session);
 
     const [state, messages] = await Promise.all([session.getState(), session.getMessages()]);
@@ -110,7 +110,7 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  'openpi:session/send',
+  'pidex:session/send',
   async (_e, req: { sessionId: string; text: string; streaming: boolean }) => {
     const session = sessions.get(req?.sessionId ?? '');
     if (!session) return { error: 'no such session' };
@@ -119,11 +119,11 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle('openpi:session/abort', (_e, sessionId: string) => {
+ipcMain.handle('pidex:session/abort', (_e, sessionId: string) => {
   sessions.get(sessionId)?.abort();
 });
 
-ipcMain.handle('openpi:session/commands', async (_e, sessionId: string) => {
+ipcMain.handle('pidex:session/commands', async (_e, sessionId: string) => {
   const session = sessions.get(sessionId);
   if (!session) return { commands: [] };
   const response = await session.getCommands();
@@ -131,7 +131,7 @@ ipcMain.handle('openpi:session/commands', async (_e, sessionId: string) => {
   return { commands: response.success ? data?.commands ?? [] : [] };
 });
 
-ipcMain.handle('openpi:session/close', (_e, sessionId: string) => {
+ipcMain.handle('pidex:session/close', (_e, sessionId: string) => {
   const session = sessions.get(sessionId);
   if (session) {
     sessions.delete(sessionId);

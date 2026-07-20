@@ -5,31 +5,31 @@ type SessionEventPayload = {
   event: Record<string, unknown> & { type: string };
 };
 
-contextBridge.exposeInMainWorld('openpi', {
+contextBridge.exposeInMainWorld('pidex', {
   platform: process.platform,
   versions: {
     electron: process.versions.electron,
     node: process.versions.node,
   },
-  workspaces: () => ipcRenderer.invoke('openpi:workspaces'),
-  addWorkspace: () => ipcRenderer.invoke('openpi:workspace:add'),
-  sessions: (dirName: string) => ipcRenderer.invoke('openpi:sessions', dirName),
+  workspaces: () => ipcRenderer.invoke('pidex:workspaces'),
+  addWorkspace: () => ipcRenderer.invoke('pidex:workspace:add'),
+  sessions: (dirName: string) => ipcRenderer.invoke('pidex:sessions', dirName),
   openSession: (req: { cwd: string; sessionFile?: string }) =>
-    ipcRenderer.invoke('openpi:session/open', req),
+    ipcRenderer.invoke('pidex:session/open', req),
   sendPrompt: (req: { sessionId: string; text: string; streaming: boolean }) =>
-    ipcRenderer.invoke('openpi:session/send', req),
-  abortSession: (sessionId: string) => ipcRenderer.invoke('openpi:session/abort', sessionId),
+    ipcRenderer.invoke('pidex:session/send', req),
+  abortSession: (sessionId: string) => ipcRenderer.invoke('pidex:session/abort', sessionId),
   sessionCommands: (sessionId: string) =>
-    ipcRenderer.invoke('openpi:session/commands', sessionId),
-  closeSession: (sessionId: string) => ipcRenderer.invoke('openpi:session/close', sessionId),
+    ipcRenderer.invoke('pidex:session/commands', sessionId),
+  closeSession: (sessionId: string) => ipcRenderer.invoke('pidex:session/close', sessionId),
   onSessionEvent: (cb: (payload: SessionEventPayload) => void) => {
     const listener = (_event: unknown, payload: SessionEventPayload) => cb(payload);
-    ipcRenderer.on('openpi:session:event', listener);
-    return () => ipcRenderer.removeListener('openpi:session:event', listener);
+    ipcRenderer.on('pidex:session:event', listener);
+    return () => ipcRenderer.removeListener('pidex:session:event', listener);
   },
   onSessionExit: (cb: (payload: { sessionId: string }) => void) => {
     const listener = (_event: unknown, payload: { sessionId: string }) => cb(payload);
-    ipcRenderer.on('openpi:session:exit', listener);
-    return () => ipcRenderer.removeListener('openpi:session:exit', listener);
+    ipcRenderer.on('pidex:session:exit', listener);
+    return () => ipcRenderer.removeListener('pidex:session:exit', listener);
   },
 });
