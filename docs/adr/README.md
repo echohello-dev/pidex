@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-ADRs document significant architectural choices made in OpenPi.
+ADRs document significant architectural choices made in pidex.
 
 Each ADR follows this shape:
 

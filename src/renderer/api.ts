@@ -60,7 +60,7 @@ type OpenPiApi = {
 
 declare global {
   interface Window {
-    openpi: OpenPiApi;
+    pidex: OpenPiApi;
   }
 }
 

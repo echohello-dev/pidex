@@ -5,7 +5,7 @@
 **A desktop workbench for the Pi coding agent.**
 **Workspace-first, not chat-first.**
 
-[Quick Start](#quick-start) · [Architecture](docs/openpi-architecture.md) · [Design tokens](#design-tokens) · [Docs](docs/openpi-project-brief.md)
+[Quick Start](#quick-start) · [Architecture](docs/pidex-architecture.md) · [Design tokens](#design-tokens) · [Docs](docs/pidex-project-brief.md)
 
 [![CI](https://github.com/echohello-dev/pidex/actions/workflows/ci.yml/badge.svg)](https://github.com/echohello-dev/pidex/actions/workflows/ci.yml)
 [![Electron 41](https://img.shields.io/badge/electron-41-blue)](https://www.electronjs.org/)
@@ -37,7 +37,7 @@ For a production build: `mise run build` then `mise run start`.
 ┌────────────────────────────────────────┐
 │  Renderer (React 19)                   │   ← dashboard, session tabs, timeline
 └───────────────────┬────────────────────┘
-                    │  typed IPC (window.openpi)
+                    │  typed IPC (window.pidex)
 ┌───────────────────▼────────────────────┐
 │  Main process (Electron)               │   ← workspace registry, event normalization
 └───────────────────┬────────────────────┘
@@ -47,13 +47,13 @@ For a production build: `mise run build` then `mise run start`.
 └────────────────────────────────────────┘
 ```
 
-Pi runs out-of-process over RPC so the UI survives a runtime crash. Pretext handles text measurement so virtualized lists stay smooth in long sessions. Full detail in [docs/openpi-architecture.md](docs/openpi-architecture.md).
+Pi runs out-of-process over RPC so the UI survives a runtime crash. Pretext handles text measurement so virtualized lists stay smooth in long sessions. Full detail in [docs/pidex-architecture.md](docs/pidex-architecture.md).
 
 ## Built on
 
 | Layer | Choice |
 |---|---|
-| Shell | Electron 41, context-isolated, typed `window.openpi` preload bridge |
+| Shell | Electron 41, context-isolated, typed `window.pidex` preload bridge |
 | UI | React 19.2, Vite 8 with HMR |
 | Text | [`@chenglou/pretext`](https://github.com/chenglou/pretext), DOM-free |
 | Language | TypeScript 6 |
@@ -96,9 +96,9 @@ uv run --with fonttools python scripts/build-screenshot.py   # docs/assets/scree
 
 | Doc | What it covers |
 |---|---|
-| [docs/openpi-project-brief.md](docs/openpi-project-brief.md) | Thesis, pain points, positioning, MVP slice |
-| [docs/openpi-architecture.md](docs/openpi-architecture.md) | Process boundaries, IPC schema, SDK vs RPC |
-| [docs/openpi-pretext-deep-dive.md](docs/openpi-pretext-deep-dive.md) | Why DOM-free text measurement |
+| [docs/pidex-project-brief.md](docs/pidex-project-brief.md) | Thesis, pain points, positioning, MVP slice |
+| [docs/pidex-architecture.md](docs/pidex-architecture.md) | Process boundaries, IPC schema, SDK vs RPC |
+| [docs/pidex-pretext-deep-dive.md](docs/pidex-pretext-deep-dive.md) | Why DOM-free text measurement |
 
 ## License
 

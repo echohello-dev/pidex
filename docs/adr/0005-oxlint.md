@@ -1,7 +1,7 @@
 # ADR 0005 — Use oxlint as the lint tool
 
 - **Status**: Accepted (2026-07-19)
-- **Context**: The repo had no lint gate. ESLint is the default but slow to install and configure, and many of its plugins don't work cleanly with React 19 + Vitest. The OpenPi project has a single-language (TypeScript) codebase and needs correctness guarantees, not style debates.
+- **Context**: The repo had no lint gate. ESLint is the default but slow to install and configure, and many of its plugins don't work cleanly with React 19 + Vitest. The pidex project has a single-language (TypeScript) codebase and needs correctness guarantees, not style debates.
 
 - **Decision**: Adopt `oxlint` for CI lint. Configure it via `.oxlintrc.json` with the `correctness` category as error and the rest allowed. Style formatting is left to manual conventions.
 

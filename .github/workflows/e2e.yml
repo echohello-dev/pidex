@@ -27,7 +27,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: openpi-e2e
+          name: pidex-e2e
           path: |
             /tmp/pidex-*.png
             test-results/

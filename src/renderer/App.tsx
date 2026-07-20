@@ -101,10 +101,10 @@ function App() {
   const activeTab = tabs.find(t => t.runtimeId === activeId) ?? null;
 
   useEffect(() => {
-    window.openpi.workspaces().then(async list => {
+    window.pidex.workspaces().then(async list => {
       setWorkspaces(list);
       const entries = await Promise.all(
-        list.map(ws => window.openpi.sessions(ws.dirName).then(s => [ws.dirName, s] as const)),
+        list.map(ws => window.pidex.sessions(ws.dirName).then(s => [ws.dirName, s] as const)),
       );
       const map: Record<string, SessionInfo[]> = {};
       for (const [dirName, s] of entries) map[dirName] = s;
@@ -121,7 +121,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const offEvent = window.openpi.onSessionEvent(({ sessionId, event }) => {
+    const offEvent = window.pidex.onSessionEvent(({ sessionId, event }) => {
       setTabs(prev =>
         prev.map(tab => {
           if (tab.runtimeId !== sessionId) return tab;
@@ -130,7 +130,7 @@ function App() {
         }),
       );
     });
-    const offExit = window.openpi.onSessionExit(({ sessionId }) => {
+    const offExit = window.pidex.onSessionExit(({ sessionId }) => {
       setTabs(prev =>
         prev.map(tab =>
           tab.runtimeId === sessionId ? { ...tab, exited: true, running: false } : tab,
@@ -166,16 +166,16 @@ function App() {
     if (!next) return;
     let sessions = wsSessions[next];
     if (!sessions) {
-      sessions = await window.openpi.sessions(next);
+      sessions = await window.pidex.sessions(next);
       setWsSessions(prev => ({ ...prev, [next]: sessions }));
     }
     if (sessions[0]) openSession(ws, sessions[0]);
   };
 
   const addWorkspace = async () => {
-    const result = await window.openpi.addWorkspace();
+    const result = await window.pidex.addWorkspace();
     if (result.error || !result.cwd) return;
-    const list = await window.openpi.workspaces();
+    const list = await window.pidex.workspaces();
     setWorkspaces(list);
     const added = list.find(w => w.cwd === result.cwd);
     if (added) {
@@ -194,7 +194,7 @@ function App() {
     }
     setOpening(true);
     try {
-      const result = await window.openpi.openSession({
+      const result = await window.pidex.openSession({
         cwd: ws.cwd,
         sessionFile: info?.file,
       });
@@ -203,7 +203,7 @@ function App() {
       }
       const model =
         result.state?.model?.id ?? result.state?.model?.name ?? info?.model ?? 'default';
-      const { commands } = await window.openpi.sessionCommands(result.sessionId);
+      const { commands } = await window.pidex.sessionCommands(result.sessionId);
       const tab: SessionTab = {
         runtimeId: result.sessionId,
         cwd: ws.cwd,
@@ -224,7 +224,7 @@ function App() {
   openSessionRef.current = openSession;
 
   const closeTab = (runtimeId: string) => {
-    window.openpi.closeSession(runtimeId);
+    window.pidex.closeSession(runtimeId);
     setTabs(prev => {
       const next = prev.filter(t => t.runtimeId !== runtimeId);
       if (activeId === runtimeId) setActiveId(next[next.length - 1]?.runtimeId ?? null);
@@ -241,7 +241,7 @@ function App() {
     );
     setDraft('');
     setSlashIndex(0);
-    await window.openpi.sendPrompt({
+    await window.pidex.sendPrompt({
       sessionId: activeTab.runtimeId,
       text,
       streaming: activeTab.running,
@@ -323,8 +323,8 @@ function App() {
         ))}
         <span className="tabbar-meta">
           <PiMark size={11} />
-          electron <b>{window.openpi?.versions.electron ?? '—'}</b> · node{' '}
-          <b>{window.openpi?.versions.node ?? '—'}</b>
+          electron <b>{window.pidex?.versions.electron ?? '—'}</b> · node{' '}
+          <b>{window.pidex?.versions.node ?? '—'}</b>
         </span>
       </nav>
 
@@ -416,7 +416,7 @@ function App() {
                     {activeTab.exited ? 'exited' : activeTab.running ? 'running' : 'idle'}
                   </span>
                   <div className="bench-actions">
-                    <BracketButton disabled={!activeTab.running} onClick={() => window.openpi.abortSession(activeTab.runtimeId)}>
+                    <BracketButton disabled={!activeTab.running} onClick={() => window.pidex.abortSession(activeTab.runtimeId)}>
                       Abort
                     </BracketButton>
                   </div>
@@ -555,7 +555,7 @@ function App() {
           <span>{tabs.length} tabs</span>
         </div>
         <span>
-          $ openpi — {measuredRows} rows measured · 0 dom reads
+          $ pidex — {measuredRows} rows measured · 0 dom reads
         </span>
       </footer>
     </div>

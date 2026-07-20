@@ -1,4 +1,4 @@
-# OpenPi Architecture Proposal
+# pidex Architecture Proposal
 
 This document captures the first-pass architecture for an Electron desktop app that wraps the Pi coding agent runtime and stays responsive under long sessions, diffs, and workspace switching.
 
@@ -55,7 +55,7 @@ Owns the narrow, typed bridge between renderer and main.
 
 Suggested responsibilities:
 
-- Expose a minimal `window.openpi` API
+- Expose a minimal `window.pidex` API
 - Keep IPC channels explicit and typed
 - Prevent renderer code from touching Node APIs directly
 
@@ -101,28 +101,28 @@ The IPC layer should be event-driven, typed, and intentionally small.
 
 | Channel | Direction | Purpose |
 |---|---|---|
-| `openpi:workspace/open` | renderer -> main | Open or focus a workspace |
-| `openpi:workspace/refresh` | renderer -> main | Re-read repo and session state |
-| `openpi:session/start` | renderer -> main | Start a new Pi session |
-| `openpi:session/resume` | renderer -> main | Resume an existing session |
-| `openpi:session/fork` | renderer -> main | Fork a session branch |
-| `openpi:agent/send` | renderer -> main | Send a prompt or command to Pi |
-| `openpi:diff/open` | renderer -> main | Open a file diff or patch view |
-| `openpi:file/open` | renderer -> main | Open a file in the workspace |
-| `openpi:git/checkout` | renderer -> main | Switch branches or worktrees |
+| `pidex:workspace/open` | renderer -> main | Open or focus a workspace |
+| `pidex:workspace/refresh` | renderer -> main | Re-read repo and session state |
+| `pidex:session/start` | renderer -> main | Start a new Pi session |
+| `pidex:session/resume` | renderer -> main | Resume an existing session |
+| `pidex:session/fork` | renderer -> main | Fork a session branch |
+| `pidex:agent/send` | renderer -> main | Send a prompt or command to Pi |
+| `pidex:diff/open` | renderer -> main | Open a file diff or patch view |
+| `pidex:file/open` | renderer -> main | Open a file in the workspace |
+| `pidex:git/checkout` | renderer -> main | Switch branches or worktrees |
 
 ### Event channels
 
 | Channel | Direction | Purpose |
 |---|---|---|
-| `openpi:workspace/state` | main -> renderer | Current workspace snapshot |
-| `openpi:session/state` | main -> renderer | Session lifecycle and metadata |
-| `openpi:agent/event` | main -> renderer | Normalized runtime events |
-| `openpi:agent/token` | main -> renderer | Streamed text deltas |
-| `openpi:agent/tool` | main -> renderer | Tool call start / progress / result |
-| `openpi:git/state` | main -> renderer | Repo, branch, dirty, commit state |
-| `openpi:fs/change` | main -> renderer | File tree or watch updates |
-| `openpi:ui/notify` | main -> renderer | Toasts, errors, approvals, prompts |
+| `pidex:workspace/state` | main -> renderer | Current workspace snapshot |
+| `pidex:session/state` | main -> renderer | Session lifecycle and metadata |
+| `pidex:agent/event` | main -> renderer | Normalized runtime events |
+| `pidex:agent/token` | main -> renderer | Streamed text deltas |
+| `pidex:agent/tool` | main -> renderer | Tool call start / progress / result |
+| `pidex:git/state` | main -> renderer | Repo, branch, dirty, commit state |
+| `pidex:fs/change` | main -> renderer | File tree or watch updates |
+| `pidex:ui/notify` | main -> renderer | Toasts, errors, approvals, prompts |
 
 ### Core payload shapes
 
@@ -187,7 +187,7 @@ type AgentEvent =
 - Use **Pi SDK** for the first implementation if the priority is rich integration and fastest product iteration.
 - Use **Pi RPC** if the priority is runtime isolation, restartability, and keeping the Electron main process lightweight.
 
-### Practical choice for OpenPi
+### Practical choice for pidex
 
 Start with **SDK** if:
 
