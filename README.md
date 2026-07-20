@@ -5,7 +5,7 @@
 **A desktop workbench for the Pi coding agent.**
 **Workspace-first, not chat-first.**
 
-[Quick Start](#quick-start) · [Architecture](docs/pidex-architecture.md) · [Design tokens](#design-tokens) · [Docs](docs/pidex-project-brief.md)
+[Quick Start](#quick-start) · [Architecture](docs/pidex-architecture.md)
 
 [![CI](https://github.com/echohello-dev/pidex/actions/workflows/ci.yml/badge.svg)](https://github.com/echohello-dev/pidex/actions/workflows/ci.yml)
 [![Electron 41](https://img.shields.io/badge/electron-41-blue)](https://www.electronjs.org/)
@@ -67,53 +67,16 @@ Pi runs out-of-process over RPC so the UI survives a runtime crash. Pretext hand
 | Package manager | Bun |
 | Toolchain | mise, all commands via `mise run` |
 
-## Design tokens
-
-The workbench inherits its palette from the [Pi coding agent](https://pi.dev) so it feels like part of the same family as the runtime. Source of truth: [`scripts/_design.py`](scripts/_design.py), hexes pulled from `pi.dev/style.css`.
-
-| Token | Hex | Role |
-|---|---|---|
-| bg-deep | `#0d1116` | Window background |
-| bg-canvas | `#161d27` | Canvas surface |
-| panel | `#212730` | Sidebar / panel |
-| panel-soft | `#252f3d` | Card surface |
-| parchment | `#dacbc2` | Named cream, primary mark and text |
-| moonstone | `#ebe7e4` | Lighter cream |
-| driftwood | `#5c5752` | Warm mid-gray |
-| terracotta | `#844f3b` | Warm bronze accent |
-| terracotta-light | `#b86b52` | Status dots |
-| sunkissed | `#e1b06e` | Warm gold |
-| sage | `#a3a473` | Sage accent |
-| accent-blue | `#6a9fcc` | Links, focus |
-
-Regenerate assets after a token edit:
-
-```bash
-uv run --with fonttools python scripts/build-icon.py    # assets/icon, mark
-uv run --with fonttools python scripts/build-logo.py    # assets/logo (composable π + pidex)
-uv run --with fonttools python scripts/build-banner.py   # docs/assets/banner-bg
-```
-
-`docs/assets/screenshot.png` is captured from the running app. To refresh: temporarily gate a `webContents.capturePage()` call behind an env var, run `PIDEX_CAPTURE=1 mise run dev`, then revert. The banner composites the screenshot over the design-system background (`docs/assets/banner-bg.png`, built by `scripts/build-banner.py`) with the composable logo watermark, all via `magick`.
-
-The banner background is procedural: `bg-canvas` field with the blueprint grid (96px minor + 480px major, lifted in opacity for hero scale) and a vertical gradient into `bg-deep`. Strictly rectilinear; no generated imagery.
-
-Banner and logo use the design system font pairing: **Georgia** (serif, from `--serif` in `tokens.css`) for the wordmark and body, **Commit Mono** (from `--mono`) for the code surfaces visible in the screenshot.
-
-## What's next
-
-- [ ] Diff viewer with virtualised summaries
-- [ ] Session fork, branch sessions visually
-- [ ] Worktree switching from the UI
-
-## Documentation
-
-| Doc | What it covers |
-|---|---|
-| [docs/pidex-project-brief.md](docs/pidex-project-brief.md) | Thesis, pain points, positioning, MVP slice |
-| [docs/pidex-architecture.md](docs/pidex-architecture.md) | Process boundaries, IPC schema, SDK vs RPC |
-| [docs/pidex-pretext-deep-dive.md](docs/pidex-pretext-deep-dive.md) | Why DOM-free text measurement |
-
 ## License
 
-[MIT](./LICENSE) — see the file for full text. Personal project, shared in the open.
+[MIT](./LICENSE): see the file for full text. Personal project, shared in the open.
+
+## Star History
+
+<a href="https://star-history.com/#echohello-dev/pidex&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=echohello-dev/pidex&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=echohello-dev/pidex&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=echohello-dev/pidex&type=Date" />
+  </picture>
+</a>
