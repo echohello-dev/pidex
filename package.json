@@ -9,7 +9,7 @@
     "dev": "mise run dev",
     "build": "mise run build",
     "start": "mise run start",
-    "lint": "oxlint src tests",
+    "lint": "bunx oxlint src tests",
     "typecheck": "bunx tsc -p tsconfig.json --noEmit && bunx tsc -p tsconfig.main.json --noEmit && bunx tsc -p tsconfig.preload.json --noEmit",
     "test": "mise run test",
     "test:unit": "bunx vitest run --project unit",

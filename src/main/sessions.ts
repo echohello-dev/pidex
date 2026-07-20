@@ -3,7 +3,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-const SESSIONS_ROOT = path.join(os.homedir(), '.pi', 'agent', 'sessions');
+const SESSIONS_ROOT = process.env.PIDEX_SESSIONS_ROOT
+  ? path.resolve(process.env.PIDEX_SESSIONS_ROOT)
+  : path.join(os.homedir(), '.pi', 'agent', 'sessions');
 
 type WorkspaceInfo = {
   dirName: string;
