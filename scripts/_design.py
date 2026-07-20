@@ -8,18 +8,16 @@ block). Update these hexes if pi.dev revs its palette.
 Token groups:
   - Warm darks (window bg, panel surfaces)
   - Creams (text, marks, lit facet)
-  - Terracotta / sunkissed (warm accents, the fluid-crest peak)
+  - Terracotta / sunkissed (warm accents)
   - Sage / accent-blue (secondary accents)
 """
 
 from __future__ import annotations
 
-from fontTools.ttLib import TTFont
-from fontTools.pens.svgPathPen import SVGPathPen
-
 # --- Warm darks ---
 # pi.dev: --color-warm-black
 WARM_BLACK = "#13110f"
+INK_BRONZE = WARM_BLACK
 # pi.dev: --panel-base
 PANEL = "#212730"
 # pi.dev: --panel-soft-base
@@ -57,17 +55,3 @@ TIDAL_BLUE = "#4b607c"
 TEXT = "#ebe7e4"
 # pi.dev: --muted
 MUTED = "#9fa4ab"
-
-DEFAULT_FONT = "/System/Library/Fonts/Supplemental/Georgia Italic.ttf"
-
-
-def pi_path(font_path: str = DEFAULT_FONT) -> tuple[str, tuple[int, int, int, int], int]:
-    """Return (svg_path_d, bbox, unitsPerEm) for the π glyph (U+03C0)."""
-    font = TTFont(font_path)
-    cmap = font.getBestCmap()
-    gname = cmap[ord("π")]
-    pen = SVGPathPen(font.getGlyphSet())
-    font.getGlyphSet()[gname].draw(pen)
-    glyf = font["glyf"][gname]
-    bbox = (glyf.xMin, glyf.yMin, glyf.xMax, glyf.yMax)
-    return pen.getCommands(), bbox, font["head"].unitsPerEm

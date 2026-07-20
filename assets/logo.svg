@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+  <!-- ISOMETRIC CUBE: cool/neutral design system surfaces. -->
+  <!-- top face (lit, bg-canvas) -->
+  <polygon points="60,16.0 101.568,40 60,64.0 18.432000000000002,40" fill="#161d27" stroke="#13110f" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- right face (mid, panel) -->
+  <polygon points="101.568,40 60,64.0 60,112.0 101.568,88" fill="#212730" stroke="#13110f" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- left face (shadow, bg-deep) -->
+  <polygon points="18.432000000000002,40 60,64.0 60,112.0 18.432000000000002,88" fill="#0d1116" stroke="#13110f" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- Pi coding agent logo painted on the top face (sheared onto the isometric top) -->
+  <g transform="matrix(0.08844255319148936 0.05106382978723404 -0.08844255319148936 0.05106382978723404 60 0)">
+    <path fill="#dacbc2" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+    <path fill="#dacbc2" d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+  </g>
+
+  <!-- WORDMARK -->
+  <text x="120" y="76" font-family="Georgia, 'Plantin MT Pro', 'Plantin MT Std', serif" font-size="32" font-weight="500" fill="#dacbc2" letter-spacing="-0.5">pidex</text>
+</svg>

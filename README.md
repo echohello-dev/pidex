@@ -18,6 +18,13 @@
 
 Daily coding-agent work means juggling repos, branches, and sessions, and the current tools are chat-first. pidex is the kitchen bench: every active repo, its branch, its sessions, and what's stale, visible in one glance.
 
+## In action
+
+| | |
+|---|---|
+| ![Boot](docs/assets/workbench-boot.gif) | ![Loaded](docs/assets/workbench-loaded.gif) |
+| App booting, workspaces populate | The workbench, fully loaded |
+
 ## Quick Start
 
 You need [mise](https://mise.jdx.dev/) and the [Pi CLI](https://pi.dev/). The dashboard reads existing sessions from `~/.pi/agent/sessions`.
@@ -82,9 +89,16 @@ The workbench inherits its palette from the [Pi coding agent](https://pi.dev) so
 Regenerate assets after a token edit:
 
 ```bash
-uv run --with fonttools python scripts/build-icon.py        # assets/icon, mark
-uv run --with fonttools python scripts/build-screenshot.py   # docs/assets/screenshot
+uv run --with fonttools python scripts/build-icon.py    # assets/icon, mark
+uv run --with fonttools python scripts/build-logo.py    # assets/logo (composable π + pidex)
+uv run --with fonttools python scripts/build-banner.py   # docs/assets/banner-bg
 ```
+
+`docs/assets/screenshot.png` is captured from the running app. To refresh: temporarily gate a `webContents.capturePage()` call behind an env var, run `PIDEX_CAPTURE=1 mise run dev`, then revert. The banner composites the screenshot over the design-system background (`docs/assets/banner-bg.png`, built by `scripts/build-banner.py`) with the composable logo watermark, all via `magick`.
+
+The banner background is procedural: `bg-canvas` field with the blueprint grid (96px minor + 480px major, lifted in opacity for hero scale) and a vertical gradient into `bg-deep`. Strictly rectilinear; no generated imagery.
+
+Banner and logo use the design system font pairing: **Georgia** (serif, from `--serif` in `tokens.css`) for the wordmark and body, **Commit Mono** (from `--mono`) for the code surfaces visible in the screenshot.
 
 ## What's next
 

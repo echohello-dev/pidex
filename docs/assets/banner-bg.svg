@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <linearGradient id="vert" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1116" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0d1116" stop-opacity="0.85"/>
+    </linearGradient>
+    <pattern id="grid_minor" width="96" height="96" patternUnits="userSpaceOnUse">
+      <path d="M 96 0 L 0 0 0 96" fill="none" stroke="#8aa9d4" stroke-opacity="0.18" stroke-width="1"/>
+    </pattern>
+    <pattern id="grid_major" width="480" height="480" patternUnits="userSpaceOnUse">
+      <path d="M 480 0 L 0 0 0 480" fill="none" stroke="#8aa9d4" stroke-opacity="0.32" stroke-width="1.75"/>
+    </pattern>
+  </defs>
+
+  <!-- base canvas -->
+  <rect x="0" y="0" width="1600" height="900" fill="#161d27"/>
+
+  <!-- blueprint grid -->
+  <rect x="0" y="0" width="1600" height="900" fill="url(#grid_minor)"/>
+  <rect x="0" y="0" width="1600" height="900" fill="url(#grid_major)"/>
+
+  <!-- vertical gradient into bg-deep (anchors the bottom) -->
+  <rect x="0" y="0" width="1600" height="900" fill="url(#vert)"/>
+</svg>
