@@ -102,4 +102,4 @@ uv run --with fonttools python scripts/build-screenshot.py   # docs/assets/scree
 
 ## License
 
-No license chosen yet. Personal project, shared in the open.
+[MIT](./LICENSE) — see the file for full text. Personal project, shared in the open.
