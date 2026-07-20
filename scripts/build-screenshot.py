@@ -1,12 +1,16 @@
-"""Build a faithful pidex dashboard mockup SVG (and PNG) using the Pi
-(pi.dev) design tokens. Layout mirrors what the renderer ships: warm-black
-window with a panel-toned workspace sidebar on the left, session pane on
-the right, input pill at the bottom. Apple-style soft drop shadow under
-the window.
+"""Build a faithful pidex dashboard mockup SVG (and PNG) using the actual
+app design tokens (src/renderer/design-system/tokens.css), which mirrors
+pi.dev. Layout mirrors what the renderer ships: dark window with the
+blueprint grid, panel-toned workspace sidebar on the left, session pane
+on the right, input pill at the bottom. Apple-style soft drop shadow.
 
 Output:
   docs/assets/screenshot.svg
   docs/assets/screenshot.png  (1440x900)
+
+This is a structural render rather than a live capture: it uses the real
+tokens (--bg-deep, --panel, --parchment, --terracotta-light) and the real
+blueprint grid pattern so the visual language matches the running app.
 """
 
 from __future__ import annotations
@@ -21,11 +25,11 @@ OUT = REPO / "docs" / "assets"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _design import (  # noqa: E402
-    WARM_BLACK,
+    BG_DEEP,
+    BG_CANVAS,
     PANEL,
     PANEL_SOFT,
     PARCHMENT,
-    MOONSTONE,
     TERRACOTTA_LIGHT,
     pi_path,
 )
@@ -44,8 +48,14 @@ SIDE_W = 300
 SIDE_BG = PANEL
 SIDE_PAD = 22
 
-# Warm neutral ground that complements the warm-black window
-BG = "#E2D8CC"
+# Warm neutral ground that complements the dark window.
+# Set to None to render on a transparent canvas (useful when the PNG will be
+# composited over a backdrop, e.g. the README banner).
+BG = None
+
+# Blueprint grid colors (from tokens.css --grid-minor / --grid-major)
+GRID_MINOR = "rgba(255,255,255,0.025)"
+GRID_MAJOR = "rgba(255,255,255,0.06)"
 
 
 def svg() -> str:
@@ -53,10 +63,9 @@ def svg() -> str:
     gx = (bbox[0] + bbox[2]) / 2
     gy = (bbox[1] + bbox[3]) / 2
 
-    # Sidebar π mark + pidex wordmark
     mark_cx = WX + 36
     mark_cy = WY + 44
-    mark_scale = 0.036  # ~37px tall
+    mark_scale = 0.036
     mark_transform = (
         f"translate({mark_cx} {mark_cy}) "
         f"scale({mark_scale} -{mark_scale}) "
@@ -106,11 +115,28 @@ def svg() -> str:
 
     pill_y = WY + WH - 64
     pill = (
-        f'<rect x="{pane_x + 30}" y="{pill_y}" width="{pane_w - 60}" height="40" rx="20" fill="{PARCHMENT}" opacity="0.06"/>'
-        f'<rect x="{pane_x + 50}" y="{pill_y + 14}" width="1.5" height="12" fill="{PARCHMENT}" opacity="0.8"/>'
-        f'<rect x="{pane_x + pane_w - 70}" y="{pill_y + 8}" width="40" height="24" rx="12" fill="{PARCHMENT}" opacity="0.14"/>'
-        f'<rect x="{pane_x + pane_w - 58}" y="{pill_y + 17}" width="16" height="6" rx="3" fill="{PARCHMENT}" opacity="0.7"/>'
+        f'<rect x="{pane_x + 30}" y="{pill_y}" width="{pane_w - 60}" height="40" rx="20" fill="{PARCHMENT}" opacity="0.10"/>'
+        f'<rect x="{pane_x + 30}" y="{pill_y}" width="{pane_w - 60}" height="40" rx="20" fill="none" stroke="{PARCHMENT}" stroke-opacity="0.18" stroke-width="1"/>'
+        f'<rect x="{pane_x + 50}" y="{pill_y + 14}" width="2" height="12" fill="{PARCHMENT}" opacity="0.85"/>'
+        f'<rect x="{pane_x + pane_w - 70}" y="{pill_y + 8}" width="40" height="24" rx="12" fill="{PARCHMENT}" opacity="0.22"/>'
+        f'<rect x="{pane_x + pane_w - 58}" y="{pill_y + 17}" width="16" height="6" rx="3" fill="{PARCHMENT}" opacity="0.85"/>'
     )
+
+    # Blueprint grid pattern (matches tokens.css body background)
+    # Clipped to the main pane area (not sidebar), so the grid is the
+    # distinctive app-chrome look in the session view.
+    grid_id = "blueprint"
+    grid_def = f"""
+    <pattern id="{grid_id}_minor" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="rgba(255,255,255,0.018)" stroke-width="0.5"/>
+    </pattern>
+    <pattern id="{grid_id}_major" width="240" height="240" patternUnits="userSpaceOnUse">
+      <path d="M 240 0 L 0 0 0 240" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.75"/>
+    </pattern>
+    <clipPath id="pane_clip">
+      <rect x="{pane_x}" y="{WY + 44}" width="{pane_w}" height="{WH - 44}"/>
+    </clipPath>
+    """
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
   <defs>
@@ -125,12 +151,13 @@ def svg() -> str:
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
+    {grid_def}
   </defs>
 
-  <rect x="0" y="0" width="{W}" height="{H}" fill="{BG}"/>
+  {f'<rect x="0" y="0" width="{W}" height="{H}" fill="{BG}"/>' if BG else ''}
 
   <g filter="url(#ds)">
-    <rect x="{WX}" y="{WY}" width="{WW}" height="{WH}" rx="{WIN_R}" ry="{WIN_R}" fill="{WARM_BLACK}"/>
+    <rect x="{WX}" y="{WY}" width="{WW}" height="{WH}" rx="{WIN_R}" ry="{WIN_R}" fill="{BG_DEEP}"/>
   </g>
 
   <!-- traffic lights -->
@@ -146,10 +173,16 @@ def svg() -> str:
   <g transform="{mark_transform}">
     <path d="{d}" fill="{PARCHMENT}"/>
   </g>
-  <text x="{mark_cx + 30}" y="{mark_cy + 6}" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="18" font-weight="600" fill="{PARCHMENT}" opacity="0.92">pidex</text>
+  <text x="{mark_cx + 30}" y="{mark_cy + 6}" font-family="Georgia, 'Plantin MT Pro', serif" font-size="18" font-weight="500" fill="{PARCHMENT}" opacity="0.92">pidex</text>
+
+  <!-- blueprint grid in main pane -->
+  <g clip-path="url(#pane_clip)">
+    <rect x="{pane_x}" y="{WY + 44}" width="{pane_w}" height="{WH - 44}" fill="{BG_CANVAS}"/>
+    <rect x="{pane_x}" y="{WY + 44}" width="{pane_w}" height="{WH - 44}" fill="url(#{grid_id}_minor)"/>
+    <rect x="{pane_x}" y="{WY + 44}" width="{pane_w}" height="{WH - 44}" fill="url(#{grid_id}_major)"/>
+  </g>
 
   {''.join(cards)}
-
   {header}
   {''.join(main_cards)}
   {pill}
