@@ -54,6 +54,10 @@ def build_logo_svg(width, height):
     left = (cx - dx, cy)
     a = dx / 470.0
     b = dy / 470.0
+    # Scale the Pi logo to 65% of the top face so it fits with padding
+    pad_scale = 0.65
+    a *= pad_scale
+    b *= pad_scale
     transform = f"matrix({a} {b} {-a} {b} {cx} {cy - dy})"
     p_d = (
         "M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z "
