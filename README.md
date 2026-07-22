@@ -69,7 +69,7 @@ Pi runs out-of-process over RPC so the UI survives a runtime crash. Pretext hand
 
 ## License
 
-[MIT](./LICENSE): see the file for full text. Personal project, shared in the open.
+[Apache-2.0](./LICENSE): see the file for full text. Personal project, shared in the open.
 
 ## Star History
 
