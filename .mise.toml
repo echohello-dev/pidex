@@ -19,6 +19,14 @@ run = [
   "bunx electron .",
 ]
 
+[tasks.bundle]
+description = "Compile main, preload, and renderer"
+run = [
+  "bunx tsc -p tsconfig.main.json",
+  "bunx tsc -p tsconfig.preload.json",
+  "bunx vite build",
+]
+
 [tasks.build]
 description = "Production build: lint, typecheck, test, bundle"
 run = [
@@ -26,9 +34,14 @@ run = [
   "bun run typecheck",
   "bun run test:unit",
   "bun run test:integration",
-  "bunx tsc -p tsconfig.main.json",
-  "bunx tsc -p tsconfig.preload.json",
-  "bunx vite build",
+  "mise run bundle",
+]
+
+[tasks.package]
+description = "Build native installers for this platform"
+run = [
+  "mise run bundle",
+  "bunx electron-builder --publish never",
 ]
 
 [tasks.start]
