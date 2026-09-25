@@ -8,6 +8,8 @@ the right.
 Outputs:
   assets/logo.svg   - horizontal lockup, transparent (composable)
   assets/logo.png   - rasterized lockup at 800x400 for quick embedding
+  assets/icon.svg   - 1024 square app icon (cube on bg-deep squircle)
+  assets/icon.png   - rasterized icon at 1024x1024 for electron-builder
 """
 
 from __future__ import annotations
@@ -70,24 +72,39 @@ TEXT_FONT = "Georgia, 'Plantin MT Pro', 'Plantin MT Std', serif"
 TEXT_WEIGHT = 500
 
 
-def build_logo_svg() -> str:
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-  <!-- ISOMETRIC CUBE: cool/neutral design system surfaces. -->
-  <!-- top face (lit, bg-canvas) -->
-  <polygon points="{TOP_X},{TOP_Y} {RIGHT_X},{RIGHT_Y} {BOT_X},{BOT_Y} {LEFT_X},{LEFT_Y}" fill="{BG_CANVAS}" stroke="{INK_BRONZE}" stroke-width="1.5" stroke-linejoin="round"/>
-  <!-- right face (mid, panel) -->
-  <polygon points="{RIGHT_X},{RIGHT_Y} {BOT_X},{BOT_Y} {BOT_X},{BOT_Y + E} {RIGHT_X},{RIGHT_Y + E}" fill="{PANEL}" stroke="{INK_BRONZE}" stroke-width="1.5" stroke-linejoin="round"/>
-  <!-- left face (shadow, bg-deep) -->
-  <polygon points="{LEFT_X},{LEFT_Y} {BOT_X},{BOT_Y} {BOT_X},{BOT_Y + E} {LEFT_X},{LEFT_Y + E}" fill="{BG_DEEP}" stroke="{INK_BRONZE}" stroke-width="1.5" stroke-linejoin="round"/>
+# App icon: macOS-style squircle, cube centred.
+ICON_SIZE = 1024
+ICON_RADIUS = 229
 
-  <!-- Pi coding agent logo painted on the top face (sheared onto the isometric top) -->
+
+def _cube_polygons() -> str:
+    return f"""  <polygon points="{TOP_X},{TOP_Y} {RIGHT_X},{RIGHT_Y} {BOT_X},{BOT_Y} {LEFT_X},{LEFT_Y}" fill="{BG_CANVAS}" stroke="{INK_BRONZE}" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="{RIGHT_X},{RIGHT_Y} {BOT_X},{BOT_Y} {BOT_X},{BOT_Y + E} {RIGHT_X},{RIGHT_Y + E}" fill="{PANEL}" stroke="{INK_BRONZE}" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="{LEFT_X},{LEFT_Y} {BOT_X},{BOT_Y} {BOT_X},{BOT_Y + E} {LEFT_X},{LEFT_Y + E}" fill="{BG_DEEP}" stroke="{INK_BRONZE}" stroke-width="1.5" stroke-linejoin="round"/>
   <g transform="{PI_TRANSFORM}">
     <path fill="{PARCHMENT}" fill-rule="evenodd" d="{P_D}"/>
     <path fill="{PARCHMENT}" d="{I_DOT_D}"/>
-  </g>
+  </g>"""
+
+
+def build_logo_svg() -> str:
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
+  <!-- ISOMETRIC CUBE: cool/neutral design system surfaces. -->
+{_cube_polygons()}
 
   <!-- WORDMARK -->
   <text x="{TEXT_X}" y="{TEXT_Y}" font-family="{TEXT_FONT}" font-size="{TEXT_SIZE}" font-weight="{TEXT_WEIGHT}" fill="{PARCHMENT}" letter-spacing="-0.5">pidex</text>
+</svg>
+"""
+
+
+def build_icon_svg() -> str:
+    # Cube sits in a ~84x96 box around (60, 64). Scale so it fills ~70% of the squircle.
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {ICON_SIZE} {ICON_SIZE}" width="{ICON_SIZE}" height="{ICON_SIZE}">
+  <rect x="0" y="0" width="{ICON_SIZE}" height="{ICON_SIZE}" rx="{ICON_RADIUS}" ry="{ICON_RADIUS}" fill="{BG_DEEP}"/>
+  <g transform="translate(512 500) scale(7.4) translate(-60 -64)">
+{_cube_polygons()}
+  </g>
 </svg>
 """
 
@@ -117,6 +134,13 @@ def main() -> None:
     render_png(svg_path, png_path, 800)
     print(f"wrote {svg_path}")
     print(f"wrote {png_path}")
+
+    icon_svg = ASSETS / "icon.svg"
+    icon_png = ASSETS / "icon.png"
+    icon_svg.write_text(build_icon_svg())
+    render_png(icon_svg, icon_png, ICON_SIZE)
+    print(f"wrote {icon_svg}")
+    print(f"wrote {icon_png}")
 
 
 if __name__ == "__main__":

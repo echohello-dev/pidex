@@ -41,6 +41,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'pidex',
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
     backgroundColor: '#0d1116',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 14 },
