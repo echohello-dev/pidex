@@ -49,6 +49,7 @@ linux:
   icon: assets/icon.png
   category: Development
   synopsis: Desktop workbench for the Pi coding agent
+  maintainer: echohello <bash@echohello.dev>
   target:
     - target: AppImage
       arch: [x64]
