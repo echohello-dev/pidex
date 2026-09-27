@@ -1,7 +1,48 @@
+# Dependencies
 node_modules/
+.bun/
+
+# Build output
 dist/
-release/
+out/
+build/
 .vite/
-.DS_Store
+*.tsbuildinfo
+
+# Electron-builder packages (1.1 GB of DMGs/zips/app bundles)
+release/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Tests / coverage
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (scripts/)
 __pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?
+Thumbs.db
+Desktop.ini
