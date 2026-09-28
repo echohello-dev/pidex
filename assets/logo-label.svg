@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10.43 8.00 190.25 112.00">
+  <defs>
+    <clipPath id="pi-face-label">
+      <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00"/>
+    </clipPath>
+  </defs>
+  <polygon points="18.43,40.00 60.00,64.00 60.00,112.00 18.43,88.00" fill="#1c2838" stroke="#6e849c" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="101.57,40.00 60.00,64.00 60.00,112.00 101.57,88.00" fill="#3d536b" stroke="#6e849c" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00" fill="#2a3b50" stroke="#6e849c" stroke-width="1.5" stroke-linejoin="round"/>
+  <g clip-path="url(#pi-face-label)">
+    <g transform="matrix(0.08855254 0.05112583 -0.08855254 0.05112583 60.00 0)">
+      <path fill="#ebe7e4" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+      <path fill="#ebe7e4" d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+    </g>
+  </g>
+<g fill="#ebe7e4" transform="translate(119.57 70.48)">
+<path d="M50 400V0H100V150H250V200H100V350H250V400ZM250 350V200H300V350Z" transform="translate(0.00 0) scale(0.032727 -0.032727)"/>
+<path d="M150 50H50V0H300V50H200V350H300V400H50V350H150Z" transform="translate(15.41 0) scale(0.032727 -0.032727)"/>
+<path d="M50 400V0H250V50H100V350H250V400ZM250 350V50H300V350Z" transform="translate(30.83 0) scale(0.032727 -0.032727)"/>
+<path d="M50 400V0H300V50H100V200H250V250H100V350H300V400Z" transform="translate(46.24 0) scale(0.032727 -0.032727)"/>
+<path d="M250 150V0H300V150ZM50 150V0H100V150ZM150 250V300H100V250ZM150 250V200H200V250ZM200 300V250H250V300ZM100 300V400H50V300ZM100 200V150H150V200ZM250 400V300H300V400ZM200 200V150H250V200Z" transform="translate(61.66 0) scale(0.032727 -0.032727)"/>
+</g>
+</svg>
