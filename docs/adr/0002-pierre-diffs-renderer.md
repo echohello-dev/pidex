@@ -10,4 +10,3 @@
   - Same engine as OpenChamber / Claude Code / Codex / Cursor — visual parity for shared screenshots.
   - Adds ~1MB of language packs to the bundle; acceptable for an agent workbench, with `chunks larger than 500kB` warning expected until we code-split Shiki languages.
   - Plumbs into future "review session" views where merge-conflict UI will reuse the same renderer.
-  - Until file content plumbed from the main process, the renderer ships a `Fig. 02 | Pierre diff probe` sample in the empty state.
