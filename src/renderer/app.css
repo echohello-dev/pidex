@@ -332,6 +332,10 @@
   color: var(--faint);
 }
 
+.empty-mark {
+  color: var(--text);
+}
+
 .empty-title {
   font-family: var(--serif);
   font-size: 1.4rem;

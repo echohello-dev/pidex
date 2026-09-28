@@ -62,7 +62,7 @@
   --grid-major: hsl(218 60% 80% / 0.02625);
 
   /* Type */
-  --serif: "Plantin MT Pro", "Plantin MT Std", Plantin, Georgia, "Times New Roman", serif;
+  --serif: "Newsreader", Georgia, "Times New Roman", serif;
   --mono: "Commit Mono", "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, monospace;
   --accent-mono: "Departure Mono", "Commit Mono", "SFMono-Regular", ui-monospace, Menlo, Monaco,
     Consolas, monospace;
