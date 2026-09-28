@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { prepare, layout } from '@chenglou/pretext';
 import { PiMark } from './components/PiMark';
+import { PidexMark } from './components/PidexMark';
 import { FigureFrame } from './components/FigureFrame';
 import { BracketButton } from './components/BracketButton';
 import { Markdown } from './components/Markdown';
@@ -21,7 +22,7 @@ type SessionTab = {
   exited: boolean;
 };
 
-const BODY_FONT = '450 15px Georgia, serif';
+const BODY_FONT = '450 15px Newsreader, Georgia, serif';
 
 function timeAgo(iso: string): string {
   const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -92,6 +93,7 @@ function App() {
   const [draft, setDraft] = useState('');
   const [opening, setOpening] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
+  const [fontReady, setFontReady] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const bootstrapped = useRef(false);
   const openSessionRef = useRef<(ws: WorkspaceInfo, info?: SessionInfo) => Promise<void>>(
@@ -147,8 +149,28 @@ function App() {
     timelineRef.current?.scrollTo({ top: timelineRef.current.scrollHeight });
   }, [activeTab?.entries.length, activeTab?.entries[activeTab.entries.length - 1]]);
 
+  useEffect(() => {
+    let cancel = false;
+    const fonts = document.fonts;
+    if (!fonts?.load) {
+      setFontReady(true);
+      return;
+    }
+    fonts.load(BODY_FONT).then(
+      () => {
+        if (!cancel) setFontReady(true);
+      },
+      () => {
+        if (!cancel) setFontReady(true);
+      },
+    );
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
   const measuredRows = useMemo(() => {
-    if (!activeTab) return 0;
+    if (!activeTab || !fontReady) return 0;
     let rows = 0;
     for (const entry of activeTab.entries) {
       if (entry.kind === 'tool') continue;
@@ -158,7 +180,7 @@ function App() {
       rows += layout(prepared, 780, 24).lineCount;
     }
     return rows;
-  }, [activeTab]);
+  }, [activeTab, fontReady]);
 
   const expandWorkspace = async (ws: WorkspaceInfo) => {
     const next = expanded === ws.dirName ? null : ws.dirName;
@@ -526,7 +548,7 @@ function App() {
             </>
           ) : (
             <div className="empty-pane">
-              <PiMark size={40} />
+              <PidexMark className="empty-mark" size={56} />
               <p className="empty-title">No session open</p>
               <p className="empty-copy">
                 Pick a session from the sidebar, or start a new one in the expanded workspace.
