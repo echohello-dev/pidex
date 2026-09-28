@@ -31,10 +31,11 @@ def build_bg_svg():
         '<stop offset="1" stop-color="#0d1116" stop-opacity="0.85"/>'
         '</linearGradient>'
         '<pattern id="grid_minor" width="96" height="96" patternUnits="userSpaceOnUse">'
-        '<path d="M 96 0 L 0 0 0 96" fill="none" stroke="hsl(218 60% 80% / 0.10)" stroke-width="1"/>'
+        '<path d="M 96 0 L 0 0 0 96" fill="none" stroke="hsl(218 60% 80% / 0.16)" stroke-width="2"/>'
         '</pattern>'
         '<pattern id="grid_major" width="480" height="480" patternUnits="userSpaceOnUse">'
-        '<path d="M 480 0 L 0 0 0 480" fill="none" stroke="hsl(218 60% 80% / 0.22)" stroke-width="1.5"/>'
+        '<path d="M 480 0 L 0 0 0 480" fill="none" stroke="hsl(218 60% 80% / 0.34)" stroke-width="3"/>'
+        '<path d="M 468 0 H 492 M 480 -12 V 12" fill="none" stroke="hsl(218 60% 80% / 0.55)" stroke-width="3"/>'
         '</pattern>'
         '</defs>'
         f'<rect x="0" y="0" width="{BANNER_W}" height="{BANNER_H}" fill="#161d27"/>'
@@ -76,7 +77,7 @@ def main():
             "--export-filename",
             str(lockup),
             "--export-width",
-            "760",
+            "920",
         ],
         check=True,
     )
