@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4.00 8.00 112.00 112.00">
+  <defs>
+    <clipPath id="pi-face-accent">
+      <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00"/>
+    </clipPath>
+  </defs>
+  <polygon points="18.43,40.00 60.00,64.00 60.00,112.00 18.43,88.00" fill="#2c4058" stroke="#d5e4f2" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="101.57,40.00 60.00,64.00 60.00,112.00 101.57,88.00" fill="#4b607c" stroke="#d5e4f2" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00" fill="#6a9fcc" stroke="#d5e4f2" stroke-width="1.5" stroke-linejoin="round"/>
+  <g clip-path="url(#pi-face-accent)">
+    <g transform="matrix(0.08855254 0.05112583 -0.08855254 0.05112583 60.00 0)">
+      <path fill="#0d1116" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+      <path fill="#0d1116" d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+    </g>
+  </g>
+</svg>

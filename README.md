@@ -22,10 +22,13 @@ Daily coding-agent work means juggling repos, branches, and sessions, and the cu
 
 ## In action
 
-| | |
-|---|---|
-| ![Boot](docs/assets/workbench-boot.gif) | ![Loaded](docs/assets/workbench-loaded.gif) |
-| App booting, workspaces populate | The workbench, fully loaded |
+![App booting, workspaces populate](docs/assets/workbench-boot.png)
+
+App booting, workspaces populate.
+
+![The workbench, fully loaded](docs/assets/workbench-loaded.png)
+
+The workbench, fully loaded.
 
 ## Install
 

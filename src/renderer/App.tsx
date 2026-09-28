@@ -5,7 +5,6 @@ import { PidexMark } from './components/PidexMark';
 import { FigureFrame } from './components/FigureFrame';
 import { BracketButton } from './components/BracketButton';
 import { Markdown } from './components/Markdown';
-import { PierreDiff } from './components/PierreDiff';
 import { applyEvent, entriesFromMessages } from './timeline';
 import type { Entry } from './timeline';
 import type { SessionInfo, SlashCommand, WorkspaceInfo } from './api';
@@ -48,41 +47,6 @@ function ToolOutput({ text }: { text: string }) {
     </>
   );
 }
-
-const PIERRE_DIFF_SAMPLE = {
-  filename: 'src/renderer/components/Markdown.tsx',
-  oldFile: `import MarkdownIt from 'markdown-it';
-
-const md = new MarkdownIt({ html: false });
-
-type MarkdownProps = { text: string };
-
-function Markdown({ text }: MarkdownProps) {
-  return <div dangerouslySetInnerHTML={{ __html: md.render(text) }} />;
-}
-
-export { Markdown };
-`,
-  newFile: `import MarkdownIt from 'markdown-it';
-import { useMemo } from 'react';
-
-const md = new MarkdownIt({ html: false, breaks: true, linkify: true });
-
-type MarkdownProps = { text: string; className?: string };
-
-function Markdown({ text, className }: MarkdownProps) {
-  const html = useMemo(() => md.render(text), [text]);
-  return (
-    <div
-      className={['md', className].filter(Boolean).join(' ')}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
-}
-
-export { Markdown };
-`,
-};
 
 function App() {
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
@@ -553,17 +517,6 @@ function App() {
               <p className="empty-copy">
                 Pick a session from the sidebar, or start a new one in the expanded workspace.
               </p>
-              <FigureFrame
-                className="probe"
-                caption="Fig. 02 | Pierre diff probe"
-                live={false}
-              >
-                <PierreDiff
-                  oldFile={PIERRE_DIFF_SAMPLE.oldFile}
-                  newFile={PIERRE_DIFF_SAMPLE.newFile}
-                  filename={PIERRE_DIFF_SAMPLE.filename}
-                />
-              </FigureFrame>
             </div>
           )}
         </main>

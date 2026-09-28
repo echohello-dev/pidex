@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+<path d="M0 0 V160 M0 0 H160" stroke="#6a9fcc" stroke-opacity="0.55" stroke-width="0.6"/>
+<path d="M8 0 V160 M0 8 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M16 0 V160 M0 16 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M24 0 V160 M0 24 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M32 0 V160 M0 32 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M40 0 V160 M0 40 H160" stroke="#6a9fcc" stroke-opacity="0.55" stroke-width="0.6"/>
+<path d="M48 0 V160 M0 48 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M56 0 V160 M0 56 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M64 0 V160 M0 64 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M72 0 V160 M0 72 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M80 0 V160 M0 80 H160" stroke="#6a9fcc" stroke-opacity="0.55" stroke-width="0.6"/>
+<path d="M88 0 V160 M0 88 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M96 0 V160 M0 96 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M104 0 V160 M0 104 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M112 0 V160 M0 112 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M120 0 V160 M0 120 H160" stroke="#6a9fcc" stroke-opacity="0.55" stroke-width="0.6"/>
+<path d="M128 0 V160 M0 128 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M136 0 V160 M0 136 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M144 0 V160 M0 144 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M152 0 V160 M0 152 H160" stroke="#6a9fcc" stroke-opacity="0.16" stroke-width="0.6"/>
+<path d="M160 0 V160 M0 160 H160" stroke="#6a9fcc" stroke-opacity="0.55" stroke-width="0.6"/>
+<path d="M10 24 V10 H24" fill="none" stroke="#ebe7e4" stroke-width="1.25"/>
+<path d="M150 24 V10 H136" fill="none" stroke="#ebe7e4" stroke-width="1.25"/>
+<path d="M10 136 V150 H24" fill="none" stroke="#ebe7e4" stroke-width="1.25"/>
+<path d="M150 136 V150 H136" fill="none" stroke="#ebe7e4" stroke-width="1.25"/>
+<g transform="translate(24 28) scale(0.96)">
+  <defs>
+    <clipPath id="pi-face-blueprint">
+      <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00"/>
+    </clipPath>
+  </defs>
+  <polygon points="18.43,40.00 60.00,64.00 60.00,112.00 18.43,88.00" fill="none" stroke="#ebe7e4" stroke-width="1.75" stroke-linejoin="round"/>
+  <polygon points="101.57,40.00 60.00,64.00 60.00,112.00 101.57,88.00" fill="none" stroke="#ebe7e4" stroke-width="1.75" stroke-linejoin="round"/>
+  <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00" fill="none" stroke="#ebe7e4" stroke-width="1.75" stroke-linejoin="round"/>
+  <g clip-path="url(#pi-face-blueprint)">
+    <g transform="matrix(0.08855254 0.05112583 -0.08855254 0.05112583 60.00 0)">
+      <path fill="#ebe7e4" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+      <path fill="#ebe7e4" d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+    </g>
+  </g>
+</g>
+</svg>

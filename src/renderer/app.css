@@ -603,11 +603,6 @@
   color: var(--faint);
 }
 
-.empty-pane .probe {
-  margin-top: var(--space-5);
-  width: min(880px, 100%);
-}
-
 /* Tool card ------------------------------------------------------------- */
 
 .tool-card {
