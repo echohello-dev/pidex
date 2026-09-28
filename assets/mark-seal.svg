@@ -31,19 +31,6 @@
 <line x1="135.25" y1="135.25" x2="140.91" y2="140.91" stroke="#6e849c" stroke-width="0.9"/>
 <line x1="131.14" y1="139.03" x2="136.28" y2="145.16" stroke="#6e849c" stroke-width="0.9"/>
 <line x1="126.71" y1="142.43" x2="131.30" y2="148.98" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="119.00" y1="140.23" x2="126.00" y2="152.35" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="117.05" y1="148.00" x2="120.43" y2="155.25" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="111.89" y1="150.14" x2="114.63" y2="157.66" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="106.56" y1="151.82" x2="108.63" y2="159.55" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="101.11" y1="153.03" x2="102.50" y2="160.91" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="95.58" y1="153.76" x2="96.28" y2="161.73" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="90.00" y1="148.00" x2="90.00" y2="162.00" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="84.42" y1="153.76" x2="83.72" y2="161.73" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="78.89" y1="153.03" x2="77.50" y2="160.91" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="73.44" y1="151.82" x2="71.37" y2="159.55" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="68.11" y1="150.14" x2="65.37" y2="157.66" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="62.95" y1="148.00" x2="59.57" y2="155.25" stroke="#6e849c" stroke-width="0.9"/>
-<line x1="61.00" y1="140.23" x2="54.00" y2="152.35" stroke="#6e849c" stroke-width="0.9"/>
 <line x1="53.29" y1="142.43" x2="48.70" y2="148.98" stroke="#6e849c" stroke-width="0.9"/>
 <line x1="48.86" y1="139.03" x2="43.72" y2="145.16" stroke="#6e849c" stroke-width="0.9"/>
 <line x1="44.75" y1="135.25" x2="39.09" y2="140.91" stroke="#6e849c" stroke-width="0.9"/>
@@ -73,12 +60,12 @@
 <line x1="73.44" y1="28.18" x2="71.37" y2="20.45" stroke="#6e849c" stroke-width="0.9"/>
 <line x1="78.89" y1="26.97" x2="77.50" y2="19.09" stroke="#6e849c" stroke-width="0.9"/>
 <line x1="84.42" y1="26.24" x2="83.72" y2="18.27" stroke="#6e849c" stroke-width="0.9"/>
-<path d="M50 400V0H100V150H250V200H100V350H250V400ZM250 350V200H300V350Z" fill="#ebe7e4" transform="translate(63.79 45.09) rotate(-30.26) scale(0.023636 -0.023636)"/>
-<path d="M150 50H50V0H300V50H200V350H300V400H50V350H150Z" fill="#ebe7e4" transform="translate(76.43 39.80) rotate(-15.13) scale(0.023636 -0.023636)"/>
-<path d="M50 400V0H250V50H100V350H250V400ZM250 350V50H300V350Z" fill="#ebe7e4" transform="translate(90.00 38.00) rotate(0.00) scale(0.023636 -0.023636)"/>
-<path d="M50 400V0H300V50H100V200H250V250H100V350H300V400Z" fill="#ebe7e4" transform="translate(103.57 39.80) rotate(15.13) scale(0.023636 -0.023636)"/>
-<path d="M250 150V0H300V150ZM50 150V0H100V150ZM150 250V300H100V250ZM150 250V200H200V250ZM200 300V250H250V300ZM100 300V400H50V300ZM100 200V150H150V200ZM250 400V300H300V400ZM200 200V150H250V200Z" fill="#ebe7e4" transform="translate(116.21 45.09) rotate(30.26) scale(0.023636 -0.023636)"/>
-<g transform="translate(90 108) scale(0.62) translate(-60 -64)">
+<path d="M50 400V0H100V150H250V200H100V350H250V400ZM250 350V200H300V350Z" fill="#ebe7e4" transform="translate(68.10 154) scale(0.020000 -0.020000)"/>
+<path d="M150 50H50V0H300V50H200V350H300V400H50V350H150Z" fill="#ebe7e4" transform="translate(77.30 154) scale(0.020000 -0.020000)"/>
+<path d="M50 400V0H250V50H100V350H250V400ZM250 350V50H300V350Z" fill="#ebe7e4" transform="translate(86.50 154) scale(0.020000 -0.020000)"/>
+<path d="M50 400V0H300V50H100V200H250V250H100V350H300V400Z" fill="#ebe7e4" transform="translate(95.70 154) scale(0.020000 -0.020000)"/>
+<path d="M250 150V0H300V150ZM50 150V0H100V150ZM150 250V300H100V250ZM150 250V200H200V250ZM200 300V250H250V300ZM100 300V400H50V300ZM100 200V150H150V200ZM250 400V300H300V400ZM200 200V150H250V200Z" fill="#ebe7e4" transform="translate(104.90 154) scale(0.020000 -0.020000)"/>
+<g transform="translate(90 96) scale(0.58) translate(-60 -64)">
   <defs>
     <clipPath id="pi-face-seal">
       <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00"/>

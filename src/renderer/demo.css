@@ -60,6 +60,42 @@ body {
   gap: var(--space-4);
 }
 
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+.style-grid > * {
+  min-width: 0;
+}
+
+.mascot-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+.stage--mascot img {
+  width: min(100%, 420px);
+}
+
+.mascot-grid .specimen {
+  align-content: end;
+}
+
+.mascot-row,
+.object-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+.mascot-row .stage img {
+  width: 168px;
+}
+
 .stage {
   display: grid;
   place-items: center;
@@ -74,6 +110,7 @@ body {
 
 .stage img {
   width: 132px;
+  max-width: 100%;
   height: auto;
 }
 
@@ -178,10 +215,29 @@ body {
   align-items: center;
 }
 
-.component-grid {
+.component-grid,
+.pattern-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
+}
+
+.pattern-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr;
+  gap: var(--space-4);
+}
+
+.pattern-swatch {
+  min-height: 148px;
+}
+
+.pattern-load {
+  display: grid;
+  align-content: center;
+  gap: var(--space-4);
+  min-height: 148px;
+  padding: var(--space-4);
 }
 
 .frame-body {
@@ -194,11 +250,18 @@ body {
   .board { padding: var(--space-5) var(--space-4) var(--space-7); }
   .logo-grid,
   .lockup-grid,
+  .style-grid,
   .swatches,
   .type-grid,
-  .component-grid {
+  .component-grid,
+  .pattern-grid,
+  .mascot-row,
+  .object-grid {
     grid-template-columns: 1fr 1fr;
   }
   .mast h1 { font-size: 2.6rem; }
   .cube-mark { height: 360px; }
+  .mascot-grid,
+  .style-grid--lockup,
+  .pattern-split { grid-template-columns: 1fr; }
 }

@@ -28,9 +28,7 @@ spec.loader.exec_module(logo)
 INK = logo.INK
 EDGE = logo.EDGE
 ACCENT = "#6a9fcc"
-DEEP = "#0d1116"
 WARM = "#e1b06e"
-WARM_INK = "#13110f"
 
 
 def svg(inner: str, view: str) -> str:
@@ -136,6 +134,9 @@ def outline_glyphs(font_path: Path, text: str, size: float) -> list[tuple[str, f
 def seal_with_upem(upem: int) -> str:
     ticks = []
     for i in range(72):
+        # Leave the bottom of the ring clear for the word.
+        if 30 <= i <= 42:
+            continue
         angle = math.radians(i * 5 - 90)
         inner = 64 if i % 6 else 58
         outer = 72
@@ -144,24 +145,18 @@ def seal_with_upem(upem: int) -> str:
         ticks.append(
             f'<line x1="{x0:.2f}" y1="{y0:.2f}" x2="{x1:.2f}" y2="{y1:.2f}" stroke="{EDGE}" stroke-width="0.9"/>'
         )
-    size = 13.0
+    size = 11.0
     letters = outline_glyphs(DEPARTURE, "PIDEX", size)
-    gap = size * 0.42
-    width = sum(advance for _, advance in letters) + gap * (len(letters) - 1)
-    radius = 52
-    cursor = -width / 2
-    glyphs = []
+    gap = size * 0.2
+    tracked = sum(advance for _, advance in letters) + gap * (len(letters) - 1)
     scale = size / upem
+    cursor = 90 - tracked / 2
+    glyphs = []
     for commands, advance in letters:
-        mid = cursor + advance / 2
-        theta = mid / radius
-        x = 90 + radius * math.sin(theta)
-        y = 90 - radius * math.cos(theta)
-        deg = math.degrees(theta)
         if commands:
             glyphs.append(
                 f'<path d="{commands}" fill="{INK}" '
-                f'transform="translate({x:.2f} {y:.2f}) rotate({deg:.2f}) scale({scale:.6f} {-scale:.6f})"/>'
+                f'transform="translate({cursor:.2f} 154) scale({scale:.6f} {-scale:.6f})"/>'
             )
         cursor += advance + gap
     cube = logo.cube_markup(logo.PRIMARY, "pi-face-seal")
@@ -172,7 +167,7 @@ def seal_with_upem(upem: int) -> str:
                 f'<circle cx="90" cy="90" r="76" fill="none" stroke="{EDGE}" stroke-width="0.75"/>',
                 *ticks,
                 *glyphs,
-                '<g transform="translate(90 108) scale(0.62) translate(-60 -64)">',
+                '<g transform="translate(90 96) scale(0.58) translate(-60 -64)">',
                 cube,
                 "</g>",
             ]
@@ -282,44 +277,171 @@ def diamond(cx: float, cy: float, e: float, scale: float) -> list[tuple[float, f
     return [xy(1 + (p - 1) * scale, q * scale) for p, q in corners]
 
 
-def mascot() -> str:
-    body, _ = iso_cube(78, 78, 78, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
-    dx = 78 * 0.8660254037844386
-    dy = 78 * 0.5
-    # Back tip of the top face is (cx, cy - dy). The Pi's top-left lands there.
+def pi_on_face(cx: float, cy: float, e: float, clip_id: str = "mascot-face") -> str:
+    dx = e * 0.8660254037844386
+    dy = e * 0.5
     b = dy / logo.PI_SPAN
-    ty = (78 - dy) - 2 * b * 165.29
-    pi_scale_matrix = (
-        f"matrix({dx / logo.PI_SPAN:.8f} {b:.8f} {-dx / logo.PI_SPAN:.8f} {b:.8f} 78.00 {ty:.2f})"
+    # Back tip of the top face is (cx, cy - dy). The Pi's top-left lands there.
+    ty = (cy - dy) - 2 * b * 165.29
+    matrix = f"matrix({dx / logo.PI_SPAN:.8f} {b:.8f} {-dx / logo.PI_SPAN:.8f} {b:.8f} {cx:.2f} {ty:.2f})"
+    face = " ".join(f"{x:.2f},{y:.2f}" for x, y in diamond(cx, cy, e, 1))
+    return "\n".join(
+        [
+            "<defs>",
+            f'  <clipPath id="{clip_id}"><polygon points="{face}"/></clipPath>',
+            "</defs>",
+            f'<g clip-path="url(#{clip_id})">',
+            f'  <g transform="{matrix}" fill="{INK}">',
+            f'    <path fill-rule="evenodd" d="{logo.P_D}"/>',
+            f'    <path d="{logo.I_DOT_D}"/>',
+            "  </g>",
+            "</g>",
+        ]
     )
-    dot_cube, _ = iso_cube(168, 118, 36, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
-    dot = diamond(168, 118, 36, 0.5)
-    dot_pts = " ".join(f"{x:.2f},{y:.2f}" for x, y in dot)
-    left_foot, _ = iso_cube(52, 168, 20, "#243246", "#31475c", "#1a2432", EDGE)
-    right_foot, _ = iso_cube(104, 168, 20, "#243246", "#31475c", "#1a2432", EDGE)
+
+
+def iso_prism(
+    cx: float,
+    cy: float,
+    width: float,
+    depth: float,
+    height: float,
+    top: str,
+    right: str,
+    left: str,
+    edge: str,
+) -> str:
+    """Top-face centre at (cx, cy). A cube is width = depth = height."""
+    rx = 0.8660254037844386
+
+    def pt(across: float, along: float, down: float = 0) -> tuple[float, float]:
+        return (cx + across * (width / 2) * rx, cy + along * (depth / 2) + down)
+
+    back, right_pt, front, left_pt = pt(0, -1), pt(1, 0), pt(0, 1), pt(-1, 0)
+
+    def drop(p: tuple[float, float]) -> tuple[float, float]:
+        return (p[0], p[1] + height)
+
+    def poly(points: list[tuple[float, float]], fill: str) -> str:
+        body = " ".join(f"{x:.2f},{y:.2f}" for x, y in points)
+        return (
+            f'<polygon points="{body}" fill="{fill}" stroke="{edge}" '
+            'stroke-width="1.6" stroke-linejoin="round"/>'
+        )
+
+    return "\n".join(
+        [
+            poly([left_pt, front, drop(front), drop(left_pt)], left),
+            poly([right_pt, front, drop(front), drop(right_pt)], right),
+            poly([back, right_pt, front, left_pt], top),
+        ]
+    )
+
+
+FOOT = "#243246"
+FOOT_RIGHT = "#31475c"
+FOOT_LEFT = "#1a2432"
+
+
+def feet_at(cx: float, ground: float, spread: float, size: float) -> list[str]:
+    cy = ground - 1.5 * size + size * 0.45
+    return [
+        iso_cube(cx - spread, cy, size, FOOT, FOOT_RIGHT, FOOT_LEFT, EDGE)[0],
+        iso_cube(cx + spread, cy, size, FOOT, FOOT_RIGHT, FOOT_LEFT, EDGE)[0],
+    ]
+
+
+def standing_dot(cx: float, ground: float, e: float) -> list[str]:
+    cy = ground - 1.5 * e
+    body, _ = iso_cube(cx, cy, e, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
+    mark = " ".join(f"{x:.2f},{y:.2f}" for x, y in diamond(cx, cy, e, 0.48))
+    return [
+        *feet_at(cx, ground, e * 0.28, e * 0.28),
+        body,
+        f'<polygon points="{mark}" fill="{INK}"/>',
+    ]
+
+
+def mascot() -> str:
+    # Both cubes share a front-bottom line, with a gap between them.
+    ground = 196.0
+    body_e = 86.0
+    body_cx, body_cy = 82.0, ground - 1.5 * body_e
+    side_e = 40.0
+    side_cx, side_cy = 196.0, ground - 1.5 * side_e
+    body, _ = iso_cube(body_cx, body_cy, body_e, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
+    side, _ = iso_cube(side_cx, side_cy, side_e, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
+    dot = " ".join(f"{x:.2f},{y:.2f}" for x, y in diamond(side_cx, side_cy, side_e, 0.48))
+    feet = [
+        *feet_at(body_cx, ground, 26, 18),
+        *feet_at(side_cx, ground, 10, 11),
+    ]
     return svg(
         "\n".join(
             [
-                '<ellipse cx="112" cy="214" rx="96" ry="9" fill="#000" opacity="0.38"/>',
-                left_foot,
-                right_foot,
+                '<ellipse cx="128" cy="214" rx="108" ry="8" fill="#000" opacity="0.32"/>',
+                *feet,
                 body,
-                "<defs>",
-                '  <clipPath id="mascot-face">',
-                f'    <polygon points="{" ".join(f"{x:.2f},{y:.2f}" for x, y in diamond(78, 78, 78, 1))}"/>',
-                "  </clipPath>",
-                "</defs>",
-                '<g clip-path="url(#mascot-face)">',
-                f'  <g transform="{pi_scale_matrix}" fill="{INK}">',
-                f'    <path fill-rule="evenodd" d="{logo.P_D}"/>',
-                f'    <path d="{logo.I_DOT_D}"/>',
-                "  </g>",
-                "</g>",
-                dot_cube,
-                f'<polygon points="{dot_pts}" fill="{INK}"/>',
+                pi_on_face(body_cx, body_cy, body_e),
+                side,
+                f'<polygon points="{dot}" fill="{INK}"/>',
             ]
         ),
-        "0 0 230 230",
+        "0 0 260 230",
+    )
+
+
+def mascot_dot() -> str:
+    ground = 158.0
+    return svg(
+        "\n".join(
+            [
+                '<ellipse cx="80" cy="172" rx="52" ry="7" fill="#000" opacity="0.32"/>',
+                *standing_dot(80, ground, 70),
+            ]
+        ),
+        "0 0 160 186",
+    )
+
+
+def mascot_page() -> str:
+    """A standing sheet. Thin in depth, so the broad face reads as a page."""
+    ground = 198.0
+    page = iso_prism(86, 64, 112, 14, 128, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
+    return svg(
+        "\n".join(
+            [
+                '<ellipse cx="120" cy="214" rx="104" ry="8" fill="#000" opacity="0.32"/>',
+                *feet_at(86, ground, 22, 14),
+                page,
+                '<path d="M62 96 H112 M62 112 H104" fill="none" stroke="#6e849c" stroke-width="1.5"/>',
+                pi_group(58, 124, 46, INK),
+                *standing_dot(186, ground, 42),
+            ]
+        ),
+        "0 0 250 228",
+    )
+
+
+def mascot_desk() -> str:
+    """The pair at a low slab, with a sheet on the desk."""
+    ground = 168.0
+    desk = iso_prism(124, 158, 200, 86, 16, "#243246", "#31475c", "#1a2432", EDGE)
+    page = iso_prism(132, 118, 78, 12, 70, "#2a3b50", "#3d536b", "#1c2838", EDGE)
+    return svg(
+        "\n".join(
+            [
+                '<ellipse cx="124" cy="208" rx="118" ry="8" fill="#000" opacity="0.28"/>',
+                *feet_at(64, ground, 16, 12),
+                iso_cube(64, ground - 1.5 * 58, 58, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)[0],
+                pi_on_face(64, ground - 1.5 * 58, 58, "desk-face"),
+                desk,
+                page,
+                '<path d="M108 128 H156 M108 142 H148" fill="none" stroke="#ebe7e4" stroke-width="1.4" opacity="0.75"/>',
+                *standing_dot(200, 162, 30),
+            ]
+        ),
+        "0 0 270 224",
     )
 
 
@@ -330,15 +452,21 @@ def main() -> None:
     write("mark-stencil.svg", stencil())
     write("mark-blueprint.svg", blueprint())
     write("mark-seal.svg", seal_with_upem(upem))
-    write("mark-accent.svg", logo.build_mark_svg(logo.Palette("#6a9fcc", "#4b607c", "#2c4058", "#d5e4f2", DEEP), "pi-face-accent"))
+    write(
+        "mark-accent.svg",
+        logo.build_mark_svg(logo.Palette("#6a9fcc", "#4d6d8f", "#24384c", "#d5e4f2", INK), "pi-face-accent"),
+    )
     write(
         "mark-warm.svg",
-        logo.build_mark_svg(logo.Palette(WARM, "#a56a42", "#6e4632", "#f4e4cf", WARM_INK), "pi-face-warm"),
+        logo.build_mark_svg(logo.Palette(WARM, "#8f6248", "#5c4034", "#f4e4cf", INK), "pi-face-warm"),
     )
     write("logo-wordmark.svg", wordmark())
     write("logo-editorial.svg", editorial())
     write("logo-label.svg", label_lockup(upem))
     write("mascot.svg", mascot())
+    write("mascot-dot.svg", mascot_dot())
+    write("mascot-page.svg", mascot_page())
+    write("mascot-desk.svg", mascot_desk())
 
 
 if __name__ == "__main__":

@@ -1,16 +1,34 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { AgentLoop } from './components/AgentLoop';
 import { Badge } from './components/Badge';
 import { BracketButton } from './components/BracketButton';
 import { CubeMark } from './components/CubeMark';
+import { PanelStack, SheetTurn, TokenSpin } from './components/DeskObjects';
 import { FigureFrame } from './components/FigureFrame';
+import { FrameLoader } from './components/FrameLoader';
+import { Loader } from './components/Loader';
 import { PiMark } from './components/PiMark';
+import { Skeleton } from './components/Skeleton';
 import mark from '../../assets/mark.svg';
 import markMono from '../../assets/mark-mono.svg';
 import markInverse from '../../assets/mark-inverse.svg';
 import icon from '../../assets/icon.svg';
 import logo from '../../assets/logo.svg';
 import logoStacked from '../../assets/logo-stacked.svg';
+import plate from '../../assets/mark-plate.svg';
+import stencil from '../../assets/mark-stencil.svg';
+import blueprint from '../../assets/mark-blueprint.svg';
+import seal from '../../assets/mark-seal.svg';
+import accent from '../../assets/mark-accent.svg';
+import warm from '../../assets/mark-warm.svg';
+import wordmark from '../../assets/logo-wordmark.svg';
+import editorial from '../../assets/logo-editorial.svg';
+import label from '../../assets/logo-label.svg';
+import mascot from '../../assets/mascot.svg';
+import mascotDot from '../../assets/mascot-dot.svg';
+import mascotPage from '../../assets/mascot-page.svg';
+import mascotDesk from '../../assets/mascot-desk.svg';
 import './design-system/index.css';
 import './demo.css';
 
@@ -86,6 +104,68 @@ function Demo() {
           </div>
         </section>
 
+        <section className="section" id="styles">
+          <h2>Styles</h2>
+          <div className="style-grid">
+            <LogoTile src={plate} caption="Plate" />
+            <LogoTile src={stencil} caption="Stencil" />
+            <LogoTile src={blueprint} caption="Blueprint" />
+            <LogoTile src={seal} caption="Seal" />
+            <LogoTile src={accent} caption="Accent" />
+            <LogoTile src={warm} caption="Warm" />
+          </div>
+          <div className="style-grid style-grid--lockup">
+            <LogoTile src={wordmark} caption="Wordmark" wide />
+            <LogoTile src={editorial} caption="Editorial" wide />
+            <LogoTile src={label} caption="Label" wide />
+          </div>
+        </section>
+
+        <section className="section" id="mascot">
+          <h2>Mascot</h2>
+          <div className="mascot-grid">
+            <FigureFrame caption="The cube and the dot">
+              <div className="stage stage--mascot">
+                <img src={mascot} alt="" />
+              </div>
+            </FigureFrame>
+            <div className="specimen">
+              <p className="ds-eyebrow">Desk pair</p>
+              <h3>The mark, stood up.</h3>
+              <p>
+                The cube carries the Pi. The smaller cube is the square dot, set on the same ground.
+                Same faces, same rim.
+              </p>
+            </div>
+          </div>
+          <div className="mascot-row">
+            <LogoTile src={mascotDot} caption="Dot" />
+            <LogoTile src={mascotPage} caption="Page" />
+            <LogoTile src={mascotDesk} caption="Desk" />
+          </div>
+        </section>
+
+        <section className="section" id="objects">
+          <h2>Objects</h2>
+          <div className="object-grid">
+            <FigureFrame caption="Sheet">
+              <div className="stage">
+                <SheetTurn />
+              </div>
+            </FigureFrame>
+            <FigureFrame caption="Stack">
+              <div className="stage">
+                <PanelStack />
+              </div>
+            </FigureFrame>
+            <FigureFrame caption="Token">
+              <div className="stage">
+                <TokenSpin />
+              </div>
+            </FigureFrame>
+          </div>
+        </section>
+
         <section className="section" id="colour">
           <h2>Colour</h2>
           <div className="swatches">
@@ -118,6 +198,54 @@ function Demo() {
                 prepare(text, font)
                 <br />
                 layout(prepared, 780, 24)
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="patterns">
+          <h2>Patterns</h2>
+          <div className="pattern-grid">
+            <FigureFrame caption="Blueprint">
+              <div className="ds-blueprint pattern-swatch" />
+            </FigureFrame>
+            <FigureFrame caption="Hatch">
+              <div className="ds-hatch pattern-swatch" />
+            </FigureFrame>
+            <FigureFrame caption="Loading">
+              <div className="pattern-load">
+                <Loader label="loading" />
+                <Loader label="thinking" />
+                <Loader label="opening" variant="rule" />
+                <p className="ds-prompt">
+                  <span className="ds-prompt-prefix">›</span>
+                  <span className="ds-caret" />
+                </p>
+              </div>
+            </FigureFrame>
+          </div>
+          <div className="pattern-split">
+            <FigureFrame caption="Session list">
+              <div className="frame-body">
+                <Skeleton rows={4} />
+              </div>
+            </FigureFrame>
+            <FigureFrame caption="Frame">
+              <div className="stage">
+                <FrameLoader label="loading" />
+              </div>
+            </FigureFrame>
+          </div>
+          <div className="pattern-split">
+            <FigureFrame caption="Agent loop">
+              <AgentLoop />
+            </FigureFrame>
+            <div className="specimen">
+              <p className="ds-eyebrow">Session</p>
+              <h3>Think, reply, tool, result.</h3>
+              <p>
+                The four steps a session already runs. The mark travels the square, and the step
+                lights as it passes.
               </p>
             </div>
           </div>

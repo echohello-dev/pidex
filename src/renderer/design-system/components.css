@@ -341,3 +341,383 @@
   border-top: 1px solid var(--line-soft);
   margin: 0;
 }
+
+/* Patterns -------------------------------------------------------------- */
+
+/* pi.dev page grid: 4px fine lines, 20px heavy lines. */
+.ds-blueprint {
+  background-color: var(--bg-canvas);
+  background-image:
+    repeating-linear-gradient(90deg, hsl(218 60% 80% / 0.16) 0 1px, transparent 1px 20px),
+    repeating-linear-gradient(0deg, hsl(218 60% 80% / 0.16) 0 1px, transparent 1px 20px),
+    repeating-linear-gradient(90deg, hsl(218 60% 80% / 0.05) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, hsl(218 60% 80% / 0.05) 0 1px, transparent 1px 4px);
+}
+
+.ds-hatch {
+  background-color: var(--bg-deep);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 7px,
+    var(--line-soft) 7px 8px
+  );
+}
+
+/* Loading --------------------------------------------------------------- */
+
+.ds-loader {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.7rem;
+  color: var(--muted-strong);
+  font-family: var(--accent-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.ds-loader-ticks {
+  display: inline-flex;
+  gap: 0.28rem;
+}
+
+.ds-loader-ticks span {
+  width: 0.42rem;
+  height: 0.42rem;
+  background: var(--line);
+  animation: ds-tick 1.2s steps(1, end) infinite;
+}
+
+.ds-loader-ticks span:nth-child(2) { animation-delay: 0.15s; }
+.ds-loader-ticks span:nth-child(3) { animation-delay: 0.3s; }
+.ds-loader-ticks span:nth-child(4) { animation-delay: 0.45s; }
+
+@keyframes ds-tick {
+  0%,
+  22% { background: var(--accent); }
+  23%,
+  100% { background: var(--line); }
+}
+
+.ds-scan {
+  position: relative;
+  display: block;
+  width: 8.5rem;
+  height: 2px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.ds-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: ds-scan 1.2s steps(7, end) infinite;
+}
+
+@keyframes ds-scan {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(280%); }
+}
+
+.ds-skeleton {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.ds-skeleton-row {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.ds-skeleton-row span {
+  display: block;
+  height: 0.55rem;
+  background: var(--panel-soft);
+  animation: ds-blink 1.6s steps(1, end) infinite;
+}
+
+.ds-skeleton-row span:first-child { width: 78%; }
+.ds-skeleton-row span:last-child { width: 34%; }
+
+.ds-skeleton-row:nth-child(2) span { animation-delay: 0.15s; }
+.ds-skeleton-row:nth-child(3) span { animation-delay: 0.3s; }
+.ds-skeleton-row:nth-child(4) span { animation-delay: 0.45s; }
+
+.ds-caret {
+  display: inline-block;
+  width: 0.5ch;
+  height: 0.95em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: ds-blink 1.05s steps(1, end) infinite;
+}
+
+/* 3D frame loader. Corner brackets, not a cube. */
+
+.ds-frame-loader {
+  display: grid;
+  justify-items: center;
+  gap: 0.9rem;
+}
+
+.ds-frame-loader-scene {
+  width: 96px;
+  height: 96px;
+  perspective: 340px;
+}
+
+.ds-frame-loader-spin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: ds-frame-turn 7.5s linear infinite;
+}
+
+@keyframes ds-frame-turn {
+  from { transform: rotateX(-24deg) rotateY(0deg); }
+  to { transform: rotateX(-24deg) rotateY(360deg); }
+}
+
+.ds-frame-loader-plane {
+  position: absolute;
+  inset: 10px;
+  border: 1px solid var(--line-strong);
+  transform-style: preserve-3d;
+}
+
+.ds-frame-loader-plane--front { transform: translateZ(28px); }
+.ds-frame-loader-plane--back {
+  transform: translateZ(-28px);
+  border-color: var(--accent-border-strong);
+}
+
+.ds-frame-loader-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  color: var(--moonstone);
+}
+
+.ds-frame-loader-plane--back .ds-frame-loader-corner { color: var(--accent); }
+
+.ds-frame-loader-corner--tl { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+.ds-frame-loader-corner--tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+.ds-frame-loader-corner--bl { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+.ds-frame-loader-corner--br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+/* Agent loop ------------------------------------------------------------ */
+
+.ds-loop {
+  padding: 1.15rem 1.5rem 1.35rem;
+}
+
+.ds-loop-stage {
+  position: relative;
+  width: min(100%, 240px);
+  margin: 0 auto;
+}
+
+.ds-loop-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--line-strong);
+}
+
+.ds-loop-track {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.ds-loop-head {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 48 720;
+  animation: ds-loop-run 4.8s linear infinite;
+}
+
+@keyframes ds-loop-run {
+  to { stroke-dashoffset: -768; }
+}
+
+.ds-loop-node {
+  position: absolute;
+  padding: 0.28rem 0.46rem 0.34rem;
+  border: 1px solid var(--line-soft);
+  background: var(--panel);
+  color: var(--muted);
+  font-family: var(--accent-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  animation: ds-loop-on 4.8s steps(1, end) infinite;
+}
+
+.ds-loop-node:nth-child(3) { animation-delay: 1.2s; }
+.ds-loop-node:nth-child(4) { animation-delay: 2.4s; }
+.ds-loop-node:nth-child(5) { animation-delay: 3.6s; }
+
+.ds-loop-node--think { top: 0; left: 0; transform: translate(-18%, -42%); }
+.ds-loop-node--reply { top: 0; right: 0; transform: translate(18%, -42%); }
+.ds-loop-node--tool { bottom: 0; right: 0; transform: translate(18%, 42%); }
+.ds-loop-node--result { bottom: 0; left: 0; transform: translate(-18%, 42%); }
+
+@keyframes ds-loop-on {
+  0%,
+  24% {
+    color: var(--text);
+    border-color: var(--accent);
+    background: var(--accent-surface-soft);
+  }
+  25%,
+  100% {
+    color: var(--muted);
+    border-color: var(--line-soft);
+    background: var(--panel);
+  }
+}
+
+/* 3D objects. Sheets and a token, not cubes. */
+
+.ds-object {
+  display: grid;
+  justify-items: center;
+  gap: 0.85rem;
+}
+
+.ds-object-scene {
+  width: 140px;
+  height: 140px;
+  display: grid;
+  place-items: center;
+  perspective: 460px;
+}
+
+.ds-sheet-spin,
+.ds-stack-spin,
+.ds-token-spin {
+  position: relative;
+  transform-style: preserve-3d;
+  animation: ds-object-turn 9s linear infinite;
+}
+
+@keyframes ds-object-turn {
+  from { transform: rotateX(-20deg) rotateY(0deg); }
+  to { transform: rotateX(-20deg) rotateY(360deg); }
+}
+
+.ds-sheet-spin { width: 74px; height: 100px; }
+
+.ds-sheet {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 7px;
+  background: #2a3b50;
+  border: 1px solid #6e849c;
+  color: var(--moonstone);
+  backface-visibility: hidden;
+  transform: translateZ(4px);
+}
+
+.ds-sheet i {
+  display: block;
+  width: 34px;
+  height: 2px;
+  background: #6e849c;
+}
+
+.ds-sheet--back {
+  background: #1c2838;
+  transform: rotateY(180deg) translateZ(4px);
+}
+
+.ds-stack-spin { width: 108px; height: 86px; }
+
+.ds-panel3 {
+  position: absolute;
+  inset: 0;
+  background: #2a3b50;
+  border: 1px solid #6e849c;
+  transform: translateZ(var(--z)) rotateY(-6deg);
+}
+
+.ds-panel3::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 28px;
+  top: 22px;
+  height: 2px;
+  background: #6e849c;
+}
+
+.ds-panel3:nth-child(1) { --z: 20px; border-color: var(--accent); }
+.ds-panel3:nth-child(2) { --z: 0px; background: #24384c; }
+.ds-panel3:nth-child(3) { --z: -20px; background: #1c2838; }
+
+.ds-token-spin {
+  width: 78px;
+  height: 78px;
+  animation-name: ds-token-turn;
+}
+
+@keyframes ds-token-turn {
+  from { transform: rotateX(-12deg) rotateY(0deg); }
+  to { transform: rotateX(-12deg) rotateY(360deg); }
+}
+
+.ds-token {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #2a3b50;
+  border: 1px solid var(--moonstone);
+  color: var(--moonstone);
+  backface-visibility: hidden;
+  transform: translateZ(5px);
+}
+
+.ds-token--back {
+  background: var(--moonstone);
+  color: #0d1116;
+  transform: rotateY(180deg) translateZ(5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-loader-ticks span,
+  .ds-scan::after,
+  .ds-skeleton-row span,
+  .ds-caret,
+  .ds-frame-loader-spin,
+  .ds-loop-head,
+  .ds-loop-node,
+  .ds-sheet-spin,
+  .ds-stack-spin,
+  .ds-token-spin {
+    animation: none;
+  }
+
+  .ds-frame-loader-spin,
+  .ds-sheet-spin,
+  .ds-stack-spin { transform: rotateX(-24deg) rotateY(-32deg); }
+  .ds-token-spin { transform: rotateX(-12deg) rotateY(-28deg); }
+  .ds-loop-node--think {
+    color: var(--text);
+    border-color: var(--accent);
+    background: var(--accent-surface-soft);
+  }
+}
