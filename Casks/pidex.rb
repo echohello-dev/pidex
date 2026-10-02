@@ -9,7 +9,7 @@ cask "pidex" do
   desc "Desktop workbench for the Pi coding agent"
   homepage "https://github.com/echohello-dev/pidex"
 
-  depends_on macos: :sonoma
+  depends_on macos: :monterey
 
   app "pidex.app"
 

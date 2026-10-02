@@ -11,10 +11,11 @@
   - electron-builder wants semver; CalVer tags with leading zeros (`2026.08.09-2`) are mapped to `2026.8.9-2` for the packager and `2026.8.9.2` for Winget.
   - Builds are unsigned. macOS Gatekeeper and Windows SmartScreen will warn until Developer ID / Authenticode certs are added via `CSC_*` secrets.
   - Docker is a Linux/X11 fallback, not the daily-driver install. The app reads `~/.pi/agent/sessions` and expects a local Pi CLI.
-  - Official Homebrew and Winget directory listings remain a follow-up (manual PR plus, for Winget, a `WINGET_TOKEN`). The org tap is the supported install path until then.
-  - Snap, Flathub, Chocolatey, and the Mac / Microsoft stores are out of scope until there is signing and a store account.
+  - Official Homebrew and Winget directory listings are manual pull requests against the published installers. The org tap stays the install path until those land.
+  - Signing and notarization run in the release workflow when Developer ID and Authenticode secrets are set. Without them the artefacts stay unsigned.
+  - A Flatpak manifest lives in `packaging/flatpak/`. Flathub submission is a human pull request. Snap, Chocolatey, and the Mac / Microsoft stores stay out of scope.
 
 - **Follow-ups**:
-  - Apple Developer ID + notarization; Authenticode for NSIS.
+  - Add `CSC_LINK`, `APPLE_API_*`, and `WIN_CSC_LINK` secrets. An Apple Development certificate cannot notarize.
   - `electron-updater` once macOS builds are signed (Squirrel.Mac refuses unsigned updates).
-  - PR the cask into `homebrew/homebrew-cask` and the singleton into `microsoft/winget-pkgs`.
+  - After the first `echoHello.Pidex` Winget manifest is merged, update PRs can use `WINGET_TOKEN`.

@@ -2,7 +2,7 @@
 
 pidex ships from GitHub Releases on every push to `main`. Tags stay CalVer (`YYYY.0M.0D`, see [ADR 0009](adr/0009-calver-releases.md)). The packager matrix and public channels are [ADR 0010](adr/0010-distribution-channels.md).
 
-Builds are unsigned. First launch on macOS needs right-click → Open. Windows SmartScreen may ask you to keep the file.
+Builds are unsigned until Developer ID and Authenticode secrets are set on the repository. Until then, first launch on macOS needs right-click → Open, and Windows SmartScreen may ask you to keep the file.
 
 ## GitHub Releases
 
@@ -63,13 +63,35 @@ $ mise run package
 
 `mise run package` builds installers for the platform you are on. CI builds all three.
 
-## Signing (not wired yet)
+## Signing
+
+The release workflow signs when these repository secrets exist. Empty secrets stay unset, and that platform is published unsigned.
+
+| Secret | Value |
+|---|---|
+| `CSC_LINK` | Base64 of the Developer ID Application `.p12` |
+| `CSC_KEY_PASSWORD` | Password for that `.p12` |
+| `APPLE_API_KEY` | Base64 of the App Store Connect API `.p8` |
+| `APPLE_API_KEY_ID` | Key ID |
+| `APPLE_API_ISSUER` | Issuer ID |
+| `APPLE_TEAM_ID` | 10-character Team ID |
+| `WIN_CSC_LINK` | Base64 of the Authenticode `.pfx` |
+| `WIN_CSC_KEY_PASSWORD` | Password for that `.pfx` |
+
+An Apple Development certificate cannot notarize a public DMG. It has to be a Developer ID Application certificate from the Apple Developer Program. With the four `APPLE_*` secrets set as well, electron-builder notarizes and staples the macOS build. Windows uses `WIN_CSC_*` only, so a Mac `.p12` is not sent to the Windows runner.
+
+```bash
+$ base64 -i Certificates.p12 | pbcopy   # store as CSC_LINK
+$ base64 -i AuthKey_XXXX.p8 | pbcopy    # store as APPLE_API_KEY
+```
 
 | Secret | Effect |
 |---|---|
-| `CSC_LINK` + `CSC_KEY_PASSWORD` | electron-builder signs macOS / Windows when present |
-| Apple notarization keys | Required before Gatekeeper stops warning |
-| `WINGET_TOKEN` | Would let CI open the `winget-pkgs` PR |
-| `TAP_TOKEN` | PAT with `repo` on `echohello-dev/homebrew-tap`; pidex dispatches `pidex-release` so the tap syncs immediately instead of waiting for the hourly cron |
+| `WINGET_TOKEN` | Classic PAT (`public_repo`) so a later workflow can open `winget-pkgs` update PRs. The first listing is a manual PR. |
+| `TAP_TOKEN` | PAT with `repo` on `echohello-dev/homebrew-tap`. pidex dispatches `pidex-release` so the tap syncs immediately instead of waiting for the hourly cron. |
 
-Leave them unset and the workflow publishes unsigned artefacts on purpose.
+## Flathub
+
+`packaging/flatpak/` is a Flatpak manifest for `dev.echohello.Pidex`. It wraps the published AppImage and grants `filesystem=home` so `~/.pi` and home-directory workspaces are visible.
+
+Flathub does not accept agent-opened submission pull requests. A person opens that PR against `flathub/flathub` branch `new-pr`. Reviewers also treat host-dependent developer tools as a special case, because pidex shells out to the Pi CLI on the host. The manifest is here so that submission can be made by hand. The AppImage and `.deb` remain the Linux install.
