@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 176">
+<ellipse cx="112.00" cy="162.00" rx="92.00" ry="8" fill="#000" opacity="0.32"/>
+<defs>
+  <clipPath id="twin-big"><circle cx="74.00" cy="102.00" r="46.00"/></clipPath>
+</defs>
+<g clip-path="url(#twin-big)">
+  <circle cx="74.00" cy="102.00" r="46.00" fill="#1c2838"/>
+  <circle cx="96.08" cy="119.48" r="37.72" fill="#3d536b"/>
+</g>
+<circle cx="74.00" cy="102.00" r="46.00" fill="none" stroke="#6e849c" stroke-width="1.5"/>
+<g transform="translate(51.00 81.00) scale(0.097991) translate(-165.29 -165.29)" fill="#ebe7e4">
+  <path fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+  <path d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+</g>
+<defs>
+  <clipPath id="twin-small"><circle cx="156.00" cy="124.00" r="24.00"/></clipPath>
+</defs>
+<g clip-path="url(#twin-small)">
+  <circle cx="156.00" cy="124.00" r="24.00" fill="#1c2838"/>
+  <circle cx="167.52" cy="133.12" r="19.68" fill="#3d536b"/>
+  <circle cx="145.92" cy="112.96" r="3.84" fill="#ebe7e4"/>
+</g>
+<circle cx="156.00" cy="124.00" r="24.00" fill="none" stroke="#6e849c" stroke-width="1.5"/>
+</svg>

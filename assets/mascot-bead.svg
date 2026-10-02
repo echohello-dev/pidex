@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 168">
+<ellipse cx="80" cy="150" rx="48" ry="8" fill="#000" opacity="0.32"/>
+<defs>
+  <clipPath id="bead"><circle cx="80" cy="76" r="56"/></clipPath>
+</defs>
+<g clip-path="url(#bead)">
+  <circle cx="80" cy="76" r="56" fill="#1c2838"/>
+  <circle cx="108" cy="98" r="46" fill="#3d536b"/>
+  <circle cx="52" cy="50" r="9" fill="#ebe7e4"/>
+</g>
+<circle cx="80" cy="76" r="56" fill="none" stroke="#6e849c" stroke-width="1.5"/>
+</svg>

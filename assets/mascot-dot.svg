@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 186">
+<ellipse cx="80" cy="172" rx="52" ry="7" fill="#000" opacity="0.32"/>
+<polygon points="43.43,137.42 60.40,147.22 60.40,166.82 43.43,157.02" fill="#1a2432" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="77.37,137.42 60.40,147.22 60.40,166.82 77.37,157.02" fill="#31475c" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="60.40,127.62 77.37,137.42 60.40,147.22 43.43,137.42" fill="#243246" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="82.63,137.42 99.60,147.22 99.60,166.82 82.63,157.02" fill="#1a2432" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="116.57,137.42 99.60,147.22 99.60,166.82 116.57,157.02" fill="#31475c" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="99.60,127.62 116.57,137.42 99.60,147.22 82.63,137.42" fill="#243246" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="19.38,53.00 80.00,88.00 80.00,158.00 19.38,123.00" fill="#1c2838" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="140.62,53.00 80.00,88.00 80.00,158.00 140.62,123.00" fill="#3d536b" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="80.00,18.00 140.62,53.00 80.00,88.00 19.38,53.00" fill="#2a3b50" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="80.00,36.20 109.10,53.00 80.00,69.80 50.90,53.00" fill="#ebe7e4"/>
+</svg>

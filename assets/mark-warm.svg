@@ -4,13 +4,13 @@
       <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00"/>
     </clipPath>
   </defs>
-  <polygon points="18.43,40.00 60.00,64.00 60.00,112.00 18.43,88.00" fill="#6e4632" stroke="#f4e4cf" stroke-width="1.5" stroke-linejoin="round"/>
-  <polygon points="101.57,40.00 60.00,64.00 60.00,112.00 101.57,88.00" fill="#a56a42" stroke="#f4e4cf" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="18.43,40.00 60.00,64.00 60.00,112.00 18.43,88.00" fill="#5c4034" stroke="#f4e4cf" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="101.57,40.00 60.00,64.00 60.00,112.00 101.57,88.00" fill="#8f6248" stroke="#f4e4cf" stroke-width="1.5" stroke-linejoin="round"/>
   <polygon points="60.00,16.00 101.57,40.00 60.00,64.00 18.43,40.00" fill="#e1b06e" stroke="#f4e4cf" stroke-width="1.5" stroke-linejoin="round"/>
   <g clip-path="url(#pi-face-warm)">
     <g transform="matrix(0.08855254 0.05112583 -0.08855254 0.05112583 60.00 0)">
-      <path fill="#13110f" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
-      <path fill="#13110f" d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+      <path fill="#ebe7e4" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+      <path fill="#ebe7e4" d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
     </g>
   </g>
 </svg>
