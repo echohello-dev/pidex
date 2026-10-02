@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 168">
+<ellipse cx="112.00" cy="142.00" rx="52.00" ry="8" fill="#000" opacity="0.32"/>
+<path d="M 112.00 28.00 A 68.00 68.00 0 1 1 44.00 96.00" fill="none" stroke="#ebe7e4" stroke-width="3" stroke-linecap="round"/>
+<defs>
+  <clipPath id="turn-bead"><circle cx="112.00" cy="96.00" r="30.00"/></clipPath>
+</defs>
+<g clip-path="url(#turn-bead)">
+  <circle cx="112.00" cy="96.00" r="30.00" fill="#1c2838"/>
+  <circle cx="126.40" cy="107.40" r="24.60" fill="#3d536b"/>
+  <circle cx="99.40" cy="82.20" r="4.80" fill="#ebe7e4"/>
+</g>
+<circle cx="112.00" cy="96.00" r="30.00" fill="none" stroke="#6e849c" stroke-width="1.5"/>
+<line x1="112.00" y1="66.00" x2="112.00" y2="28.00" stroke="#6a9fcc" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

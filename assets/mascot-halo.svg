@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 196">
+<ellipse cx="104.00" cy="178.00" rx="86.00" ry="8" fill="#000" opacity="0.32"/>
+<defs>
+  <mask id="halo-mask">
+    <rect width="220" height="196" fill="#fff"/>
+<polygon points="53.77,77.00 104.00,106.00 104.00,164.00 53.77,135.00" fill="#000" stroke="#000" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="154.23,77.00 104.00,106.00 104.00,164.00 154.23,135.00" fill="#000" stroke="#000" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="104.00,48.00 154.23,77.00 104.00,106.00 53.77,77.00" fill="#000" stroke="#000" stroke-width="1.6" stroke-linejoin="round"/>
+  </mask>
+</defs>
+<polygon points="80.47,152.45 90.00,157.95 90.00,168.95 80.47,163.45" fill="#1a2432" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="99.53,152.45 90.00,157.95 90.00,168.95 99.53,163.45" fill="#31475c" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="90.00,146.95 99.53,152.45 90.00,157.95 80.47,152.45" fill="#243246" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="108.47,152.45 118.00,157.95 118.00,168.95 108.47,163.45" fill="#1a2432" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="127.53,152.45 118.00,157.95 118.00,168.95 127.53,163.45" fill="#31475c" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="118.00,146.95 127.53,152.45 118.00,157.95 108.47,152.45" fill="#243246" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="53.77,77.00 104.00,106.00 104.00,164.00 53.77,135.00" fill="#1c2838" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="154.23,77.00 104.00,106.00 104.00,164.00 154.23,135.00" fill="#3d536b" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="104.00,48.00 154.23,77.00 104.00,106.00 53.77,77.00" fill="#2a3b50" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<defs>
+  <clipPath id="halo-face"><polygon points="104.00,48.00 154.23,77.00 104.00,106.00 53.77,77.00"/></clipPath>
+</defs>
+<g clip-path="url(#halo-face)">
+  <g transform="matrix(0.10700099 0.06177705 -0.10700099 0.06177705 104.00 27.58)" fill="#ebe7e4">
+    <path fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+    <path d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+  </g>
+</g>
+<ellipse cx="104.00" cy="77.00" rx="84.00" ry="40.00" fill="none" stroke="#6e849c" stroke-width="1.5" mask="url(#halo-mask)"/>
+<defs>
+  <clipPath id="halo-bead"><circle cx="188.00" cy="77.00" r="9.00"/></clipPath>
+</defs>
+<g clip-path="url(#halo-bead)">
+  <circle cx="188.00" cy="77.00" r="9.00" fill="#1c2838"/>
+  <circle cx="192.32" cy="80.42" r="7.38" fill="#3d536b"/>
+  <circle cx="184.22" cy="72.86" r="3.00" fill="#ebe7e4"/>
+</g>
+<circle cx="188.00" cy="77.00" r="9.00" fill="none" stroke="#6e849c" stroke-width="1.5"/>
+</svg>

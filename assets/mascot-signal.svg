@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 196">
+<ellipse cx="90.00" cy="182.00" rx="62.00" ry="8" fill="#000" opacity="0.32"/>
+<polygon points="63.61,155.40 74.00,161.40 74.00,173.40 63.61,167.40" fill="#1a2432" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="84.39,155.40 74.00,161.40 74.00,173.40 84.39,167.40" fill="#31475c" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="74.00,149.40 84.39,155.40 74.00,161.40 63.61,155.40" fill="#243246" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="95.61,155.40 106.00,161.40 106.00,173.40 95.61,167.40" fill="#1a2432" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="116.39,155.40 106.00,161.40 106.00,173.40 116.39,167.40" fill="#31475c" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="106.00,149.40 116.39,155.40 106.00,161.40 95.61,155.40" fill="#243246" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="34.57,72.00 90.00,104.00 90.00,168.00 34.57,136.00" fill="#1c2838" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="145.43,72.00 90.00,104.00 90.00,168.00 145.43,136.00" fill="#3d536b" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<polygon points="90.00,40.00 145.43,72.00 90.00,104.00 34.57,72.00" fill="#2a3b50" stroke="#6e849c" stroke-width="1.6" stroke-linejoin="round"/>
+<defs>
+  <clipPath id="signal-face"><polygon points="90.00,40.00 145.43,72.00 90.00,104.00 34.57,72.00"/></clipPath>
+</defs>
+<g clip-path="url(#signal-face)">
+  <g transform="matrix(0.11807005 0.06816778 -0.11807005 0.06816778 90.00 17.47)" fill="#ebe7e4">
+    <path fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+    <path d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+  </g>
+</g>
+<line x1="90.00" y1="40.00" x2="90.00" y2="23.00" stroke="#6e849c" stroke-width="1.5" stroke-linecap="round"/>
+<defs>
+  <clipPath id="signal-head"><circle cx="90.00" cy="10.00" r="16.00"/></clipPath>
+</defs>
+<g clip-path="url(#signal-head)">
+  <circle cx="90.00" cy="10.00" r="16.00" fill="#1c2838"/>
+  <circle cx="97.68" cy="16.08" r="13.12" fill="#3d536b"/>
+  <circle cx="83.28" cy="2.64" r="3.00" fill="#ebe7e4"/>
+</g>
+<circle cx="90.00" cy="10.00" r="16.00" fill="none" stroke="#6e849c" stroke-width="1.5"/>
+</svg>

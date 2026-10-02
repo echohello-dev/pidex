@@ -445,6 +445,223 @@ def mascot_desk() -> str:
     )
 
 
+def sphere(cx: float, cy: float, r: float, clip_id: str, *, glint: bool = True) -> str:
+    """A round bead: dark base, lit face, and a moonstone glint."""
+    parts = [
+        "<defs>",
+        f'  <clipPath id="{clip_id}"><circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r:.2f}"/></clipPath>',
+        "</defs>",
+        f'<g clip-path="url(#{clip_id})">',
+        f'  <circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r:.2f}" fill="#1c2838"/>',
+        f'  <circle cx="{cx + r * 0.48:.2f}" cy="{cy + r * 0.38:.2f}" r="{r * 0.82:.2f}" fill="#3d536b"/>',
+    ]
+    if glint:
+        parts.append(
+            f'  <circle cx="{cx - r * 0.42:.2f}" cy="{cy - r * 0.46:.2f}" r="{max(r * 0.16, 3):.2f}" fill="{INK}"/>'
+        )
+    parts += [
+        "</g>",
+        f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r:.2f}" fill="none" stroke="{EDGE}" stroke-width="1.5"/>',
+    ]
+    return "\n".join(parts)
+
+
+def ground_shadow(cx: float, y: float, rx: float) -> str:
+    return f'<ellipse cx="{cx:.2f}" cy="{y:.2f}" rx="{rx:.2f}" ry="8" fill="#000" opacity="0.32"/>'
+
+
+def mascot_signal() -> str:
+    """A cube with the Pi, and a bead held up on a stem."""
+    ground = 168.0
+    e = 64.0
+    cx = 90.0
+    cy = ground - 1.5 * e
+    tip_y = cy - e * 0.5
+    head_r = 16.0
+    head_y = tip_y - head_r - 14
+    body, _ = iso_cube(cx, cy, e, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
+    return svg(
+        "\n".join(
+            [
+                ground_shadow(cx, ground + 14, 62),
+                *feet_at(cx, ground, 16, 12),
+                body,
+                pi_on_face(cx, cy, e, "signal-face"),
+                (
+                    f'<line x1="{cx:.2f}" y1="{tip_y:.2f}" x2="{cx:.2f}" y2="{head_y + head_r - 3:.2f}" '
+                    f'stroke="{EDGE}" stroke-width="1.5" stroke-linecap="round"/>'
+                ),
+                sphere(cx, head_y, head_r, "signal-head"),
+            ]
+        ),
+        "0 0 180 196",
+    )
+
+
+def mascot_twins() -> str:
+    """The pair, drawn as two beads on one ground."""
+    ground = 148.0
+    big_r, small_r = 46.0, 24.0
+    big_x, small_x = 74.0, 156.0
+    big_y, small_y = ground - big_r, ground - small_r
+    size = 46.0
+    return svg(
+        "\n".join(
+            [
+                ground_shadow(112, ground + 14, 92),
+                sphere(big_x, big_y, big_r, "twin-big", glint=False),
+                pi_group(big_x - size / 2, big_y - size / 2 + 2, size, INK),
+                sphere(small_x, small_y, small_r, "twin-small"),
+            ]
+        ),
+        "0 0 210 176",
+    )
+
+
+def mascot_cairn() -> str:
+    """Three cubes stacked. Each one sits on the centre of the face below."""
+    ground = 186.0
+    cx = 96.0
+    sizes = (68.0, 44.0, 26.0)
+    cursor = ground
+    placed: list[tuple[float, float, float]] = []
+    for e in sizes:
+        cy = cursor - 1.5 * e
+        placed.append((cx, cy, e))
+        cursor = cy + e * 0.35
+    parts = [ground_shadow(cx, ground + 12, 72), *feet_at(cx, ground, 18, 13)]
+    for x, cy, e in placed:
+        parts.append(iso_cube(x, cy, e, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)[0])
+    top_x, top_cy, top_e = placed[-1]
+    dot = " ".join(f"{x:.2f},{y:.2f}" for x, y in diamond(top_x, top_cy, top_e, 0.46))
+    parts.append(f'<polygon points="{dot}" fill="{INK}"/>')
+    return svg("\n".join(parts), "0 0 190 214")
+
+
+def mascot_turn() -> str:
+    """The open arc, with the centre dot grown into a bead."""
+    cx, cy, radius = 112.0, 96.0, 68.0
+    bead_r = 30.0
+    return svg(
+        "\n".join(
+            [
+                ground_shadow(cx, cy + bead_r + 16, 52),
+                (
+                    f'<path d="M {cx:.2f} {cy - radius:.2f} A {radius:.2f} {radius:.2f} 0 1 1 {cx - radius:.2f} {cy:.2f}" '
+                    f'fill="none" stroke="{INK}" stroke-width="3" stroke-linecap="round"/>'
+                ),
+                sphere(cx, cy, bead_r, "turn-bead"),
+                (
+                    f'<line x1="{cx:.2f}" y1="{cy - bead_r:.2f}" x2="{cx:.2f}" y2="{cy - radius:.2f}" '
+                    f'stroke="{ACCENT}" stroke-width="1.5" stroke-linecap="round"/>'
+                ),
+            ]
+        ),
+        "0 0 200 168",
+    )
+
+
+def mascot_halo() -> str:
+    """The standing cube, with a ring in the plane of its top face."""
+    ground = 164.0
+    e = 58.0
+    cx = 104.0
+    cy = ground - 1.5 * e
+    rx, ry = 84.0, 40.0
+    body, _ = iso_cube(cx, cy, e, logo.TOP, logo.RIGHT, logo.LEFT, EDGE)
+    hidden = body.replace(logo.TOP, "#000").replace(logo.RIGHT, "#000").replace(logo.LEFT, "#000").replace(EDGE, "#000")
+    return svg(
+        "\n".join(
+            [
+                ground_shadow(cx, ground + 14, 86),
+                "<defs>",
+                '  <mask id="halo-mask">',
+                '    <rect width="220" height="196" fill="#fff"/>',
+                hidden,
+                "  </mask>",
+                "</defs>",
+                *feet_at(cx, ground, 14, 11),
+                body,
+                pi_on_face(cx, cy, e, "halo-face"),
+                (
+                    f'<ellipse cx="{cx:.2f}" cy="{cy:.2f}" rx="{rx:.2f}" ry="{ry:.2f}" fill="none" '
+                    f'stroke="{EDGE}" stroke-width="1.5" mask="url(#halo-mask)"/>'
+                ),
+                sphere(cx + rx, cy, 9, "halo-bead"),
+            ]
+        ),
+        "0 0 220 196",
+    )
+
+
+def disc() -> str:
+    # The Pi's square must sit inside the circle, so size is the inscribed square.
+    size = 84
+    origin = 80 - size / 2
+    return svg(
+        "\n".join(
+            [
+                f'<circle cx="80" cy="80" r="74" fill="none" stroke="{EDGE}" stroke-width="1.5"/>',
+                '<circle cx="80" cy="80" r="66" fill="#2a3b50"/>',
+                pi_group(origin, origin, size, INK),
+            ]
+        ),
+        "0 0 160 160",
+    )
+
+
+def arc() -> str:
+    # A turn: centre, radius, and an open curve with round caps.
+    return svg(
+        "\n".join(
+            [
+                f'<circle cx="80" cy="80" r="3.2" fill="{INK}"/>',
+                f'<line x1="80" y1="80" x2="80" y2="26" stroke="{ACCENT}" stroke-width="1.5" stroke-linecap="round"/>',
+                (
+                    f'<path d="M80 26 A54 54 0 1 1 26 80" fill="none" stroke="{INK}" '
+                    'stroke-width="3" stroke-linecap="round"/>'
+                ),
+            ]
+        ),
+        "0 0 160 160",
+    )
+
+
+def orbit() -> str:
+    return svg(
+        "\n".join(
+            [
+                f'<circle cx="80" cy="80" r="62" fill="none" stroke="{EDGE}" stroke-width="1.25"/>',
+                f'<circle cx="80" cy="80" r="38" fill="none" stroke="{EDGE}" stroke-width="1" stroke-dasharray="1.5 5" stroke-linecap="round"/>',
+                f'<circle cx="80" cy="80" r="4" fill="{ACCENT}"/>',
+                f'<circle cx="142" cy="80" r="9" fill="{INK}"/>',
+            ]
+        ),
+        "0 0 160 160",
+    )
+
+
+def bead() -> str:
+    """The square dot, drawn as a sphere."""
+    return svg(
+        "\n".join(
+            [
+                '<ellipse cx="80" cy="150" rx="48" ry="8" fill="#000" opacity="0.32"/>',
+                "<defs>",
+                '  <clipPath id="bead"><circle cx="80" cy="76" r="56"/></clipPath>',
+                "</defs>",
+                '<g clip-path="url(#bead)">',
+                '  <circle cx="80" cy="76" r="56" fill="#1c2838"/>',
+                '  <circle cx="108" cy="98" r="46" fill="#3d536b"/>',
+                f'  <circle cx="52" cy="50" r="9" fill="{INK}"/>',
+                "</g>",
+                f'<circle cx="80" cy="76" r="56" fill="none" stroke="{EDGE}" stroke-width="1.5"/>',
+            ]
+        ),
+        "0 0 160 168",
+    )
+
+
 def main() -> None:
     font = TTFont(DEPARTURE)
     upem = font["head"].unitsPerEm
@@ -467,6 +684,15 @@ def main() -> None:
     write("mascot-dot.svg", mascot_dot())
     write("mascot-page.svg", mascot_page())
     write("mascot-desk.svg", mascot_desk())
+    write("mark-disc.svg", disc())
+    write("mark-arc.svg", arc())
+    write("mark-orbit.svg", orbit())
+    write("mascot-bead.svg", bead())
+    write("mascot-signal.svg", mascot_signal())
+    write("mascot-twins.svg", mascot_twins())
+    write("mascot-cairn.svg", mascot_cairn())
+    write("mascot-turn.svg", mascot_turn())
+    write("mascot-halo.svg", mascot_halo())
 
 
 if __name__ == "__main__":
