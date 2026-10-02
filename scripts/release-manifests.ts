@@ -61,7 +61,7 @@ export function homebrewCask(tag: string, checksums: ReleaseChecksums): string {
   desc "Desktop workbench for the Pi coding agent"
   homepage "${REPO}"
 
-  depends_on macos: :sonoma
+  depends_on macos: :monterey
 
   app "pidex.app"
 
@@ -150,7 +150,7 @@ export function latestHomebrewCask(): string {
   desc "Desktop workbench for the Pi coding agent"
   homepage "${REPO}"
 
-  depends_on macos: :sonoma
+  depends_on macos: :monterey
 
   app "pidex.app"
 

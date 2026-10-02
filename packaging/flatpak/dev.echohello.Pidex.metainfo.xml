@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.echohello.Pidex</id>
+  <name>pidex</name>
+  <summary>Desktop workbench for the Pi coding agent</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <developer id="dev.echohello">
+    <name>echoHello</name>
+  </developer>
+  <url type="homepage">https://github.com/echohello-dev/pidex</url>
+  <description>
+    <p>
+      pidex is a workspace-first desktop workbench for the Pi coding agent.
+      It reads existing sessions from the Pi CLI on this computer.
+    </p>
+  </description>
+  <launchable type="desktop-id">dev.echohello.Pidex.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="2026.09.28-2" date="2026-09-28"/>
+  </releases>
+</component>

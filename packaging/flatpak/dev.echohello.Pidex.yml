@@ -1,0 +1,47 @@
+app-id: dev.echohello.Pidex
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: pidex
+separate-locales: false
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.Notifications
+modules:
+  - name: pidex
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 dev.echohello.Pidex.metainfo.xml /app/share/metainfo/dev.echohello.Pidex.metainfo.xml
+      - install -Dm644 dev.echohello.Pidex.desktop /app/share/applications/dev.echohello.Pidex.desktop
+      - install -Dm644 dev.echohello.Pidex.png /app/share/icons/hicolor/256x256/apps/dev.echohello.Pidex.png
+      - install -Dm755 pidex.sh /app/bin/pidex
+    sources:
+      - type: file
+        path: dev.echohello.Pidex.metainfo.xml
+      - type: file
+        path: dev.echohello.Pidex.desktop
+      - type: file
+        path: dev.echohello.Pidex.png
+      - type: file
+        path: pidex.sh
+      - type: extra-data
+        filename: pidex.AppImage
+        only-arches:
+          - x86_64
+        url: https://github.com/echohello-dev/pidex/releases/download/2026.09.28-2/pidex-linux-x86_64.AppImage
+        sha256: d619aa5afbc7c1cac7146135d41510ed97b7bc819e957b7aa009e2a454eaab6b
+        size: 126532577
+      - type: script
+        dest-filename: apply_extra
+        commands:
+          - chmod +x pidex.AppImage
+          - ./pidex.AppImage --appimage-extract
+          - mv squashfs-root pidex

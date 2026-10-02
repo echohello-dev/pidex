@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=pidex
+Comment=Desktop workbench for the Pi coding agent
+Exec=pidex
+Icon=dev.echohello.Pidex
+Terminal=false
+Type=Application
+Categories=Development;
+StartupWMClass=pidex
