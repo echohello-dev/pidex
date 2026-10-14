@@ -163,14 +163,20 @@ jobs:
               unset "$name"
             fi
           done
+          builder=(bunx electron-builder ${{ matrix.args }} -c.extraMetadata.version="$SEMVER" --publish never)
           if [ "$RUNNER_OS" = "macOS" ] && [ -n "${CSC_LINK-}" ] && [ -n "${APPLE_API_ISSUER-}" ]; then
+            # The certificate lives in the temporary keychain electron-builder
+            # creates from CSC_LINK. Discovery stays off unless that keychain exists,
+            # so a runner cannot sign with some other identity.
+            export CSC_IDENTITY_AUTO_DISCOVERY=true
+            builder+=(-c.forceCodeSigning=true)
             echo "signing and notarizing the macOS build"
           elif [ "$RUNNER_OS" = "Windows" ] && [ -n "${WIN_CSC_LINK-}" ]; then
             echo "signing the Windows build"
           else
             echo "no signing secrets for $RUNNER_OS; publishing unsigned artefacts"
           fi
-          DEBUG= bunx electron-builder ${{ matrix.args }} -c.extraMetadata.version="$SEMVER" --publish never
+          DEBUG= "${builder[@]}"
       - name: upload installers
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
