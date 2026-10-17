@@ -96,12 +96,24 @@ ipcMain.handle(
     }
 
     const id = `s${++sessionSeq}`;
-    const session = new RpcSession(id, cwd, sessionFile);
+    let session: RpcSession;
+    try {
+      session = new RpcSession(id, cwd, sessionFile);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'could not start pi';
+      return { error: message };
+    }
     session.onEvent = (sessionId, event) => sendToRenderer('pidex:session:event', { sessionId, event });
     session.onExit = sessionId => sendToRenderer('pidex:session:exit', { sessionId });
     sessions.set(id, session);
 
     const [state, messages] = await Promise.all([session.getState(), session.getMessages()]);
+    const launchError = session.launchError();
+    if (launchError) {
+      sessions.delete(id);
+      session.dispose();
+      return { error: launchError };
+    }
     return {
       sessionId: id,
       state: state.success ? state.data : null,

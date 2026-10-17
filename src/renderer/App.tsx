@@ -56,6 +56,7 @@ function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   const [fontReady, setFontReady] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -179,12 +180,14 @@ function App() {
       return;
     }
     setOpening(true);
+    setOpenError(null);
     try {
       const result = await window.pidex.openSession({
         cwd: ws.cwd,
         sessionFile: info?.file,
       });
       if (result.error || !result.sessionId) {
+        setOpenError(result.error ?? 'Could not open the session.');
         return;
       }
       const model =
@@ -517,6 +520,7 @@ function App() {
               <p className="empty-copy">
                 Pick a session from the sidebar, or start a new one in the expanded workspace.
               </p>
+              {openError ? <p className="empty-copy empty-copy--error">{openError}</p> : null}
             </div>
           )}
         </main>
