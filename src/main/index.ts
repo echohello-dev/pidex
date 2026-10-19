@@ -1,10 +1,14 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { listSessions, listWorkspaces, SESSIONS_ROOT } from './sessions';
+import { listSessions, listWorkspaces } from './sessions';
+import { sessionPath } from './workbench';
 import { RpcSession } from './rpc';
+import { registerWorkbench, sessionDefaults } from './workbench-ipc';
 
 const isDev = !app.isPackaged;
+if (isDev && process.env.PIDEX_E2E_USER_DATA)
+  app.setPath('userData', process.env.PIDEX_E2E_USER_DATA);
 const sessions = new Map<string, RpcSession>();
 let sessionSeq = 0;
 let mainWindow: BrowserWindow | null = null;
@@ -14,10 +18,13 @@ function customWorkspacesFile(): string {
 }
 
 function readCustomWorkspaces(): string[] {
+  if (process.env.PIDEX_E2E_CWD) return [process.env.PIDEX_E2E_CWD];
   try {
     const raw = fs.readFileSync(customWorkspacesFile(), 'utf8');
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((p): p is string => typeof p === 'string')
+      : [];
   } catch {
     return [];
   }
@@ -26,7 +33,10 @@ function readCustomWorkspaces(): string[] {
 function addCustomWorkspace(cwd: string): void {
   const existing = readCustomWorkspaces();
   if (!existing.includes(cwd)) {
-    fs.writeFileSync(customWorkspacesFile(), JSON.stringify([...existing, cwd], null, 2));
+    fs.writeFileSync(
+      customWorkspacesFile(),
+      JSON.stringify([...existing, cwd], null, 2),
+    );
   }
 }
 
@@ -53,8 +63,12 @@ function createWindow() {
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.loadURL(
+      (process.env.PIDEX_E2E_CWD && process.env.PIDEX_E2E_RENDERER_URL) ||
+        'http://localhost:5173',
+    );
+    if (!process.env.PIDEX_E2E_CWD)
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   }
@@ -64,7 +78,11 @@ function createWindow() {
   });
 }
 
-ipcMain.handle('pidex:workspaces', () => listWorkspaces(readCustomWorkspaces()));
+ipcMain.handle('pidex:workspaces', () =>
+  listWorkspaces(readCustomWorkspaces()),
+);
+
+registerWorkbench(() => mainWindow, readCustomWorkspaces, sessions);
 
 ipcMain.handle('pidex:workspace:add', async () => {
   if (!mainWindow) return { error: 'no window' };
@@ -72,7 +90,8 @@ ipcMain.handle('pidex:workspace:add', async () => {
     title: 'Add workspace',
     properties: ['openDirectory', 'createDirectory'],
   });
-  if (result.canceled || result.filePaths.length === 0) return { error: 'cancelled' };
+  if (result.canceled || result.filePaths.length === 0)
+    return { error: 'cancelled' };
   const cwd = result.filePaths[0];
   addCustomWorkspace(cwd);
   return { cwd };
@@ -85,14 +104,21 @@ ipcMain.handle('pidex:sessions', (_e, dirName: string) => {
 
 ipcMain.handle(
   'pidex:session/open',
-  async (_e, req: { cwd: string; sessionFile?: string }) => {
+  async (_e, req: { cwd: string; sessionFile?: string; fork?: boolean }) => {
     const cwd = typeof req?.cwd === 'string' ? req.cwd : '';
-    const sessionFile = typeof req?.sessionFile === 'string' ? req.sessionFile : undefined;
+    const sessionFile =
+      typeof req?.sessionFile === 'string' ? req.sessionFile : undefined;
     if (!cwd || !fs.existsSync(cwd)) {
       return { error: 'workspace path does not exist' };
     }
-    if (sessionFile && !path.resolve(sessionFile).startsWith(SESSIONS_ROOT)) {
-      return { error: 'session file outside pi sessions root' };
+    if (sessionFile) {
+      try {
+        await sessionPath(sessionFile);
+      } catch {
+        return {
+          error: 'session file outside pi sessions root or unavailable',
+        };
+      }
     }
 
     const id = `s${++sessionSeq}`;
@@ -103,11 +129,55 @@ ipcMain.handle(
       const message = err instanceof Error ? err.message : 'could not start pi';
       return { error: message };
     }
-    session.onEvent = (sessionId, event) => sendToRenderer('pidex:session:event', { sessionId, event });
-    session.onExit = sessionId => sendToRenderer('pidex:session:exit', { sessionId });
+    session.onEvent = (sessionId, event) =>
+      sendToRenderer('pidex:session:event', { sessionId, event });
+    session.onExit = (sessionId) =>
+      sendToRenderer('pidex:session:exit', { sessionId });
     sessions.set(id, session);
 
-    const [state, messages] = await Promise.all([session.getState(), session.getMessages()]);
+    if (req.fork && sessionFile) {
+      const cloned = await session.command({ type: 'clone' });
+      if (
+        !cloned.success ||
+        (cloned.data as { cancelled?: boolean } | undefined)?.cancelled
+      ) {
+        sessions.delete(id);
+        session.dispose();
+        return { error: cloned.error ?? 'Session fork was cancelled.' };
+      }
+    }
+
+    if (!sessionFile) {
+      const defaults = await sessionDefaults(cwd);
+      if (defaults.model && defaults.provider) {
+        const changed = await session.command({
+          type: 'set_model',
+          provider: defaults.provider,
+          modelId: defaults.model,
+        });
+        if (!changed.success) {
+          sessions.delete(id);
+          session.dispose();
+          return {
+            error: changed.error ?? 'Could not apply the default model.',
+          };
+        }
+      }
+      const thinking = await session.command({
+        type: 'set_thinking_level',
+        level: defaults.thinking,
+      });
+      if (!thinking.success) {
+        sessions.delete(id);
+        session.dispose();
+        return { error: thinking.error ?? 'Could not apply reasoning effort.' };
+      }
+    }
+
+    const [state, messages] = await Promise.all([
+      session.getState(),
+      session.getMessages(),
+    ]);
     const launchError = session.launchError();
     if (launchError) {
       sessions.delete(id);
@@ -117,7 +187,9 @@ ipcMain.handle(
     return {
       sessionId: id,
       state: state.success ? state.data : null,
-      messages: messages.success ? (messages.data as { messages?: unknown[] })?.messages ?? [] : [],
+      messages: messages.success
+        ? ((messages.data as { messages?: unknown[] })?.messages ?? [])
+        : [],
     };
   },
 );
@@ -127,7 +199,10 @@ ipcMain.handle(
   async (_e, req: { sessionId: string; text: string; streaming: boolean }) => {
     const session = sessions.get(req?.sessionId ?? '');
     if (!session) return { error: 'no such session' };
-    const response = await session.prompt(String(req.text ?? ''), Boolean(req.streaming));
+    const response = await session.prompt(
+      String(req.text ?? ''),
+      Boolean(req.streaming),
+    );
     return { success: response.success, error: response.error };
   },
 );
@@ -141,7 +216,7 @@ ipcMain.handle('pidex:session/commands', async (_e, sessionId: string) => {
   if (!session) return { commands: [] };
   const response = await session.getCommands();
   const data = response.data as { commands?: unknown[] } | undefined;
-  return { commands: response.success ? data?.commands ?? [] : [] };
+  return { commands: response.success ? (data?.commands ?? []) : [] };
 });
 
 ipcMain.handle('pidex:session/close', (_e, sessionId: string) => {

@@ -1,542 +1,734 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { prepare, layout } from '@chenglou/pretext';
-import { PiMark } from './components/PiMark';
+import { useEffect, useRef, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
-import { FigureFrame } from './components/FigureFrame';
+import welcomeMark from './assets/workbench/welcome-mark.svg';
 import { BracketButton } from './components/BracketButton';
-import { Markdown } from './components/Markdown';
-import { applyEvent, entriesFromMessages } from './timeline';
-import type { Entry } from './timeline';
-import type { SessionInfo, SlashCommand, WorkspaceInfo } from './api';
-
-type SessionTab = {
-  runtimeId: string;
-  cwd: string;
-  workspaceName: string;
-  title: string;
-  model: string;
-  entries: Entry[];
-  commands: SlashCommand[];
-  running: boolean;
-  exited: boolean;
-};
-
-const BODY_FONT = '450 15px Newsreader, Georgia, serif';
-
-function timeAgo(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return 'now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
-}
-
-function ToolOutput({ text }: { text: string }) {
-  const lines = text.split('\n');
-  const shown = lines.slice(0, 14);
-  return (
-    <>
-      {shown.map((line, i) => (
-        <div key={i} className="tool-line">
-          {line}
-        </div>
-      ))}
-      {lines.length > shown.length ? (
-        <div className="tool-line tool-line--dim">… {lines.length - shown.length} more lines</div>
-      ) : null}
-    </>
-  );
-}
+import {
+  Composer,
+  EmptyState,
+  Icon,
+  NavItem,
+  SearchField,
+  Transcript,
+} from './components/WorkbenchControls';
+import {
+  ChangesView,
+  FilesView,
+  SettingsView,
+  SkillsView,
+} from './components/WorkbenchViews';
+import { CommandPalette } from './components/CommandPalette';
+import { timeAgo, useWorkbench } from './useWorkbench';
 
 function App() {
-  const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
-  const [wsSessions, setWsSessions] = useState<Record<string, SessionInfo[]>>({});
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [tabs, setTabs] = useState<SessionTab[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
-  const [opening, setOpening] = useState(false);
-  const [openError, setOpenError] = useState<string | null>(null);
-  const [slashIndex, setSlashIndex] = useState(0);
-  const [fontReady, setFontReady] = useState(false);
+  const b = useWorkbench();
+  const { api, ws, active, view, details, sessions, preview } = b;
+  const [sidebar, setSidebar] = useState(true);
+  const [terminal, setTerminal] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const [sessionQuery, setSessionQuery] = useState('');
+  const [allHistory, setAllHistory] = useState(false);
+  const [paletteFile, setPaletteFile] = useState('');
+  const [resetSettings, setResetSettings] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const bootstrapped = useRef(false);
-  const openSessionRef = useRef<(ws: WorkspaceInfo, info?: SessionInfo) => Promise<void>>(
-    async () => {},
+
+  useEffect(() => {
+    timelineRef.current?.scrollTo?.({ top: timelineRef.current.scrollHeight });
+  }, [active?.entries, preview?.entries, view]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPalette((p) => !p);
+      }
+      if (event.key === ',') {
+        event.preventDefault();
+        b.navigate('settings');
+      }
+      if (event.key.toLowerCase() === 'h' && event.shiftKey) {
+        event.preventDefault();
+        b.navigate('history');
+      }
+      if (event.key.toLowerCase() === 'b') {
+        event.preventDefault();
+        setSidebar((v) => !v);
+      }
+      if (event.key.toLowerCase() === 'o') {
+        event.preventDefault();
+        void b.addWorkspace();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const composer = (placeholder?: string, label?: string) => (
+    <Composer
+      draft={b.draft}
+      onDraft={b.onDraft}
+      onSend={b.send}
+      onStop={() => active && b.run(() => api.abortSession(active.runtimeId))}
+      onAttach={b.attach}
+      model={b.currentModel}
+      models={b.models}
+      onModel={b.changeModel}
+      running={view === 'session' && active?.running}
+      disabled={
+        !ws || (view === 'session' && active?.exited) || b.previewLoading
+      }
+      busy={b.busy}
+      placeholder={placeholder}
+      label={label}
+      commands={active?.commands ?? []}
+      modelDisabled={view === 'history'}
+      allowDefaultModel={view === 'new' || !active}
+    />
   );
-
-  const activeTab = tabs.find(t => t.runtimeId === activeId) ?? null;
-
-  useEffect(() => {
-    window.pidex.workspaces().then(async list => {
-      setWorkspaces(list);
-      const entries = await Promise.all(
-        list.map(ws => window.pidex.sessions(ws.dirName).then(s => [ws.dirName, s] as const)),
-      );
-      const map: Record<string, SessionInfo[]> = {};
-      for (const [dirName, s] of entries) map[dirName] = s;
-      setWsSessions(map);
-      const first = list[0];
-      if (first && !bootstrapped.current) {
-        bootstrapped.current = true;
-        setExpanded(first.dirName);
-        const firstSession = map[first.dirName]?.[0];
-        if (firstSession) openSessionRef.current(first, firstSession);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const offEvent = window.pidex.onSessionEvent(({ sessionId, event }) => {
-      setTabs(prev =>
-        prev.map(tab => {
-          if (tab.runtimeId !== sessionId) return tab;
-          const { entries, running } = applyEvent(tab.entries, event);
-          return { ...tab, entries, running: running ?? tab.running };
-        }),
-      );
-    });
-    const offExit = window.pidex.onSessionExit(({ sessionId }) => {
-      setTabs(prev =>
-        prev.map(tab =>
-          tab.runtimeId === sessionId ? { ...tab, exited: true, running: false } : tab,
-        ),
-      );
-    });
-    return () => {
-      offEvent();
-      offExit();
-    };
-  }, []);
-
-  useEffect(() => {
-    timelineRef.current?.scrollTo({ top: timelineRef.current.scrollHeight });
-  }, [activeTab?.entries.length, activeTab?.entries[activeTab.entries.length - 1]]);
-
-  useEffect(() => {
-    let cancel = false;
-    const fonts = document.fonts;
-    if (!fonts?.load) {
-      setFontReady(true);
-      return;
-    }
-    fonts.load(BODY_FONT).then(
-      () => {
-        if (!cancel) setFontReady(true);
-      },
-      () => {
-        if (!cancel) setFontReady(true);
-      },
+  const filteredSessions = sessions.filter((s) =>
+    `${s.title} ${s.model}`.toLowerCase().includes(sessionQuery.toLowerCase()),
+  );
+  const title = {
+    new: 'Workspace',
+    session: active?.title ?? 'Session',
+    changes: 'Changes review',
+    history: 'Session history',
+    settings: 'Models & access',
+    skills: 'Skills',
+    files: 'Files & preview',
+  }[view];
+  const branch = details.branch || ws?.branch || 'local';
+  const context = `${ws?.name ?? 'pidex'} / ${branch} / ${view === 'history' ? `${sessions.length} sessions` : view === 'changes' ? `${details.changes.length} changes` : view === 'settings' ? 'workspace defaults' : 'local workspace'}`;
+  const live = b.tabs.filter((t) => t.cwd === ws?.cwd && !t.exited);
+  const exportSession = () => {
+    if (!preview) return;
+    const text = preview.entries
+      .map((e) =>
+        e.kind === 'tool'
+          ? `## ${e.tool}\n\n${e.output}`
+          : `## ${e.kind}\n\n${e.text}`,
+      )
+      .join('\n\n');
+    const url = URL.createObjectURL(
+      new Blob([text], { type: 'text/markdown' }),
     );
-    return () => {
-      cancel = true;
-    };
-  }, []);
-
-  const measuredRows = useMemo(() => {
-    if (!activeTab || !fontReady) return 0;
-    let rows = 0;
-    for (const entry of activeTab.entries) {
-      if (entry.kind === 'tool') continue;
-      const text = entry.kind === 'assistant' ? entry.text || entry.thinking : entry.text;
-      if (!text) continue;
-      const prepared = prepare(text, BODY_FONT);
-      rows += layout(prepared, 780, 24).lineCount;
-    }
-    return rows;
-  }, [activeTab, fontReady]);
-
-  const expandWorkspace = async (ws: WorkspaceInfo) => {
-    const next = expanded === ws.dirName ? null : ws.dirName;
-    setExpanded(next);
-    if (!next) return;
-    let sessions = wsSessions[next];
-    if (!sessions) {
-      sessions = await window.pidex.sessions(next);
-      setWsSessions(prev => ({ ...prev, [next]: sessions }));
-    }
-    if (sessions[0]) openSession(ws, sessions[0]);
-  };
-
-  const addWorkspace = async () => {
-    const result = await window.pidex.addWorkspace();
-    if (result.error || !result.cwd) return;
-    const list = await window.pidex.workspaces();
-    setWorkspaces(list);
-    const added = list.find(w => w.cwd === result.cwd);
-    if (added) {
-      setExpanded(added.dirName);
-      setWsSessions(prev => ({ ...prev, [added.dirName]: [] }));
-    }
-  };
-
-  const openSession = async (ws: WorkspaceInfo, info?: SessionInfo) => {
-    const existing = tabs.find(
-      t => t.cwd === ws.cwd && t.title === (info?.title ?? 'new session'),
-    );
-    if (existing) {
-      setActiveId(existing.runtimeId);
-      return;
-    }
-    setOpening(true);
-    setOpenError(null);
-    try {
-      const result = await window.pidex.openSession({
-        cwd: ws.cwd,
-        sessionFile: info?.file,
-      });
-      if (result.error || !result.sessionId) {
-        setOpenError(result.error ?? 'Could not open the session.');
-        return;
-      }
-      const model =
-        result.state?.model?.id ?? result.state?.model?.name ?? info?.model ?? 'default';
-      const { commands } = await window.pidex.sessionCommands(result.sessionId);
-      const tab: SessionTab = {
-        runtimeId: result.sessionId,
-        cwd: ws.cwd,
-        workspaceName: ws.name,
-        title: info?.title ?? 'new session',
-        model,
-        entries: entriesFromMessages(result.messages ?? []),
-        commands,
-        running: Boolean(result.state?.isStreaming),
-        exited: false,
-      };
-      setTabs(prev => [...prev, tab]);
-      setActiveId(tab.runtimeId);
-    } finally {
-      setOpening(false);
-    }
-  };
-  openSessionRef.current = openSession;
-
-  const closeTab = (runtimeId: string) => {
-    window.pidex.closeSession(runtimeId);
-    setTabs(prev => {
-      const next = prev.filter(t => t.runtimeId !== runtimeId);
-      if (activeId === runtimeId) setActiveId(next[next.length - 1]?.runtimeId ?? null);
-      return next;
-    });
-  };
-
-  const send = async (raw?: string) => {
-    const text = (raw ?? draft).trim();
-    if (!text || !activeTab || activeTab.exited) return;
-    const echo: Entry = { key: `local-${Date.now()}`, kind: 'user', text };
-    setTabs(prev =>
-      prev.map(t => (t.runtimeId === activeTab.runtimeId ? { ...t, entries: [...t.entries, echo] } : t)),
-    );
-    setDraft('');
-    setSlashIndex(0);
-    await window.pidex.sendPrompt({
-      sessionId: activeTab.runtimeId,
-      text,
-      streaming: activeTab.running,
-    });
-  };
-
-  const slashQuery = draft.startsWith('/') ? draft.slice(1) : null;
-  const slashMatches = slashQuery !== null && activeTab
-    ? activeTab.commands
-        .filter(c => c.name.toLowerCase().includes(slashQuery.toLowerCase()))
-        .slice(0, 8)
-    : [];
-  const slashOpen = slashQuery !== null && slashMatches.length > 0;
-
-  const onComposerKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (slashOpen) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSlashIndex(i => (i + 1) % slashMatches.length);
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSlashIndex(i => (i - 1 + slashMatches.length) % slashMatches.length);
-        return;
-      }
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const cmd = slashMatches[Math.min(slashIndex, slashMatches.length - 1)];
-        setDraft(`/${cmd.name} `);
-        setSlashIndex(0);
-        return;
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setDraft('');
-        setSlashIndex(0);
-        return;
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const cmd = slashMatches[Math.min(slashIndex, slashMatches.length - 1)];
-        send(`/${cmd.name}`);
-        return;
-      }
-    }
-    if (e.key === 'Enter') send();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pidex-session.md';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
-    <div className="app-shell">
-      <nav className="tabbar">
-        {tabs.map(tab => (
-          <button
-            key={tab.runtimeId}
-            type="button"
-            className={`tab${tab.runtimeId === activeId ? ' is-active' : ''}`}
-            onClick={() => setActiveId(tab.runtimeId)}
-          >
-            <span
-              className={`tab-dot ${
-                tab.exited ? 'tab-dot--done' : tab.running ? 'tab-dot--active' : 'tab-dot--stale'
-              }`}
-            />
-            {tab.workspaceName}
-            <span className="tab-branch">{tab.title.slice(0, 24)}</span>
-            <span
-              className="tab-close"
-              role="button"
-              aria-label={`Close ${tab.workspaceName}`}
-              onClick={e => {
-                e.stopPropagation();
-                closeTab(tab.runtimeId);
-              }}
-            >
-              ×
-            </span>
-          </button>
-        ))}
-        <span className="tabbar-meta">
-          <PiMark size={11} />
-          electron <b>{window.pidex?.versions.electron ?? '—'}</b> · node{' '}
-          <b>{window.pidex?.versions.node ?? '—'}</b>
+    <div
+      className={`app-shell wb-shell${sidebar ? '' : ' wb-shell--collapsed'}`}
+    >
+      <header className="wb-titlebar">
+        <span
+          className={`wb-window-controls${api?.platform === 'darwin' ? ' wb-window-controls--native' : ''}`}
+          aria-hidden="true"
+        >
+          <i />
+          <i />
+          <i />
         </span>
-      </nav>
-
-      <div className="app-body">
-        <aside className="sidebar">
-          <div className="sidebar-head">
-            <span className="sidebar-group-label">Workspaces</span>
-            <span className="sidebar-head-actions">
-              <button type="button" className="sidebar-add" aria-label="Add workspace" onClick={addWorkspace}>
-                +
-              </button>
-              <span className="sidebar-group-label">{workspaces.length}</span>
-            </span>
-          </div>
-          <div className="sidebar-scroll">
-            <div className="sidebar-group">
-              {workspaces.map(ws => (
-                <div key={ws.dirName}>
-                  <button
-                    type="button"
-                    className={`ws-row${ws.dirName === expanded ? ' is-active' : ''}`}
-                    onClick={() => expandWorkspace(ws)}
-                  >
-                    <span className="ws-row-top">
-                      <span className="ws-row-name">{ws.name}</span>
-                      <span className="ws-row-meta">{timeAgo(ws.lastActive)}</span>
-                    </span>
-                    <span className="ws-row-branch">
-                      {ws.branch || 'no git'} · {ws.sessionCount} sessions
-                    </span>
-                  </button>
-                  {expanded === ws.dirName ? (
-                    <div className="ws-sessions">
-                      {(wsSessions[ws.dirName] ?? []).slice(0, 12).map(s => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          className="session-row"
-                          onClick={() => openSession(ws, s)}
-                        >
-                          <span className="session-row-title">{s.title}</span>
-                          <span className="session-row-meta">
-                            {s.model || 'pi'} · {s.messageCount} msgs · {timeAgo(s.timestamp)}
-                          </span>
-                        </button>
-                      ))}
-                      {wsSessions[ws.dirName] === undefined ? (
-                        <span className="session-row-meta">loading…</span>
-                      ) : null}
-                      {wsSessions[ws.dirName]?.length === 0 ? (
-                        <span className="session-row-meta">no sessions</span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="sidebar-foot">
+        <button
+          type="button"
+          className="wb-icon-button"
+          onClick={() => setSidebar((v) => !v)}
+          aria-label="Toggle sidebar"
+          aria-expanded={sidebar}
+        >
+          <Icon name="panel-left" />
+        </button>
+        <PidexMark size={20} />
+        <span className="wb-window-title">
+          {ws?.name ?? 'pidex'} / {title}
+        </span>
+        <button
+          type="button"
+          className="wb-icon-button"
+          onClick={() => setPalette(true)}
+          aria-label="Quick switch"
+        >
+          <Icon name="search" />
+        </button>
+        <kbd>⌘K</kbd>
+        <button
+          type="button"
+          className="wb-icon-button"
+          onClick={() => setTerminal((v) => !v)}
+          aria-label="Toggle session output"
+          aria-expanded={terminal}
+        >
+          <Icon name="terminal" />
+        </button>
+      </header>
+      <div className="wb-body">
+        {sidebar && (
+          <aside className="wb-sidebar" aria-label="Workspace navigation">
+            <button
+              type="button"
+              className="wb-project-select"
+              onClick={() => setPalette(true)}
+            >
+              <Icon name="folder-open" />
+              <span>{ws?.name ?? 'Choose a project'}</span>
+              <Icon name="chevron-down" />
+            </button>
+            <p className="wb-meta wb-branch">{branch} / local workspace</p>
             <BracketButton
               primary
-              style={{ width: '100%' }}
-              disabled={!expanded || opening}
               onClick={() => {
-                const ws = workspaces.find(w => w.dirName === expanded) ?? workspaces[0];
-                if (ws) openSession(ws);
+                b.setActiveId(null);
+                b.navigate('new');
               }}
+              disabled={!ws}
             >
-              {opening ? 'Opening…' : 'New session'}
+              New session
             </BracketButton>
-          </div>
-        </aside>
-
-        <main className="main-pane">
-          {activeTab ? (
-            <>
-              <header className="bench-head">
-                <div className="bench-head-top">
-                  <h1 className="bench-title">{activeTab.workspaceName}</h1>
-                  <span
-                    className={`ds-badge ${
-                      activeTab.exited
-                        ? 'ds-badge--done'
-                        : activeTab.running
-                          ? 'ds-badge--active ds-badge--pulse'
-                          : 'ds-badge--stale'
-                    }`}
-                  >
-                    {activeTab.exited ? 'exited' : activeTab.running ? 'running' : 'idle'}
-                  </span>
-                  <div className="bench-actions">
-                    <BracketButton disabled={!activeTab.running} onClick={() => window.pidex.abortSession(activeTab.runtimeId)}>
-                      Abort
-                    </BracketButton>
-                  </div>
-                </div>
-                <div className="bench-stats">
-                  <span className="bench-path">{activeTab.cwd}</span>
-                  <span>
-                    model <b>{activeTab.model}</b>
-                  </span>
-                  <span>
-                    session <b>{activeTab.title.slice(0, 48)}</b>
-                  </span>
-                </div>
-              </header>
-
-              <div className="timeline" ref={timelineRef}>
-                {activeTab.entries.map(entry => {
-                  if (entry.kind === 'tool') {
-                    return (
-                      <FigureFrame
-                        key={entry.key}
-                        className="tool-card"
-                        caption={`${entry.tool}${entry.args ? ` · ${entry.args.slice(0, 60)}` : ''}`}
-                        live={entry.running}
-                      >
-                        <div className="tool-body">
-                          {entry.output ? (
-                            <ToolOutput text={entry.output} />
-                          ) : (
-                            <div className="tool-line tool-line--dim">
-                              {entry.running ? 'running…' : '(no output)'}
-                            </div>
-                          )}
-                          {!entry.ok ? <div className="tool-line tool-line--del">✗ failed</div> : null}
-                        </div>
-                      </FigureFrame>
-                    );
-                  }
-                  if (entry.kind === 'assistant') {
-                    return (
-                      <div key={entry.key} className="msg msg--assistant">
-                        <span className="msg-role">
-                          {entry.streaming ? 'pi · streaming' : 'pi'}
-                        </span>
-                        {entry.thinking ? <p className="msg-thinking">{entry.thinking}</p> : null}
-                        {entry.text ? <Markdown text={entry.text} className="msg-text" /> : null}
-                        {entry.streaming && !entry.text ? (
-                          <p className="msg-text msg-text--dim">thinking…</p>
-                        ) : null}
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={entry.key} className="msg msg--user">
-                      <span className="msg-role">you</span>
-                      <p className="msg-text">{entry.text}</p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <footer className="composer">
-                {slashOpen ? (
-                  <div className="slash-menu">
-                    {slashMatches.map((cmd, i) => (
-                      <button
-                        key={cmd.name}
-                        type="button"
-                        className={`slash-item${i === Math.min(slashIndex, slashMatches.length - 1) ? ' is-active' : ''}`}
-                        onMouseDown={e => {
-                          e.preventDefault();
-                          send(`/${cmd.name}`);
-                        }}
-                      >
-                        <span className="slash-name">/{cmd.name}</span>
-                        <span className="slash-desc">{cmd.description ?? cmd.source ?? ''}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="composer-row">
-                  <span className="composer-prompt">›</span>
-                  <input
-                    className="composer-input"
-                    value={draft}
-                    onChange={e => {
-                      setDraft(e.target.value);
-                      setSlashIndex(0);
+            <nav aria-label="Main navigation">
+              <NavItem
+                icon="message-square"
+                active={view === 'history'}
+                detail={sessions.length}
+                onClick={() => b.navigate('history')}
+              >
+                Sessions
+              </NavItem>
+              <NavItem
+                icon="changes"
+                active={view === 'changes'}
+                detail={details.changes.length}
+                onClick={() => b.navigate('changes')}
+              >
+                Changes
+              </NavItem>
+              <NavItem
+                icon="skills"
+                active={view === 'skills'}
+                onClick={() => b.navigate('skills')}
+              >
+                Skills
+              </NavItem>
+            </nav>
+            <div className="wb-sidebar-scroll">
+              <p className="wb-eyebrow">Recent sessions</p>
+              {live
+                .filter((t) => !sessions.some((s) => s.file === t.file))
+                .map((t) => (
+                  <button
+                    key={t.runtimeId}
+                    type="button"
+                    className={`wb-session-item${active?.runtimeId === t.runtimeId && view === 'session' ? ' is-active' : ''}`}
+                    onClick={() => {
+                      b.setActiveId(t.runtimeId);
+                      b.navigate('session');
                     }}
-                    onKeyDown={onComposerKey}
-                    placeholder={
-                      activeTab.exited
-                        ? 'session exited'
-                        : activeTab.running
-                          ? `steer ${activeTab.workspaceName}…`
-                          : `prompt ${activeTab.workspaceName}…`
-                    }
-                    disabled={activeTab.exited}
-                    spellCheck={false}
-                  />
-                </div>
-                <div className="composer-hint">
-                  <span>{activeTab.running ? 'enter to steer · / for commands' : 'enter to send · / for commands'}</span>
-                  <span>{activeTab.model}</span>
-                </div>
-              </footer>
-            </>
-          ) : (
-            <div className="empty-pane">
-              <PidexMark className="empty-mark" size={56} />
-              <p className="empty-title">No session open</p>
-              <p className="empty-copy">
-                Pick a session from the sidebar, or start a new one in the expanded workspace.
-              </p>
-              {openError ? <p className="empty-copy empty-copy--error">{openError}</p> : null}
+                  >
+                    <span>{t.title}</span>
+                    <small>
+                      {t.running ? 'Working' : 'Ready'} / this window
+                    </small>
+                  </button>
+                ))}
+              {sessions.slice(0, 3).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`wb-session-item${active?.file === s.file && view === 'session' ? ' is-active' : ''}`}
+                  onClick={() => b.showSession(s)}
+                  disabled={b.busy}
+                >
+                  <span>{s.title}</span>
+                  <small>
+                    {b.tabs.find((t) => t.file === s.file)?.running
+                      ? 'Working'
+                      : 'Saved'}{' '}
+                    / {timeAgo(s.timestamp)}
+                  </small>
+                </button>
+              ))}
+              {!sessions.length && !live.length && (
+                <p className="wb-sidebar-empty">
+                  Your sessions will appear here.
+                </p>
+              )}
+              <p className="wb-eyebrow wb-other-projects">Other projects</p>
+              {b.workspaces
+                .filter((w) => w.dirName !== b.selected)
+                .map((w) => (
+                  <NavItem
+                    key={w.dirName}
+                    icon="folder"
+                    detail={w.sessionCount}
+                    onClick={() => b.selectWorkspace(w)}
+                  >
+                    {w.name}
+                  </NavItem>
+                ))}
+              <NavItem icon="plus" onClick={() => void b.addWorkspace()}>
+                Open project
+              </NavItem>
             </div>
+            <NavItem
+              icon="settings"
+              active={view === 'settings'}
+              detail="⌘,"
+              onClick={() => b.navigate('settings')}
+            >
+              Settings
+            </NavItem>
+            <p className="wb-eyebrow wb-connection">
+              {active?.running ? 'PI WORKING / LOCAL' : 'LOCAL WORKSPACE'}
+            </p>
+          </aside>
+        )}
+        <main className="wb-main">
+          {b.error && (
+            <div className="wb-error" role="alert">
+              <span>{b.error}</span>
+              <button
+                type="button"
+                aria-label="Dismiss error"
+                onClick={() => b.setError('')}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {!ws ? (
+            <div className="wb-welcome">
+              <img src={welcomeMark} alt="" aria-hidden="true" />
+              <h1>Welcome to pidex</h1>
+              <p>
+                Pick a project folder to get started. Your conversations and
+                settings stay local.
+              </p>
+              <div className="wb-welcome-picker">
+                <span className="wb-eyebrow">Open project</span>
+                <div className="wb-path-preview">~/projects /</div>
+                <BracketButton
+                  primary
+                  onClick={() => void b.addWorkspace()}
+                  disabled={b.loading || !api}
+                >
+                  {b.loading ? 'Loading…' : 'Browse folder'}
+                </BracketButton>
+              </div>
+            </div>
+          ) : (
+            <>
+              <header className="wb-view-header">
+                <div>
+                  <h1>{title}</h1>
+                  <p>{context}</p>
+                </div>
+                {view === 'settings' ? (
+                  <BracketButton onClick={() => setResetSettings((v) => v + 1)}>
+                    Restore defaults
+                  </BracketButton>
+                ) : view === 'history' ? (
+                  <BracketButton disabled={!preview} onClick={exportSession}>
+                    Export
+                  </BracketButton>
+                ) : (
+                  <BracketButton
+                    onClick={() =>
+                      view === 'new'
+                        ? void b.addWorkspace()
+                        : b.navigate('files')
+                    }
+                  >
+                    {view === 'new' ? 'Open project' : 'Browse files'}
+                  </BracketButton>
+                )}
+              </header>
+              {view === 'new' && (
+                <div className="wb-start-scroll">
+                  <div className="wb-start">
+                    <div className="wb-start-title">
+                      <PidexMark size={48} />
+                      <div>
+                        <h2>Start a session</h2>
+                        <p>Bring a task. Pi works in your workspace.</p>
+                      </div>
+                    </div>
+                    <div className="wb-working-directory">
+                      <span className="wb-eyebrow">Work in</span>
+                      <label className="wb-select">
+                        <select
+                          aria-label="Working directory"
+                          value={b.selected}
+                          onChange={(e) => {
+                            const next = b.workspaces.find(
+                              (w) => w.dirName === e.target.value,
+                            );
+                            if (next) b.selectWorkspace(next);
+                          }}
+                        >
+                          {b.workspaces.map((w) => (
+                            <option key={w.dirName} value={w.dirName}>
+                              {w.name} / {w.branch || 'local'}
+                            </option>
+                          ))}
+                        </select>
+                        <Icon name="chevron-down" />
+                      </label>
+                      <span className="wb-meta">{ws.cwd}</span>
+                    </div>
+                    {composer()}
+                    <div className="wb-starters">
+                      <button
+                        type="button"
+                        onClick={() => b.onDraft('Help me track down a bug: ')}
+                      >
+                        <span>
+                          <Icon name="file-code" />
+                          Fix a bug
+                        </span>
+                        <small>Track down a regression.</small>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => b.navigate('changes')}
+                      >
+                        <span>
+                          <Icon name="starter-changes" />
+                          Review changes
+                        </span>
+                        <small>Check the current diff.</small>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          b.onDraft('Explain the structure of this project.')
+                        }
+                      >
+                        <span>
+                          <Icon name="starter-search" />
+                          Explore the code
+                        </span>
+                        <small>Understand this project.</small>
+                      </button>
+                    </div>
+                    <div className="wb-section-heading">
+                      <span className="wb-eyebrow">Continue a session</span>
+                      <button
+                        type="button"
+                        onClick={() => b.navigate('history')}
+                      >
+                        View all / ⌘⇧H
+                      </button>
+                    </div>
+                    <div className="wb-continue">
+                      {sessions.slice(0, 2).map((s) => (
+                        <button
+                          type="button"
+                          key={s.id}
+                          className="wb-session-item"
+                          onClick={() => b.showSession(s)}
+                          disabled={b.busy}
+                        >
+                          <span>{s.title}</span>
+                          <small>
+                            Saved / {branch} / {timeAgo(s.timestamp)}
+                          </small>
+                        </button>
+                      ))}
+                      {!sessions.length && (
+                        <p className="wb-meta">
+                          No saved sessions yet. Start with a task above.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {view === 'session' &&
+                (active ? (
+                  <div className="wb-active-layout">
+                    <section className="wb-conversation">
+                      <div ref={timelineRef} className="wb-transcript">
+                        <Transcript entries={active.entries} />
+                        {!active.entries.length && (
+                          <EmptyState title="Ready when you are">
+                            Send a task to start working with Pi.
+                          </EmptyState>
+                        )}
+                      </div>
+                      {composer(
+                        active.exited
+                          ? 'Session exited. Start a new session to continue.'
+                          : active.running
+                            ? 'Add a follow-up while pi works…'
+                            : 'Continue this session…',
+                      )}
+                    </section>
+                    <aside className="wb-context">
+                      <span className="wb-eyebrow">Session</span>
+                      <h2>
+                        {active.running
+                          ? 'Working on'
+                          : active.exited
+                            ? 'Session exited'
+                            : 'Ready to continue'}
+                        <br />
+                        {active.title}
+                      </h2>
+                      <span className="wb-eyebrow">Active worktree</span>
+                      <div className="wb-static-select">{branch}</div>
+                      <span className="wb-eyebrow">Changed files</span>
+                      {details.changes.slice(0, 8).map((f, i) => (
+                        <button
+                          className="wb-file-row"
+                          type="button"
+                          key={`${f.path}-${i}`}
+                          onClick={() => b.navigate('changes')}
+                        >
+                          <Icon name="file-code" />
+                          <span>{f.path.split('/').at(-1)}</span>
+                          <small>
+                            +{f.additions} −{f.deletions}
+                          </small>
+                        </button>
+                      ))}
+                      {!details.changes.length && (
+                        <p className="wb-meta">No changed files.</p>
+                      )}
+                      <BracketButton
+                        primary
+                        onClick={() => b.navigate('changes')}
+                      >
+                        Review {details.changes.length} files
+                      </BracketButton>
+                      <span className="wb-eyebrow">Activity</span>
+                      <p className="wb-meta">
+                        {active.entries.filter((e) => e.kind === 'tool').length}{' '}
+                        tool calls in this session.
+                      </p>
+                      <p className="wb-meta">
+                        {active.running
+                          ? 'You can keep typing. Follow-ups steer Pi while it works.'
+                          : 'Your conversation is saved locally by Pi.'}
+                      </p>
+                      <div className="wb-flex-space" />
+                      <BracketButton onClick={b.closeSession}>
+                        Close session
+                      </BracketButton>
+                    </aside>
+                  </div>
+                ) : (
+                  <EmptyState title="No session open">
+                    Select a saved session or start a new one.
+                  </EmptyState>
+                ))}
+              {view === 'changes' && (
+                <ChangesView
+                  cwd={ws.cwd}
+                  details={details}
+                  onDetails={b.setDetails}
+                  report={b.report}
+                  composer={composer('Ask pi about these changes…')}
+                />
+              )}
+              {view === 'history' && (
+                <div className="wb-split-view">
+                  <aside className="wb-subpanel">
+                    <SearchField
+                      value={sessionQuery}
+                      onChange={setSessionQuery}
+                      placeholder="Search sessions…"
+                      label="Search sessions"
+                    />
+                    <div className="wb-history-list">
+                      {(allHistory
+                        ? filteredSessions
+                        : filteredSessions.slice(0, 30)
+                      ).map((s, i, arr) => {
+                        const day = new Date(s.timestamp).toLocaleDateString();
+                        const prev =
+                          i > 0
+                            ? new Date(
+                                arr[i - 1].timestamp,
+                              ).toLocaleDateString()
+                            : '';
+                        return (
+                          <div key={s.id}>
+                            {day !== prev && (
+                              <p className="wb-eyebrow wb-day-label">
+                                {day === new Date().toLocaleDateString()
+                                  ? 'Today'
+                                  : day}
+                              </p>
+                            )}
+                            <button
+                              type="button"
+                              className={`wb-session-item${preview?.info.id === s.id ? ' is-active' : ''}`}
+                              onClick={() => void b.showPreview(s)}
+                            >
+                              <span>{s.title}</span>
+                              <small>
+                                {timeAgo(s.timestamp)} / {s.messageCount} msgs
+                              </small>
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {!filteredSessions.length && (
+                        <p className="wb-meta">No sessions found.</p>
+                      )}
+                    </div>
+                    <BracketButton onClick={() => setAllHistory((v) => !v)}>
+                      {allHistory ? 'Show recent' : 'Show all sessions'}
+                    </BracketButton>
+                  </aside>
+                  <section className="wb-conversation">
+                    {preview ? (
+                      <>
+                        <div className="wb-history-heading">
+                          <div>
+                            <h2>{preview.info.title}</h2>
+                            <p className="wb-meta">
+                              {preview.info.model || 'Pi'} / saved locally
+                            </p>
+                          </div>
+                          <BracketButton
+                            primary
+                            onClick={() => b.navigate('changes')}
+                          >
+                            Review changes
+                          </BracketButton>
+                        </div>
+                        <div ref={timelineRef} className="wb-transcript">
+                          {b.previewLoading ? (
+                            <p className="wb-meta" role="status">
+                              Loading session…
+                            </p>
+                          ) : (
+                            <>
+                              <Transcript entries={preview.entries} />
+                              <div className="wb-fork-actions">
+                                <BracketButton
+                                  disabled={b.busy || !preview.entries.length}
+                                  onClick={b.forkSession}
+                                >
+                                  Fork from here
+                                </BracketButton>
+                                <span className="wb-meta">
+                                  Start a new session from this conversation.
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {composer('Continue this session…', 'Resume')}
+                      </>
+                    ) : (
+                      <EmptyState title="Your session history">
+                        Saved conversations will appear here.
+                      </EmptyState>
+                    )}
+                  </section>
+                </div>
+              )}
+              {view === 'settings' && (
+                <SettingsView
+                  key={ws.cwd}
+                  cwd={ws.cwd}
+                  models={b.models}
+                  modelError={b.modelError}
+                  modelsLoading={b.modelsLoading}
+                  defaults={b.defaults}
+                  resetSignal={resetSettings}
+                  onSaved={b.setDefaults}
+                  report={b.report}
+                  onFiles={() => b.navigate('files')}
+                />
+              )}
+              {view === 'skills' && (
+                <SkillsView
+                  key={ws.cwd}
+                  cwd={ws.cwd}
+                  commands={active?.commands ?? []}
+                  onUse={b.useSkill}
+                  report={b.report}
+                />
+              )}
+              {view === 'files' && (
+                <FilesView
+                  key={ws.cwd}
+                  cwd={ws.cwd}
+                  files={details.files}
+                  initialFile={paletteFile}
+                  report={b.report}
+                />
+              )}
+            </>
+          )}
+          {terminal && (
+            <section className="wb-output" aria-label="Session output">
+              <header>
+                <span className="wb-eyebrow">Session output</span>
+                <button
+                  type="button"
+                  className="wb-icon-button"
+                  onClick={() => setTerminal(false)}
+                  aria-label="Close session output"
+                >
+                  ×
+                </button>
+              </header>
+              <pre>
+                {active?.entries
+                  .filter((e) => e.kind === 'tool' && e.tool === 'bash')
+                  .map((e) =>
+                    e.kind === 'tool' ? `$ ${e.args}\n${e.output}` : '',
+                  )
+                  .join('\n\n') ||
+                  'Shell output from the current Pi session will appear here.'}
+              </pre>
+            </section>
           )}
         </main>
       </div>
-
-      <footer className="statusbar">
-        <div className="statusbar-left">
-          <span className="status-ok">
-            {activeTab?.running ? 'agent running' : 'runtime linked'}
-          </span>
-          <span>{tabs.length} tabs</span>
-        </div>
+      <footer className="wb-statusbar">
+        <span className={active?.exited ? 'wb-muted' : ''}>
+          {!ws
+            ? 'RUNTIME IDLE'
+            : active?.exited
+              ? 'PI EXITED'
+              : active?.running
+                ? 'PI WORKING'
+                : b.busy
+                  ? 'PI CONNECTING'
+                  : b.modelError && !active
+                    ? 'PI UNAVAILABLE'
+                    : 'PI READY'}
+        </span>
         <span>
-          $ pidex — {measuredRows} rows measured · 0 dom reads
+          {view === 'history'
+            ? 'Local session archive'
+            : `${b.measuredRows} rows measured / ${b.tabs.length} open sessions`}
         </span>
       </footer>
+      {palette && (
+        <CommandPalette
+          workspaces={b.workspaces}
+          sessions={sessions}
+          files={details.files}
+          commands={active?.commands ?? []}
+          onClose={() => setPalette(false)}
+          onWorkspace={b.selectWorkspace}
+          onSession={b.showSession}
+          onNavigate={b.navigate}
+          onFile={(file) => {
+            setPaletteFile(file);
+            b.navigate('files');
+          }}
+          onCommand={b.useSkill}
+          onAddWorkspace={() => void b.addWorkspace()}
+        />
+      )}
     </div>
   );
 }
