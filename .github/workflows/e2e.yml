@@ -16,12 +16,6 @@ jobs:
         with:
           install: true
       - run: bun install --frozen-lockfile
-      - run: npm install -g @earendil-works/pi-coding-agent
-      - run: bunx tsc -p tsconfig.main.json
-      - run: bunx tsc -p tsconfig.preload.json
-      - run: bunx vite build
-      - run: mise run dev:vite &
-      - run: bunx wait-on http://localhost:5173
       - run: mise run test:e2e
       - name: upload test artefacts
         if: always()

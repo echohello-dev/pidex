@@ -83,6 +83,16 @@ $ mise run dev          # starts Vite + Electron
 
 For a production build: `mise run build` then `mise run start`. Native installers: `mise run package`.
 
+### Tests
+
+```bash
+$ bun run test:unit         # parsers, session archives, workspace and skill discovery
+$ bun run test:integration  # React component behavior in jsdom
+$ bun run test:e2e          # real Electron UI on macOS
+```
+
+The E2E suite compiles main/preload, starts an isolated renderer server on a free port, and creates temporary Git workspaces, sessions, and app settings. It uses a deterministic Pi RPC fixture, so it needs no provider credentials. Screenshots are written to `test-results/workbench/`. Every PR runs all three test lanes; `mise run build` also runs lint, typecheck, unit and component tests.
+
 ## Architecture
 
 ```

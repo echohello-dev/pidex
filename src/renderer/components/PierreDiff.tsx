@@ -134,3 +134,8 @@ function PierreDiff({ oldFile, newFile, filename, className }: PierreDiffProps) 
 }
 
 export { PierreDiff };
+
+/** Render an existing Git patch without regenerating or truncating its hunks. */
+export function PierrePatch({ patch }: { patch: string }) {
+  return <PatchDiff patch={patch} options={{ theme: 'pierre-dark', themeType: 'dark', diffStyle: 'unified', disableFileHeader: true }} />;
+}

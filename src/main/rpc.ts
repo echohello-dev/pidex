@@ -3,7 +3,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-const PI_MISSING = 'Could not find the pi command. Install it, or set PIDEX_PI to the binary.';
+const PI_MISSING =
+  'Could not find the pi command. Install it, or set PIDEX_PI to the binary.';
 
 type RpcEvent = Record<string, unknown> & { type: string };
 
@@ -63,7 +64,7 @@ export function resolvePi(
 
 function childEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const current = (env.PATH ?? '').split(path.delimiter).filter(Boolean);
-  const extra = piPathDirs().filter(dir => !current.includes(dir));
+  const extra = piPathDirs().filter((dir) => !current.includes(dir));
   return { ...env, PATH: [...extra, ...current].join(path.delimiter) };
 }
 
@@ -75,16 +76,25 @@ class RpcSession {
   private seq = 0;
   private closed = false;
   private failed: string | null = null;
-  private pending = new Map<string, { resolve: (r: RpcResponse) => void; timer: NodeJS.Timeout }>();
+  private pending = new Map<
+    string,
+    { resolve: (r: RpcResponse) => void; timer: NodeJS.Timeout }
+  >();
   onEvent: (sessionId: string, event: RpcEvent) => void = () => {};
   onExit: (sessionId: string, code: number | null) => void = () => {};
 
-  constructor(id: string, cwd: string, sessionFile?: string) {
+  constructor(
+    id: string,
+    cwd: string,
+    sessionFile?: string,
+    ephemeral = false,
+  ) {
     this.id = id;
     this.cwd = cwd;
     const bin = resolvePi();
     if (!bin) throw new Error(PI_MISSING);
     const args = ['--mode', 'rpc'];
+    if (ephemeral) args.push('--no-session');
     if (sessionFile) args.push('--session', sessionFile);
     this.proc = spawn(bin, args, {
       cwd,
@@ -93,16 +103,16 @@ class RpcSession {
     });
 
     this.proc.stdout!.setEncoding('utf8');
-    this.proc.stdout!.on('data', chunk => this.handleChunk(chunk));
+    this.proc.stdout!.on('data', (chunk) => this.handleChunk(chunk));
     this.proc.stderr!.setEncoding('utf8');
     this.proc.stderr!.on('data', () => {});
     this.proc.stdin?.on('error', () => {});
-    this.proc.on('error', err => {
+    this.proc.on('error', (err) => {
       const code = (err as NodeJS.ErrnoException).code;
       this.failed = code === 'ENOENT' ? PI_MISSING : err.message;
       this.close(null);
     });
-    this.proc.on('exit', code => {
+    this.proc.on('exit', (code) => {
       this.failed ??= 'process exited';
       this.close(code);
     });
@@ -160,10 +170,16 @@ class RpcSession {
       });
     }
     const id = `req-${++this.seq}`;
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        resolve({ type: 'response', command: String(cmd.type ?? ''), success: false, id, error: 'timeout' });
+        resolve({
+          type: 'response',
+          command: String(cmd.type ?? ''),
+          success: false,
+          id,
+          error: 'timeout',
+        });
       }, 30000);
       this.pending.set(id, { resolve, timer });
       try {
@@ -171,8 +187,15 @@ class RpcSession {
       } catch (err) {
         clearTimeout(timer);
         this.pending.delete(id);
-        const message = err instanceof Error ? err.message : 'could not write to pi';
-        resolve({ type: 'response', command: String(cmd.type ?? ''), success: false, id, error: message });
+        const message =
+          err instanceof Error ? err.message : 'could not write to pi';
+        resolve({
+          type: 'response',
+          command: String(cmd.type ?? ''),
+          success: false,
+          id,
+          error: message,
+        });
       }
     });
   }
