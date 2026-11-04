@@ -1,5 +1,10 @@
 import { PatchDiff } from '@pierre/diffs/react';
-import { useEffect, useMemo, useRef } from 'react';
+import {
+  getFiletypeFromFileName,
+  getSingularPatch,
+  preloadHighlighter,
+} from '@pierre/diffs';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type PierreDiffProps = {
   oldFile: string;
@@ -137,5 +142,58 @@ export { PierreDiff };
 
 /** Render an existing Git patch without regenerating or truncating its hunks. */
 export function PierrePatch({ patch }: { patch: string }) {
-  return <PatchDiff patch={patch} options={{ theme: 'pierre-dark', themeType: 'dark', diffStyle: 'unified', disableFileHeader: true }} />;
+  const language = useMemo(
+    () => getFiletypeFromFileName(getSingularPatch(patch).name) ?? 'text',
+    [patch],
+  );
+  const [ready, setReady] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setError('');
+    // With a hidden header, StrictMode can hydrate the library's empty <pre>
+    // before async highlighting completes and leave the first patch blank.
+    void preloadHighlighter({
+      themes: ['pierre-dark'],
+      langs: [language],
+    }).then(
+      () => {
+        if (!cancelled) setReady(patch);
+      },
+      (reason) => {
+        if (!cancelled)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : 'Could not load the diff renderer.',
+          );
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [patch, language]);
+  if (error)
+    return (
+      <p role="alert" className="wb-meta wb-padded">
+        {error}
+      </p>
+    );
+  if (ready !== patch)
+    return (
+      <p role="status" className="wb-meta wb-padded">
+        Loading diff…
+      </p>
+    );
+  return (
+    <PatchDiff
+      patch={patch}
+      options={{
+        theme: 'pierre-dark',
+        themeType: 'dark',
+        diffStyle: 'unified',
+        disableFileHeader: true,
+      }}
+    />
+  );
 }

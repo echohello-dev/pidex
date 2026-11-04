@@ -64,7 +64,7 @@ jobs:
             echo "| macOS Apple silicon | \`pidex-mac-arm64.dmg\` |"
             echo "| macOS Intel | \`pidex-mac-x64.dmg\` |"
             echo "| Windows | \`pidex-win-x64.exe\` |"
-            echo "| Linux | \`pidex-linux-x64.AppImage\` |"
+            echo "| Linux | \`pidex-linux-x86_64.AppImage\` |"
             echo "| Docker | \`docker pull ghcr.io/echohello-dev/pidex:${TAG}\` |"
             echo
             echo "macOS via Homebrew:"

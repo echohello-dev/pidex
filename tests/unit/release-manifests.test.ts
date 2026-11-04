@@ -13,7 +13,7 @@ const checksums = {
   'pidex-mac-arm64.dmg': 'aaa'.repeat(21) + 'aa',
   'pidex-mac-x64.dmg': 'bbb'.repeat(21) + 'bb',
   'pidex-win-x64.exe': 'ccc'.repeat(21) + 'cc',
-  'pidex-linux-x64.AppImage': 'ddd'.repeat(21) + 'dd',
+  'pidex-linux-x86_64.AppImage': 'ddd'.repeat(21) + 'dd',
 };
 
 describe('versionsFromCalver', () => {

@@ -13,7 +13,7 @@ export type ReleaseChecksums = {
   'pidex-mac-arm64.dmg'?: string;
   'pidex-mac-x64.dmg'?: string;
   'pidex-win-x64.exe'?: string;
-  'pidex-linux-x64.AppImage'?: string;
+  'pidex-linux-x86_64.AppImage'?: string;
 };
 
 const CALVER = /^(\d{4})\.(\d{2})\.(\d{2})(?:-(\d+))?$/;

@@ -87,14 +87,9 @@ export function ChangesView({
     return () => {
       cancelled = true;
     };
-  }, [
-    cwd,
-    file?.path,
-    file?.staged,
-    file?.untracked,
-    file?.additions,
-    file?.deletions,
-  ]);
+    // A refreshed snapshot may contain new text with identical numstat counts.
+    // Its file object changes even when path, state and line counts do not.
+  }, [cwd, file]);
 
   const act = async (
     action: 'stage' | 'stage-all' | 'unstage' | 'commit',
@@ -103,7 +98,15 @@ export function ChangesView({
     if (busy) return;
     setBusy(true);
     try {
-      onDetails(unwrap(await window.pidex.gitAction(cwd, action, target)));
+      const next = unwrap(await window.pidex.gitAction(cwd, action, target));
+      if ((action === 'stage' || action === 'unstage') && target) {
+        const selected = next.changes.find(
+          (change) =>
+            change.path === target && change.staged === (action === 'stage'),
+        );
+        if (selected) setSelectedKey(keyOf(selected));
+      }
+      onDetails(next);
       if (action === 'commit') setMessage('');
     } catch (e) {
       report(e);
@@ -203,7 +206,7 @@ export function ChangesView({
                   <EmptyState title="Preview unavailable">
                     {patchError}
                   </EmptyState>
-                ) : patch ? (
+                ) : /^@@ /m.test(patch) ? (
                   <PierrePatch patch={patch} />
                 ) : (
                   <EmptyState title="No text changes">

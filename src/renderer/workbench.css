@@ -837,11 +837,13 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 .wb-change-files {
   overflow-y: auto;
+  min-height: 80px;
   max-height: 40%;
   flex-shrink: 1;
 }
 .wb-change-list {
   gap: 12px;
+  overflow-y: auto;
 }
 .wb-commit-message {
   resize: vertical;

@@ -22,19 +22,23 @@ Daily coding-agent work means juggling repos, branches, and sessions. pidex keep
 
 ## In action
 
-![Start a session in a workspace](docs/assets/workbench-boot.png)
+| Start a session | Work with Pi |
+| :---: | :---: |
+| [![Start a session in a workspace](docs/assets/workbench-boot.png)](docs/assets/workbench-boot.png) | [![Pi working in the current workspace](docs/assets/workbench-loaded.png)](docs/assets/workbench-loaded.png) |
+| Choose a workspace and model, or continue recent work. | Keep the conversation, branch, and changed files together. |
+| **Review changes** | **Recover context** |
+| [![Review a Git patch](docs/assets/workbench-changes.png)](docs/assets/workbench-changes.png) | [![Preview saved session history](docs/assets/workbench-history.png)](docs/assets/workbench-history.png) |
+| Inspect added and removed lines before staging a file. | Read saved conversations before resuming or forking. |
 
-Start a session with workspace model defaults and quick access to recent conversations.
+Click any screenshot for the full-size capture.
 
-![Pi streaming in the workbench](docs/assets/workbench-loaded.png)
+### Review → stage → unstage
 
-Keep the conversation, current branch, and changed files together while Pi works. Scroll up to read older messages without being pulled back to the latest response.
+![Review the working-copy patch, stage the file, then unstage it](docs/assets/workbench-diff-review.gif)
 
-![Review and stage a Git patch](docs/assets/workbench-changes.png)
+The selected file stays in view as it moves between the working copy and the index. Staged and unstaged changes have separate patches; empty and binary changes show an explanation.
 
-Review real Git patches and stage or unstage individual files before committing.
-
-These captures come from the Electron UI tests, using temporary workspaces and deterministic Pi responses. They show the implemented desktop UI; they do not require a live model.
+These are captures of real Electron interactions with a temporary Git workspace and deterministic Pi responses. The GIF shows actual staging and unstaging, verified against Git's index. [Refresh the media](docs/media.md) with `mise run docs:media`.
 
 ## What works today
 
@@ -83,7 +87,7 @@ Or download `pidex-win-x64.exe` from [Releases](https://github.com/echohello-dev
 
 ```bash
 $ curl -sL -o pidex.AppImage \
-    https://github.com/echohello-dev/pidex/releases/latest/download/pidex-linux-x64.AppImage
+    https://github.com/echohello-dev/pidex/releases/latest/download/pidex-linux-x86_64.AppImage
 $ chmod +x pidex.AppImage && ./pidex.AppImage
 ```
 
