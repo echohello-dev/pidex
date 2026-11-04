@@ -87,14 +87,9 @@ export function ChangesView({
     return () => {
       cancelled = true;
     };
-  }, [
-    cwd,
-    file?.path,
-    file?.staged,
-    file?.untracked,
-    file?.additions,
-    file?.deletions,
-  ]);
+    // A refreshed snapshot may contain new text with identical numstat counts.
+    // Its file object changes even when path, state and line counts do not.
+  }, [cwd, file]);
 
   const act = async (
     action: 'stage' | 'stage-all' | 'unstage' | 'commit',

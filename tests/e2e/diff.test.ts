@@ -210,4 +210,20 @@ describe('real Git diffs in Electron', () => {
     ).toBeGreaterThanOrEqual(80);
     await page.setViewportSize({ width: 1440, height: 900 });
   });
+
+  it('refreshes the displayed patch when content changes with the same diff statistics', async () => {
+    await select('partial.ts');
+    await expect
+      .poll(async () => (await patchText()).join('\n'), { timeout: 10000 })
+      .toContain('"working"');
+    await fs.writeFile(
+      path.join(project, 'partial.ts'),
+      'export const phase = "refreshed";\n',
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect
+      .poll(async () => (await patchText()).join('\n'), { timeout: 10000 })
+      .toContain('"refreshed"');
+    expect((await patchText()).join('\n')).not.toContain('"working"');
+  });
 });
