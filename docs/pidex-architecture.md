@@ -103,12 +103,17 @@ mise pins Node and Bun. `mise run dev` starts Vite on port 5173 and Electron aga
 
 `mise run test:e2e` compiles main/preload, selects a free renderer port, and launches real Electron windows through Playwright. Tests use temporary workspaces, archives, settings, and a deterministic Pi RPC fixture. No provider credentials or Pi installation are needed. Live model/provider behavior needs separate testing. CI runs Electron checks on macOS; Linux requires an X display.
 
-Screenshots and a Playwright trace are written to `test-results/workbench/`. Long-session metrics and screenshots are under `test-results/long-session/`. Refresh documentation captures after a passing E2E run:
+Screenshots and a Playwright trace are written to `test-results/workbench/`. Long-session metrics and screenshots are under `test-results/long-session/`. `tests/e2e/diff.test.ts` checks rendered patch text, separate staged/unstaged content, stage/unstage selection, empty and binary changes, and distant hunks.
+
+Refresh the README gallery and stage/unstage GIF with:
 
 ```bash
-cp test-results/workbench/01-new-session.png docs/assets/workbench-boot.png
-cp test-results/workbench/02-active-session.png docs/assets/workbench-loaded.png
-cp test-results/workbench/03-changes-review.png docs/assets/workbench-changes.png
+mise run docs:media
+```
+
+This requires ffmpeg and a display. The capture script verifies the real Git index before saving the media; see [README media](media.md). The long-transcript image can be refreshed separately after a passing E2E run:
+
+```bash
 cp test-results/long-session/active.png docs/assets/workbench-long-session.png
 ```
 

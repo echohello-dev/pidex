@@ -59,5 +59,12 @@ run = [
 description = "Run e2e tests against the live Electron app"
 run = "bunx vitest run --config vitest.e2e.config.ts"
 
+[tasks."docs:media"]
+description = "Capture README screenshots and the Git stage/unstage GIF (requires ffmpeg and a display)"
+run = [
+  "mise run bundle",
+  "node scripts/capture-workbench.mjs",
+]
+
 [settings]
 experimental = true

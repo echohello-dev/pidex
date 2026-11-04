@@ -14,8 +14,8 @@ Stable artefact names, so `releases/latest/download/<file>` always points at the
 | `pidex-mac-x64.dmg` | macOS Intel |
 | `pidex-win-x64.exe` | Windows NSIS installer |
 | `pidex-win-x64-portable.exe` | Windows portable |
-| `pidex-linux-x64.AppImage` | Linux AppImage |
-| `pidex-linux-x64.deb` | Debian / Ubuntu |
+| `pidex-linux-x86_64.AppImage` | Linux AppImage |
+| `pidex-linux-amd64.deb` | Debian / Ubuntu |
 | `pidex.rb` | Versioned Homebrew cask |
 | `echoHello.Pidex.yaml` | Winget singleton manifest |
 | `pidex.json` | Scoop manifest |
