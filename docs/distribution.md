@@ -2,7 +2,7 @@
 
 pidex ships from GitHub Releases on every push to `main`. Tags stay CalVer (`YYYY.0M.0D`, see [ADR 0009](adr/0009-calver-releases.md)). The packager matrix and public channels are [ADR 0010](adr/0010-distribution-channels.md).
 
-Builds are unsigned until Developer ID and Authenticode secrets are set on the repository. Until then, first launch on macOS needs right-click → Open, and Windows SmartScreen may ask you to keep the file.
+Signing is conditional on the release workflow configuration. Builds without Developer ID or Authenticode secrets are published unsigned. For an unsigned build, macOS may require right-click → Open, and Windows SmartScreen may ask you to keep the file. See [Signing](#signing) for the supported configuration.
 
 ## GitHub Releases
 

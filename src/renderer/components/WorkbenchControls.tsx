@@ -1,4 +1,10 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  memo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { BracketButton } from './BracketButton';
 import { FigureFrame } from './FigureFrame';
 import { Markdown } from './Markdown';
@@ -270,77 +276,81 @@ export function Composer({
   );
 }
 
-export function Transcript({ entries }: { entries: Entry[] }) {
+export const TranscriptRow = memo(function TranscriptRow({
+  entry,
+  expanded,
+}: {
+  entry: Entry;
+  expanded: Map<string, boolean>;
+}) {
+  if (entry.kind === 'tool')
+    return (
+      <details
+        className={`wb-tool${!entry.ok ? ' wb-tool--error' : ''}`}
+        open={expanded.get(entry.key) ?? false}
+        onToggle={(event) => expanded.set(entry.key, event.currentTarget.open)}
+      >
+        <summary>
+          <Icon
+            name={
+              entry.running
+                ? 'activity-terminal'
+                : entry.tool === 'read'
+                  ? 'file'
+                  : entry.ok
+                    ? 'check'
+                    : 'file'
+            }
+          />
+          <span>
+            {entry.tool}
+            {entry.args ? ` / ${entry.args}` : ''}
+          </span>
+          <small>
+            {entry.running ? 'Running' : entry.ok ? 'Done' : 'Failed'}
+          </small>
+        </summary>
+        <pre>
+          {entry.output ||
+            (entry.running ? 'Waiting for output…' : 'No output.')}
+        </pre>
+      </details>
+    );
   return (
-    <>
-      {entries.map((entry) => {
-        if (entry.kind === 'tool')
-          return (
+    <article key={entry.key} className={`wb-message wb-message--${entry.kind}`}>
+      <div className="wb-eyebrow">
+        {entry.kind === 'user'
+          ? '$ YOU'
+          : entry.streaming
+            ? 'PI / WORKING'
+            : 'PI'}
+      </div>
+      {entry.kind === 'assistant' ? (
+        <>
+          {entry.thinking && (
             <details
-              className={`wb-tool${!entry.ok ? ' wb-tool--error' : ''}`}
-              key={entry.key}
+              className="wb-thinking"
+              open={expanded.get(entry.key) ?? false}
+              onToggle={(event) =>
+                expanded.set(entry.key, event.currentTarget.open)
+              }
             >
-              <summary>
-                <Icon
-                  name={
-                    entry.running
-                      ? 'activity-terminal'
-                      : entry.tool === 'read'
-                        ? 'file'
-                        : entry.ok
-                          ? 'check'
-                          : 'file'
-                  }
-                />
-                <span>
-                  {entry.tool}
-                  {entry.args ? ` / ${entry.args}` : ''}
-                </span>
-                <small>
-                  {entry.running ? 'Running' : entry.ok ? 'Done' : 'Failed'}
-                </small>
-              </summary>
-              <pre>
-                {entry.output ||
-                  (entry.running ? 'Waiting for output…' : 'No output.')}
-              </pre>
+              <summary>Thinking</summary>
+              <p>{entry.thinking}</p>
             </details>
-          );
-        return (
-          <article
-            key={entry.key}
-            className={`wb-message wb-message--${entry.kind}`}
-          >
-            <div className="wb-eyebrow">
-              {entry.kind === 'user'
-                ? '$ YOU'
-                : entry.streaming
-                  ? 'PI / WORKING'
-                  : 'PI'}
-            </div>
-            {entry.kind === 'assistant' ? (
-              <>
-                {entry.thinking && (
-                  <details className="wb-thinking">
-                    <summary>Thinking</summary>
-                    <p>{entry.thinking}</p>
-                  </details>
-                )}
-                {entry.text ? (
-                  <Markdown text={entry.text} />
-                ) : (
-                  entry.streaming && <p className="wb-muted">Thinking…</p>
-                )}
-              </>
-            ) : (
-              <p>{entry.text}</p>
-            )}
-          </article>
-        );
-      })}
-    </>
+          )}
+          {entry.text ? (
+            <Markdown text={entry.text} />
+          ) : (
+            entry.streaming && <p className="wb-muted">Thinking…</p>
+          )}
+        </>
+      ) : (
+        <p>{entry.text}</p>
+      )}
+    </article>
   );
-}
+});
 
 export function EmptyState({
   title,

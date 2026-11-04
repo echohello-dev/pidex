@@ -146,6 +146,22 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
           event('agent_end');
         }, 3000),
       );
+      if (command.message === 'stream long-session benchmark') {
+        for (let i = 0; i < 30; i++)
+          timers.push(
+            setTimeout(
+              () => {
+                event('message_update', {
+                  assistantMessageEvent: {
+                    type: 'text_delta',
+                    delta: `\n\nStreaming check ${i}: the workspace remains responsive while new output arrives.`,
+                  },
+                });
+              },
+              (i + 1) * 80,
+            ),
+          );
+      }
       break;
     }
     default:

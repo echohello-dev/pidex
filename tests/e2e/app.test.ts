@@ -18,7 +18,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
-const ELECTRON_BIN = `${ROOT}/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron`;
+const ELECTRON_BIN = path.join(
+  ROOT,
+  'node_modules/electron/dist',
+  process.platform === 'darwin'
+    ? 'Electron.app/Contents/MacOS/Electron'
+    : process.platform === 'win32'
+      ? 'electron.exe'
+      : 'electron',
+);
 let app: ElectronApplication;
 let win: Page;
 let fixtureRoot: string;

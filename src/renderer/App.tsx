@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
 import welcomeMark from './assets/workbench/welcome-mark.svg';
 import { BracketButton } from './components/BracketButton';
@@ -8,7 +8,6 @@ import {
   Icon,
   NavItem,
   SearchField,
-  Transcript,
 } from './components/WorkbenchControls';
 import {
   ChangesView,
@@ -16,6 +15,7 @@ import {
   SettingsView,
   SkillsView,
 } from './components/WorkbenchViews';
+import { Transcript } from './components/Transcript';
 import { CommandPalette } from './components/CommandPalette';
 import { timeAgo, useWorkbench } from './useWorkbench';
 
@@ -29,11 +29,6 @@ function App() {
   const [allHistory, setAllHistory] = useState(false);
   const [paletteFile, setPaletteFile] = useState('');
   const [resetSettings, setResetSettings] = useState(0);
-  const timelineRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    timelineRef.current?.scrollTo?.({ top: timelineRef.current.scrollHeight });
-  }, [active?.entries, preview?.entries, view]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;
@@ -448,14 +443,17 @@ function App() {
                 (active ? (
                   <div className="wb-active-layout">
                     <section className="wb-conversation">
-                      <div ref={timelineRef} className="wb-transcript">
-                        <Transcript entries={active.entries} />
+                      <Transcript
+                        key={active.runtimeId}
+                        entries={active.entries}
+                        follow
+                      >
                         {!active.entries.length && (
                           <EmptyState title="Ready when you are">
                             Send a task to start working with Pi.
                           </EmptyState>
                         )}
-                      </div>
+                      </Transcript>
                       {composer(
                         active.exited
                           ? 'Session exited. Start a new session to continue.'
@@ -587,7 +585,9 @@ function App() {
                       <>
                         <div className="wb-history-heading">
                           <div>
-                            <h2>{preview.info.title}</h2>
+                            <h2 title={preview.info.title}>
+                              {preview.info.title}
+                            </h2>
                             <p className="wb-meta">
                               {preview.info.model || 'Pi'} / saved locally
                             </p>
@@ -599,14 +599,16 @@ function App() {
                             Review changes
                           </BracketButton>
                         </div>
-                        <div ref={timelineRef} className="wb-transcript">
+                        <Transcript
+                          key={preview.info.file}
+                          entries={preview.entries}
+                        >
                           {b.previewLoading ? (
                             <p className="wb-meta" role="status">
                               Loading session…
                             </p>
                           ) : (
                             <>
-                              <Transcript entries={preview.entries} />
                               <div className="wb-fork-actions">
                                 <BracketButton
                                   disabled={b.busy || !preview.entries.length}
@@ -620,7 +622,7 @@ function App() {
                               </div>
                             </>
                           )}
-                        </div>
+                        </Transcript>
                         {composer('Continue this session…', 'Resume')}
                       </>
                     ) : (
@@ -708,7 +710,7 @@ function App() {
         <span>
           {view === 'history'
             ? 'Local session archive'
-            : `${b.measuredRows} rows measured / ${b.tabs.length} open sessions`}
+            : `${active?.entries.length ?? 0} entries / ${b.tabs.length} open sessions`}
         </span>
       </footer>
       {palette && (
