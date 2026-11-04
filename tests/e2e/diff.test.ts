@@ -106,6 +106,10 @@ describe('real Git diffs in Electron', () => {
       },
     });
     page = await app.firstWindow();
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0].setContentSize(1440, 900),
+    );
+    await page.setViewportSize({ width: 1440, height: 900 });
     page.on('pageerror', (error) => errors.push(error.message));
     page.setDefaultTimeout(15000);
     await page
@@ -189,5 +193,21 @@ describe('real Git diffs in Electron', () => {
     expect(rendered).toContain('value4 = 4;');
     expect(rendered).toContain('value249 = 249;');
     expect(errors).toEqual([]);
+  });
+
+  it('keeps a long changed-file list selectable at the minimum window size', async () => {
+    await page.setViewportSize({ width: 900, height: 600 });
+    await select('partial.ts');
+    await expect
+      .poll(async () => (await patchText()).join('\n'), { timeout: 10000 })
+      .toContain('"working"');
+    await select('new-file.ts', 'Untracked');
+    await expect
+      .poll(async () => (await patchText()).join('\n'), { timeout: 10000 })
+      .toContain('created = true');
+    expect(
+      await page.locator('.wb-change-files').evaluate((el) => el.clientHeight),
+    ).toBeGreaterThanOrEqual(80);
+    await page.setViewportSize({ width: 1440, height: 900 });
   });
 });

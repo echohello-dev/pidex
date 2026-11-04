@@ -18,7 +18,7 @@ Review both the stills and the GIF before committing. Keep the GIF focused on th
 
 ## Diff verification
 
-`tests/e2e/diff.test.ts` checks the actual rendered text inside the diff viewer, including its shadow DOM. It covers the first opened patch, separate staged and working-copy content, paths containing spaces, stage/unstage selection, additions, deletions, empty and binary files, and distant hunks in a long file. Mounting a `diffs-container` alone is not treated as proof that a patch rendered.
+`tests/e2e/diff.test.ts` checks the actual rendered text inside the diff viewer, including its shadow DOM. It covers the first opened patch, separate staged and working-copy content, paths containing spaces, stage/unstage selection, additions, deletions, empty and binary files, distant hunks in a long file, and selecting files at the minimum window size. Electron suites run sequentially so native window focus is isolated. Mounting a `diffs-container` alone is not treated as proof that a patch rendered.
 
 ## References
 
