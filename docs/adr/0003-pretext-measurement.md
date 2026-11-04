@@ -10,3 +10,7 @@
   - No need to maintain a parallel `getBoundingClientRect` measurement path.
   - When the renderer virtualises the timeline, Pretext's `layoutWithLines` is already wired in and ready.
   - Avoids the canvas-vs-DOM font metrics drift by only measuring, never rendering.
+
+## Implementation update — 2026-11-04
+
+[ADR 0011](0011-virtualized-transcript.md) implements transcript virtualization. Pretext now supplies cached row-height estimates, while ResizeObserver measures rendered Markdown and expanded rows. The status bar reports entry count; it no longer remeasures every message on each streamed delta. The original no-DOM-measurement consequence above is superseded for final rendered row heights. Pretext remains a measurement tool, not a text renderer.

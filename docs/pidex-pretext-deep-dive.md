@@ -1,5 +1,7 @@
 # Pretext Deep-Dive for pidex
 
+> Research and design background. The implemented transcript uses cached Pretext height estimates with TanStack Virtual and ResizeObserver measurements; see [ADR 0011](adr/0011-virtualized-transcript.md) and the [current architecture](pidex-architecture.md). Performance figures below describe the referenced library research, not a pidex benchmark.
+
 ## What Pretext Actually Is
 
 [Pretext](https://github.com/chenglou/pretext) (~39K GitHub stars, MIT, ~15KB gzipped, zero dependencies) is a pure TypeScript library that measures multiline text dimensions without touching the DOM. Created by Cheng Lou (ex-Meta React Core team, now Midjourney). The core insight: split text measurement into a one-time **prepare** phase (uses Canvas to measure segment widths) and an ultra-cheap **layout** phase (pure arithmetic over cached widths).

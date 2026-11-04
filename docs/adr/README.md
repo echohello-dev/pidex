@@ -23,3 +23,4 @@ Each ADR follows this shape:
 | [0008](0008-pi-dev-design-system.md) | Adopt pi.dev design system for visual language | Accepted |
 | [0009](0009-calver-releases.md) | Calendar-versioned releases via GitHub Actions | Accepted |
 | [0010](0010-distribution-channels.md) | Ship desktop installers and public package channels | Accepted |
+| [0011](0011-virtualized-transcript.md) | Virtualize the session transcript | Accepted |

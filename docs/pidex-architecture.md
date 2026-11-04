@@ -1,267 +1,115 @@
-# pidex Architecture Proposal
+# pidex architecture
 
-This document captures the first-pass architecture for an Electron desktop app that wraps the Pi coding agent runtime and stays responsive under long sessions, diffs, and workspace switching.
+pidex is a local Electron workbench for the Pi coding agent. This document describes the implemented app. The [project brief](pidex-project-brief.md) records the broader product direction; [ADRs](adr/README.md) explain the choices behind it.
 
-## Goals
+## Process boundary
 
-- Pi-first desktop workbench, not a chat-first client
-- Fast workspace switching and context recovery
-- Rich tool and session visualization
-- Strong diff and file navigation performance
-- Renderer responsiveness under sustained UI churn
-- Local-first architecture with a clean runtime boundary
-
-## Process Diagram
-
-```mermaid
-flowchart LR
-  U[User] --> R[Renderer UI\nReact + Pretext]
-  R <-->|IPC events / commands| M[Electron Main Process]
-  M <-->|SDK or RPC| P[Pi Runtime]
-  M --> S[(Local Store)]
-  M --> G[Git / Worktree / FS services]
-  R --> V[Virtualized lists\nDiffs / Sessions / Workspaces]
-  P -->|tool events| M
-  P -->|streamed text / status| M
-  M -->|normalized UI events| R
+```text
+React renderer
+  workspace navigation, session/history transcripts, files, changes, settings
+        ↕ typed window.pidex bridge
+Electron preload
+        ↕ explicit IPC requests and session events
+Electron main
+  local files, Git, settings, session archives, process lifecycle
+        ↕ newline-delimited JSON over stdin/stdout
+Pi CLI: pi --mode rpc
+  one subprocess per active session
 ```
 
-### Responsibilities
+The renderer has context isolation enabled and Node integration disabled. Filesystem and Git operations run in main. Pi owns agent execution, provider access, tool policy, and session persistence. pidex is not an additional sandbox for Pi tools.
 
-- **Renderer UI**: draws workspace state, session timeline, diffs, and action cards
-- **Electron Main**: owns process lifecycle, workspace orchestration, persistence, and IPC routing
-- **Pi Runtime**: runs agent logic, tool execution, and session state
-- **Local Store**: persists UI state, session summaries, resume pointers, and user prefs
-- **Git / Worktree / FS services**: provide repo state and file operations for workspace awareness
+## Code map
 
-## Electron Module Boundaries
+| File | Responsibility |
+|---|---|
+| `src/main/index.ts` | Windows, workspace registration, active session lifecycle, prompt/abort/close IPC |
+| `src/main/rpc.ts` | Pi executable discovery, child processes, request IDs, response timeouts, event forwarding |
+| `src/main/sessions.ts` | Discover workspaces and read session metadata from Pi JSONL archives |
+| `src/main/workbench.ts` | Workspace inspection, Git patches, file previews, skills, archive branch traversal |
+| `src/main/workbench-ipc.ts` | Validated workspace actions, Git mutations, settings, model discovery |
+| `src/preload/index.ts` | Explicit `window.pidex` bridge and event subscriptions |
+| `src/renderer/api.ts` | Renderer-facing API types |
+| `src/renderer/useWorkbench.ts` | Workspace selection, open sessions, drafts, previews, runtime event subscriptions |
+| `src/renderer/timeline.ts` | Pure archive-to-entry conversion and Pi event reducer |
+| `src/renderer/components/Transcript.tsx` | Virtualization, measurement, selection/focus retention, scrolling |
+| `src/renderer/components/WorkbenchControls.tsx` | Composer and memoized message/tool rows |
+| `src/renderer/components/WorkbenchViews.tsx` | Changes, files, skills, and settings views |
 
-### `main/`
+Shared schemas and a separate runtime-adapter package were early proposals; the current code keeps runtime handling in `main/rpc.ts` and exposes types through the preload and renderer API.
 
-Owns the app runtime and native integration.
+## Session lifecycle
 
-Suggested responsibilities:
+Opening or resuming a session starts a Pi subprocess in the workspace directory. Resume supplies a validated session file. Fork asks Pi to clone the selected archive before returning the new session state. New sessions apply the workspace's saved model and reasoning defaults.
 
-- Create and manage app windows
-- Start and stop the Pi runtime
-- Maintain workspace/session registry
-- Bridge filesystem, git, and worktree operations
-- Persist local application state
-- Translate Pi runtime events into renderer-safe IPC events
+Main requests `get_state`, `get_messages`, and available commands. The renderer converts the returned messages into user, assistant, and tool entries. Subsequent Pi events arrive through `pidex:session:event`; `timeline.ts` applies text/thinking deltas and tool start/update/end events. Main forwards the RPC events rather than translating them into a second event protocol.
 
-### `preload/`
+Pi requests carry IDs and have 30-second timeouts. Stdout is split on newline only. A missing executable produces an error in the window; `PIDEX_PI` can select an absolute executable path. Discovery also checks common Bun, Homebrew, mise, and PATH directories.
 
-Owns the narrow, typed bridge between renderer and main.
+Closing a session terminates its process. Window closure and app shutdown dispose of all active processes. Process exits are reported to the renderer. The UI remains available, but automatic process restart is not implemented.
 
-Suggested responsibilities:
+## IPC
 
-- Expose a minimal `window.pidex` API
-- Keep IPC channels explicit and typed
-- Prevent renderer code from touching Node APIs directly
+The authoritative channel definitions are in `src/preload/index.ts`. Important groups are:
 
-### `renderer/`
-
-Owns presentation only.
-
-Suggested responsibilities:
-
-- Workspace dashboard
-- Session timeline and tool cards
-- Diff viewer and file navigation
-- Resume / replay / branch / switch actions
-- Search and filtering over local session state
-
-### `shared/`
-
-Owns types and schemas shared across processes.
-
-Suggested responsibilities:
-
-- IPC event types
-- Workspace and session domain types
-- Runtime event normalization schemas
-- UI state models
-
-### `runtime/`
-
-Owns the Pi integration layer.
-
-Suggested responsibilities:
-
-- SDK integration or RPC client
-- Session lifecycle management
-- Event translation from Pi into app events
-- Tool call normalization
-
-## IPC Event Schema
-
-The IPC layer should be event-driven, typed, and intentionally small.
-
-### Command channels
-
-| Channel | Direction | Purpose |
+| Bridge methods | Main channels | Purpose |
 |---|---|---|
-| `pidex:workspace/open` | renderer -> main | Open or focus a workspace |
-| `pidex:workspace/refresh` | renderer -> main | Re-read repo and session state |
-| `pidex:session/start` | renderer -> main | Start a new Pi session |
-| `pidex:session/resume` | renderer -> main | Resume an existing session |
-| `pidex:session/fork` | renderer -> main | Fork a session branch |
-| `pidex:agent/send` | renderer -> main | Send a prompt or command to Pi |
-| `pidex:diff/open` | renderer -> main | Open a file diff or patch view |
-| `pidex:file/open` | renderer -> main | Open a file in the workspace |
-| `pidex:git/checkout` | renderer -> main | Switch branches or worktrees |
+| `workspaces`, `addWorkspace`, `sessions` | `pidex:workspaces`, `pidex:workspace:add`, `pidex:sessions` | Discover and select local work |
+| `openSession`, `sendPrompt`, `abortSession`, `closeSession` | `pidex:session/open`, `/send`, `/abort`, `/close` | Drive active Pi sessions |
+| `previewSession` | `pidex:session:preview` | Read archive messages without starting Pi |
+| `inspectWorkspace`, `readFile`, `filePatch`, `gitAction` | `pidex:workspace:inspect`, `:read`, `:patch`, `:git` | Inspect local files and manage changes |
+| `models`, `setModel`, `settings`, `saveSettings` | `pidex:models:list`, `pidex:session:model`, `pidex:settings:get`, `:save` | Model discovery and per-workspace defaults |
+| `onSessionEvent`, `onSessionExit` | `pidex:session:event`, `pidex:session:exit` | Subscribe to runtime events; each subscription returns cleanup |
 
-### Event channels
+Workspace helpers validate known workspaces and file containment. Realpath checks reject previews outside the workspace, including symlinks that escape it. Text previews are limited to 1 MB and reject binary files. Git commands use argument arrays, literal pathspecs where needed, and disable external diff/textconv helpers. Session previews validate the Pi archive root and JSONL extension and reject archives larger than 16 MB; resuming uses Pi directly.
 
-| Channel | Direction | Purpose |
-|---|---|---|
-| `pidex:workspace/state` | main -> renderer | Current workspace snapshot |
-| `pidex:session/state` | main -> renderer | Session lifecycle and metadata |
-| `pidex:agent/event` | main -> renderer | Normalized runtime events |
-| `pidex:agent/token` | main -> renderer | Streamed text deltas |
-| `pidex:agent/tool` | main -> renderer | Tool call start / progress / result |
-| `pidex:git/state` | main -> renderer | Repo, branch, dirty, commit state |
-| `pidex:fs/change` | main -> renderer | File tree or watch updates |
-| `pidex:ui/notify` | main -> renderer | Toasts, errors, approvals, prompts |
+## Local state
 
-### Core payload shapes
+Pi session archives live under `~/.pi/agent/sessions`. pidex discovers workspace paths from session headers and merges manually added folders. Custom workspace paths and per-workspace session defaults live in Electron's user-data directory as `workspaces.json` and `session-defaults.json`.
 
-```ts
-type WorkspaceState = {
-  workspaceId: string
-  cwd: string
-  repoName?: string
-  branch?: string
-  dirty: boolean
-  lastCommit?: string
-  freshness: 'active' | 'stale' | 'blocked' | 'done'
-  activeSessionId?: string
-  summary?: string
-}
+History preview follows the archive's current parent chain so abandoned branches are not mixed into the displayed conversation. Archive metadata scans read a bounded prefix, so displayed message counts and model metadata can be incomplete for large sessions. The full active branch is read separately for preview.
 
-type SessionState = {
-  sessionId: string
-  workspaceId: string
-  status: 'idle' | 'running' | 'waiting' | 'paused' | 'error' | 'done'
-  startedAt: string
-  updatedAt: string
-  parentSessionId?: string
-  forkCount: number
-}
+Workspace inspection reads the file tree and Git branch/status. It refreshes on focus, view/runtime-state changes, and every 15 seconds. There is no filesystem watcher. File discovery skips common dependency/build directories and symlinks and is capped at 3,000 files and seven directory levels.
 
-type AgentEvent =
-  | { type: 'message.delta'; sessionId: string; role: 'user' | 'assistant'; text: string }
-  | { type: 'message.final'; sessionId: string; role: 'user' | 'assistant'; text: string }
-  | { type: 'tool.start'; sessionId: string; tool: string; input: unknown }
-  | { type: 'tool.progress'; sessionId: string; tool: string; message: string }
-  | { type: 'tool.result'; sessionId: string; tool: string; output: unknown; ok: boolean }
-  | { type: 'status'; sessionId: string; value: 'thinking' | 'waiting' | 'streaming' | 'complete' }
-  | { type: 'error'; sessionId: string; message: string }
+Drafts, open tabs, transcript selection, and expanded rows are in-memory UI state. Scroll position and expansion are not persisted when a transcript is reopened.
+
+## Transcript rendering
+
+`@tanstack/react-virtual` mounts the visible rows plus six rows of overscan on each side. Stable entry keys and memoized rows keep completed messages from rerendering on every new token. Pretext supplies initial height estimates cached by entry object and viewport width in a WeakMap. Closed sessions can be collected without a global archive cache.
+
+Markdown and tool output use native browser layout. ResizeObserver supplies actual row heights, including expanded thinking and tools. Width changes and font readiness invalidate measurements. Observer work is scheduled through animation frames to avoid resize feedback loops.
+
+Active sessions initially open at the end. Appends and row growth follow the tail when the reader is near the bottom. Upward wheel or keyboard navigation and pointer interaction cancel a pending automatic scroll. History previews start at the beginning. Selected text ranges and keyboard-focused rows remain mounted while scrolling; tool/thinking expansion survives row recycling within the view.
+
+![Long transcript in the Electron test fixture](assets/workbench-long-session.png)
+
+The generated 1,500-turn fixture contains 4,500 user, assistant, and tool entries with Markdown, code, thinking, and varied tool output. An isolated local development run reduced opening time from about 8.3 seconds to 1.4 seconds and transcript DOM nodes from 39,000 to fewer than 100. These are observations, not timing guarantees; test metrics vary with host load.
+
+Current limits:
+
+- Browser Find and Select All cover mounted text rather than the full archive.
+- Selecting a large range deliberately retains more DOM rows.
+- A single huge message or tool output is still rendered as one row.
+- Reopening a view resets its reading position and expanded cards.
+- File, workspace, and session lists are not virtualized by this change.
+
+See [ADR 0011](adr/0011-virtualized-transcript.md) for the decision and test method.
+
+## Build and verification
+
+mise pins Node and Bun. `mise run dev` starts Vite on port 5173 and Electron against that server. Main/preload compile with TypeScript; Vite bundles the renderer. Source checkouts use the development server because `app.isPackaged` is false. Packaged apps load `dist/renderer/index.html`.
+
+`mise run build` runs oxlint, typechecking, unit tests, component tests, and bundling. `mise run package` bundles installers for the host platform; run the build checks separately before packaging.
+
+`mise run test:e2e` compiles main/preload, selects a free renderer port, and launches real Electron windows through Playwright. Tests use temporary workspaces, archives, settings, and a deterministic Pi RPC fixture. No provider credentials or Pi installation are needed. Live model/provider behavior needs separate testing. CI runs Electron checks on macOS; Linux requires an X display.
+
+Screenshots and a Playwright trace are written to `test-results/workbench/`. Long-session metrics and screenshots are under `test-results/long-session/`. Refresh documentation captures after a passing E2E run:
+
+```bash
+cp test-results/workbench/01-new-session.png docs/assets/workbench-boot.png
+cp test-results/workbench/02-active-session.png docs/assets/workbench-loaded.png
+cp test-results/workbench/03-changes-review.png docs/assets/workbench-changes.png
+cp test-results/long-session/active.png docs/assets/workbench-long-session.png
 ```
 
-### Design rules
-
-- Keep commands small and intention-based
-- Stream tokens separately from final message snapshots
-- Normalize runtime events before they hit the renderer
-- Make every event identifiable by `workspaceId` and `sessionId`
-- Never expose raw Node or filesystem access to the renderer
-
-## Pi SDK vs RPC Decision Matrix
-
-| Criterion | Pi SDK | Pi RPC | Recommendation |
-|---|---|---|---|
-| Native embedding | Best | Good | SDK if you want direct app integration |
-| Isolation from crashes | Moderate | Best | RPC if runtime stability matters most |
-| Startup simplicity | Good | Good | Tie |
-| Session control | Best | Good | SDK |
-| Event streaming | Best | Good | SDK |
-| Debuggability | Good | Good | Tie |
-| Recovery after failure | Moderate | Best | RPC |
-| Packaging complexity | Lower | Slightly higher | SDK |
-| Future multi-runtime support | Good | Best | RPC |
-| Main-process memory footprint | Higher | Lower | RPC |
-
-### Recommendation
-
-- Use **Pi SDK** for the first implementation if the priority is rich integration and fastest product iteration.
-- Use **Pi RPC** if the priority is runtime isolation, restartability, and keeping the Electron main process lightweight.
-
-### Practical choice for pidex
-
-Start with **SDK** if:
-
-- you want to drive sessions directly from Electron state
-- you want the fewest moving parts during prototyping
-- you are comfortable keeping Pi inside the app process boundary
-
-Start with **RPC** if:
-
-- you expect the runtime to crash independently of the UI
-- you want the app to supervise and restart Pi cleanly
-- you want a clearer boundary for future non-Node clients
-
-## Pretext Integration Points
-
-Pretext should be used where repeated measurement of dynamic text is expensive.
-
-### Best fit areas
-
-- Workspace list rows with variable-length summaries
-- Session timeline cards
-- Tool output cards
-- Diff summary rows and file change previews
-- Search results with long labels and snippets
-- Any virtualized text-heavy list
-
-### How to use it
-
-1. Measure text once when content or font changes.
-2. Cache the prepared handle per text/font pair.
-3. Compute height with `layout()` during virtualized list sizing.
-4. Keep the renderer free of DOM-based measurement on scroll and resize hot paths.
-
-### Integration pattern
-
-```ts
-// Pseudocode
-const prepared = prepare(text, font)
-const { height, lineCount } = layout(prepared, width, lineHeight)
-```
-
-### Renderer architecture guidance
-
-- Pair Pretext with list virtualization for long histories
-- Precompute dimensions in a memoized view-model layer, not in React render
-- Reuse prepared text handles for stable font/content combinations
-- Use it for sizing and layout hints, not for business logic
-
-### What Pretext should not do
-
-- It should not manage stream state
-- It should not replace a virtual list library
-- It should not be used for every text node by default
-- It should not become part of IPC or runtime logic
-
-## Build Pipeline
-
-- **mise** manages Node and Bun versions via `.mise.toml`. All commands go through `mise run`.
-- **Development**: `mise run dev` starts Vite (port 5173) and Electron concurrently. Electron loads the dev server in development and `dist/renderer/index.html` in production.
-- **Production build**: `mise run build` compiles `main/` and `preload/` with `tsc`, then bundles the renderer with Vite.
-- **CI**: GitHub Actions uses `jdx/mise-action` to install tools and runs `mise run build` on every PR and push to `main`.
-- **Releases**: push to `main` tags a calendar-versioned release (`YYYY.0M.0D`) via the release workflow.
-
-## Suggested MVP Slice
-
-1. Workspace dashboard with repo and session state
-2. Streaming agent transcript with tool cards
-3. Diff viewer with virtualized summaries
-4. Session resume and fork flow
-5. Pretext-backed measurement for long text lists
-
-## Open Questions
-
-- Should Pi run in-process via SDK or be supervised as a subprocess via RPC?
-- What is the smallest useful workspace dashboard for the first release?
-- How much git/worktree state should be cached locally versus derived live?
-- Which panes need Pretext first: sessions, diffs, or workspace lists?
+Releases use calendar versions and build desktop installers plus distribution manifests. See [distribution](distribution.md) for channels and conditional signing.

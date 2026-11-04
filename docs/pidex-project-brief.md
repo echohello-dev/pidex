@@ -1,5 +1,7 @@
 # pidex Project Brief
 
+> Product direction and original motivation. For implemented behavior, see the [README](../README.md) and [architecture](pidex-architecture.md). Session trees, context migration, task integrations, and multi-root orchestration remain future work.
+
 ## What is pidex
 
 pidex is an Electron desktop app that wraps the [Pi coding agent runtime](https://pi.dev/) and gives developers a daily workbench. It is not a commercial product or a clone of OpenCode. It is a personal project — learn by building, improve day-to-day DX, and share a stronger local-first desktop harness pattern for coding agents.
@@ -11,7 +13,7 @@ pidex is one half of a two-product split:
 | **pidex** | Daily-use coding workbench centred on the Pi runtime |
 | **Weldable** | Installer, launcher, updater, and provider/gateway config utility |
 
-Weldable handles install, BYOK, provider bootstrap, SSO, and enterprise gateway wiring. pidex relies on Weldable for setup and focuses entirely on the daily coding workflow.
+Weldable handles install, BYOK, provider bootstrap, SSO, and enterprise gateway wiring. This is the intended product split. The current pidex release works with a separately installed Pi CLI and its provider configuration; Weldable is not required to run it.
 
 ## The Mental Model
 
@@ -66,7 +68,7 @@ These are the concrete workflow problems driving the idea, all observed while us
 
 - **Not a multi-runtime orchestrator.** It is Pi-first, with adapters for Claude Code or Codex possible later as optional extensions.
 - **Not a bundler or installer.** That role belongs to Weldable.
-- **Not ageneral purpose AI chat app.** It builds specifically on Pi’s tool set and session model.
+- **Not a general purpose AI chat app.** It builds specifically on Pi’s tool set and session model.
 
 ## Key Architecture Choices
 
@@ -75,30 +77,25 @@ These are the concrete workflow problems driving the idea, all observed while us
 - **Main process** owns lifecycle, Pi runtime, workspace registry, persistence, and IPC routing
 - **Renderer** owns presentation only — React UI, virtualized lists, and text measurement via Pretext
 - **Preload** exposes a typed `window.pidex` API as a narrow bridge between processes
-- All agent events are normalized in main before they reach the renderer
+- Main forwards Pi RPC events over IPC; the renderer reduces them into UI transcript entries
 
 ### Pi Runtime Integration
 
-Two viable paths:
-
-- **SDK**: Embed Pi directly in the main process for richest integration, fastest iteration, most direct session control
-- **RPC**: Run Pi as a managed subprocess for stronger isolation, independent crash recovery, and future non-Node clients
-
-Initial recommendation: start with **SDK** for the simplest prototype; evaluate **RPC** if runtime stability or process isolation becomes a concern.
+The implemented runtime uses one supervised `pi --mode rpc` subprocess per active session. Electron main owns the process; the renderer receives events through `window.pidex`. See [ADR 0006](adr/0006-pi-runtime-rpc.md).
 
 ### Pretext for Rendering Performance
 
-[Pretext](https://github.com/chenglou/pretext) is a ~15KB TypeScript library by Cheng Lou (ex-Meta React Core, now Midjourney) that measures multiline text dimensions without touching the DOM. It is 600x faster than browser-based text measurement. See the [Pretext deep-dive](./pidex-pretext-deep-dive.md) for details.
+[Pretext](https://github.com/chenglou/pretext) is a ~15KB TypeScript library by Cheng Lou (ex-Meta React Core, now Midjourney) that measures multiline text dimensions without touching the DOM. Its DOM-free estimates help size rows before they mount; pidex-specific measurements are recorded in ADR 0011. See the [Pretext deep-dive](./pidex-pretext-deep-dive.md) for details.
 
 In pidex, Pretext is:
 
-- Applied to text-heavy virtualised lists (session timelines, workspace summaries, diff previews)
-- Used to precompute row heights, line counts, and text layouts off the DOM hot path
+- Applied to the virtualized active-session and history transcripts; other lists remain separate work
+- Used for cached transcript row-height estimates; ResizeObserver measures rendered rows
 - Treated as a tool for layout dispatch, not business logic
 
 ### Harnss as UX Reference
 
-[Harnss](https://github.com/OpenSource03/harnss) is an Electron wrapper for Claude Code and Codex that renders agent output as interactive cards. It is the strongest design reference for how pidex should present agent activity — rich tool cards, multi-session awareness,24ith explicit repo and task context surfacing.
+[Harnss](https://github.com/OpenSource03/harnss) is an Electron wrapper for Claude Code and Codex that renders agent output as interactive cards. It is the strongest design reference for how pidex should present agent activity — rich tool cards, multi-session awareness, with explicit repo and task context surfacing.
 
 ### Tooling
 
@@ -140,11 +137,10 @@ pidex does NOT need to compete across every axis. The distinctiveness is:
 
 The MVP should answer one question: **can this workbench feel meaningfully better than OpenCode for workspace switching, repo awareness, and long-session responsiveness?**
 
-This is not a product that ships. It's a790d — validate the thesis, build a cleaner desktop harness, and share the pattern.
+Desktop installers now ship through GitHub Releases. The goal remains to validate the workflow, improve the desktop harness, and share the pattern.
 
-## böjnings
+## Open questions
 
-- Should Pi run in-process via SDK or be supervised via RPC?
 - What is the smallest useful workspace dashboard for the first release?
 - How much git/worktree state should be cached locally versus derived live?
 - Which panes need Pretext first? Sessions, diffs, or workspace lists?

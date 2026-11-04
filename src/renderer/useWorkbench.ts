@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { prepare, layout } from '@chenglou/pretext';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyEvent, entriesFromMessages, type Entry } from './timeline';
 import type {
   Defaults,
@@ -67,7 +66,6 @@ export function useWorkbench() {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelError, setModelError] = useState('');
   const [defaults, setDefaults] = useState(DEFAULTS);
-  const [fontReady, setFontReady] = useState(false);
   const currentCwd = useRef('');
   const previewSeq = useRef(0);
   const opening = useRef(false);
@@ -218,31 +216,6 @@ export function useWorkbench() {
       window.removeEventListener('focus', update);
     };
   }, [view, active?.running, refresh, report, ws]);
-
-  useEffect(() => {
-    if (!document.fonts?.load) {
-      setFontReady(true);
-      return;
-    }
-    void document.fonts.load('400 18px Newsreader').then(
-      () => setFontReady(true),
-      () => setFontReady(true),
-    );
-  }, []);
-  const measuredRows = useMemo(
-    () =>
-      !fontReady
-        ? 0
-        : (active?.entries ?? []).reduce((rows, entry) => {
-            if (entry.kind === 'tool' || !entry.text) return rows;
-            return (
-              rows +
-              layout(prepare(entry.text, '400 18px Newsreader'), 780, 28)
-                .lineCount
-            );
-          }, 0),
-    [active?.entries, fontReady],
-  );
 
   const navigate = (next: View) => {
     setView(next);
@@ -505,7 +478,6 @@ export function useWorkbench() {
     attach,
     changeModel,
     currentModel,
-    measuredRows,
     report,
     run,
     refresh,

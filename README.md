@@ -18,21 +18,40 @@
 
 ## Why this exists
 
-Daily coding-agent work means juggling repos, branches, and sessions, and the current tools are chat-first. pidex is the kitchen bench: every active repo, its branch, its sessions, and what's stale, visible in one glance.
+Daily coding-agent work means juggling repos, branches, and sessions. pidex keeps the workspace in view: pick a repo, continue a session, inspect files, and review the changes Pi made.
 
 ## In action
 
-![App booting, workspaces populate](docs/assets/workbench-boot.png)
+![Start a session in a workspace](docs/assets/workbench-boot.png)
 
-App booting, workspaces populate.
+Start a session with workspace model defaults and quick access to recent conversations.
 
-![The workbench, fully loaded](docs/assets/workbench-loaded.png)
+![Pi streaming in the workbench](docs/assets/workbench-loaded.png)
 
-The workbench, fully loaded.
+Keep the conversation, current branch, and changed files together while Pi works. Scroll up to read older messages without being pulled back to the latest response.
+
+![Review and stage a Git patch](docs/assets/workbench-changes.png)
+
+Review real Git patches and stage or unstage individual files before committing.
+
+These captures come from the Electron UI tests, using temporary workspaces and deterministic Pi responses. They show the implemented desktop UI; they do not require a live model.
+
+## What works today
+
+- Add local workspaces and discover existing Pi sessions.
+- Start, stop, steer, resume, and fork sessions; preview history before launching Pi.
+- Render streamed Markdown, thinking, and expandable tool output.
+- Browse files, review diffs, stage changes, and commit.
+- Discover workspace and global skills, switch models, and save model and reasoning defaults per workspace.
+- Use quick switch for workspaces, sessions, files, and commands.
+
+Active sessions and history use a virtualized transcript. A local development benchmark with 4,500 mixed entries opened in about 1.4 seconds, down from 8.3 seconds, and mounted fewer than 100 transcript DOM nodes instead of 39,000. Timings vary by machine and load; see [ADR 0011](docs/adr/0011-virtualized-transcript.md) for the method and limits.
+
+Session trees, folder-to-folder context migration, and multi-root workflows remain on the [issue tracker](https://github.com/echohello-dev/pidex/issues).
 
 ## Install
 
-You need the [Pi CLI](https://pi.dev/). The dashboard reads existing sessions from `~/.pi/agent/sessions`.
+Install the [Pi CLI](https://pi.dev/) and configure your provider through Pi first. pidex uses your local Pi runtime and reads saved sessions from `~/.pi/agent/sessions`. It does not bundle Pi or provider credentials.
 
 ### macOS
 
@@ -41,7 +60,7 @@ $ brew tap echohello-dev/tap
 $ brew install --cask pidex
 ```
 
-Or download `pidex-mac-arm64.dmg` (Apple silicon) or `pidex-mac-x64.dmg` (Intel) from [Releases](https://github.com/echohello-dev/pidex/releases/latest). First launch is right-click → Open; the DMG is unsigned until we add a Developer ID.
+Or download `pidex-mac-arm64.dmg` (Apple silicon) or `pidex-mac-x64.dmg` (Intel) from [Releases](https://github.com/echohello-dev/pidex/releases/latest). Signing depends on the release configuration. If macOS blocks an unsigned build, use right-click → Open. See [distribution and signing](docs/distribution.md#signing).
 
 ### Windows
 
@@ -72,7 +91,7 @@ A `.deb` and a GHCR image (`ghcr.io/echohello-dev/pidex`) ship alongside. Docker
 
 ## Quick Start
 
-From source you need [mise](https://mise.jdx.dev/) as well.
+From source, use [mise](https://mise.jdx.dev/) to install the Node and Bun versions pinned in `.mise.toml`. Git is needed for workspace changes and commits.
 
 ```bash
 $ git clone git@github.com:echohello-dev/pidex.git && cd pidex
@@ -81,17 +100,21 @@ $ bun install
 $ mise run dev          # starts Vite + Electron
 ```
 
-For a production build: `mise run build` then `mise run start`. Native installers: `mise run package`.
+`mise run build` runs lint, typechecking, unit and component tests, then compiles the app. `mise run package` bundles native installers for your platform. Source checkouts use the Vite server; installed builds load their bundled renderer.
+
+If the app cannot find Pi, set `PIDEX_PI` to its absolute executable path before launching. Tool access and provider credentials are managed by Pi; pidex does not add a separate permission sandbox.
 
 ### Tests
 
 ```bash
 $ bun run test:unit         # parsers, session archives, workspace and skill discovery
 $ bun run test:integration  # React component behavior in jsdom
-$ bun run test:e2e          # real Electron UI on macOS
+$ mise run test:e2e         # real Electron UI; Linux needs an X display
 ```
 
-The E2E suite compiles main/preload, starts an isolated renderer server on a free port, and creates temporary Git workspaces, sessions, and app settings. It uses a deterministic Pi RPC fixture, so it needs no provider credentials. Screenshots are written to `test-results/workbench/`. Every PR runs all three test lanes; `mise run build` also runs lint, typecheck, unit and component tests.
+The E2E suite compiles main/preload, starts an isolated renderer server on a free port, and creates temporary Git workspaces, sessions, and app settings. It uses a deterministic Pi RPC fixture, so it needs no Pi installation or provider credentials and does not validate live provider calls. Screenshots are written to `test-results/workbench/`. Every PR runs all three test lanes; `mise run build` also runs lint, typecheck, unit and component tests.
+
+The long-session suite opens 4,500 mixed transcript entries and checks streaming, keyboard and wheel scrolling, text selection, focused links, expansion, and resize behavior. It writes timing observations and screenshots to `test-results/long-session/`. See [ADR 0011](docs/adr/0011-virtualized-transcript.md) for the measurement approach and tradeoffs.
 
 ## Architecture
 
@@ -109,7 +132,11 @@ The E2E suite compiles main/preload, starts an isolated renderer server on a fre
 └────────────────────────────────────────┘
 ```
 
-Pi runs out-of-process over RPC so the UI survives a runtime crash. Pretext handles text measurement so virtualized lists stay smooth in long sessions. Full detail in [docs/pidex-architecture.md](docs/pidex-architecture.md).
+Pi runs out of process over RPC. The main process supervises its lifecycle and forwards events through the preload bridge; the renderer reduces them into transcript entries. TanStack Virtual mounts visible entries with overscan, Pretext supplies cached height estimates, and ResizeObserver measures rendered Markdown and expanded tools.
+
+Browser Find and Select All cover mounted transcript text. Reopening a transcript resets its scroll position and expanded cards. Full-session search, persistent reading position, and virtualization within a single huge message remain future work.
+
+Read the [architecture](docs/pidex-architecture.md), [project direction](docs/pidex-project-brief.md), and [decision records](docs/adr/README.md).
 
 ## Built on
 
@@ -117,7 +144,8 @@ Pi runs out-of-process over RPC so the UI survives a runtime crash. Pretext hand
 |---|---|
 | Shell | Electron 41, context-isolated, typed `window.pidex` preload bridge |
 | UI | React 19.2, Vite 8 with HMR |
-| Text | [`@chenglou/pretext`](https://github.com/chenglou/pretext), DOM-free |
+| Transcript | TanStack Virtual, cached Pretext estimates, ResizeObserver measurements |
+| Content | markdown-it for Markdown, @pierre/diffs for patches |
 | Language | TypeScript 6 |
 | Package manager | Bun |
 | Toolchain | mise, all commands via `mise run` |

@@ -25,6 +25,7 @@
   "dependencies": {
     "@chenglou/pretext": "^0.0.6",
     "@pierre/diffs": "^1.2.12",
+    "@tanstack/react-virtual": "^3.14.26",
     "markdown-it": "^14.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

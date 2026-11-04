@@ -615,6 +615,19 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   min-width: 0;
   overflow-wrap: anywhere;
   padding: 0 4px 4px 0;
+  overflow-anchor: none;
+}
+.wb-transcript-rows {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+}
+.wb-transcript-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flow-root;
 }
 .wb-context {
   display: flex;
@@ -798,6 +811,10 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 .wb-history-heading h2 {
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .wb-history-heading .wb-meta {
   margin-top: 8px;
@@ -1386,6 +1403,10 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   }
 }
 @media (max-width: 1000px) {
+  .wb-history-heading h2 {
+    font-size: 18px;
+    line-height: 24px;
+  }
   .wb-body {
     grid-template-columns: 216px minmax(0, 1fr);
   }
