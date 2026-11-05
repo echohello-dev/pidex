@@ -44,10 +44,13 @@ These are captures of real Electron interactions with a temporary Git workspace 
 
 - Add local workspaces and discover existing Pi sessions.
 - Start, stop, steer, resume, and fork sessions; preview history before launching Pi.
+- Browse linked session archives and branch entries; preview and continue the selected path.
 - Render streamed Markdown, thinking, and expandable tool output.
 - Browse files, review diffs, stage changes, and commit.
 - Discover workspace and global skills, switch models, and save model and reasoning defaults per workspace.
 - Use quick switch for workspaces, sessions, files, and commands.
+
+Session history shows source/fork relationships and an entry tree with selected and archive-tip markers. Select a branch tip or an earlier entry to preview its parent chain. Resume at the archive tip continues in place; **Resume in new fork** continues a historical selection in a separate archive and preserves the source. **Fork from here** uses the selected entry. Pi 1.5.0 RPC does not expose arbitrary-entry navigation, so historical forks extract a native branch archive; current-tip forks retain Pi's `clone` command. Continuation requires an intact Pi v3 archive within the 16 MiB browsing limit. See [ADR 0013](docs/adr/0013-session-branch-selection.md) for runtime semantics and limits.
 
 Active sessions and history use a virtualized transcript. A local development benchmark with 4,500 mixed entries opened in about 1.4 seconds, down from 8.3 seconds, and mounted fewer than 100 transcript DOM nodes instead of 39,000. Timings vary by machine and load; see [ADR 0011](docs/adr/0011-virtualized-transcript.md) for the method and limits.
 

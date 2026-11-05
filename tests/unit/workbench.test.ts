@@ -235,7 +235,7 @@ describe('workspace inspection and preview', () => {
         .map((record) => JSON.stringify(record))
         .join('\n'),
     );
-    expect(await readSession(file, root)).toEqual([first, second]);
+    await expect(readSession(file, root)).rejects.toThrow('cyclic lineage');
     const secret = path.join(outside, 'private.jsonl');
     await fs.writeFile(secret, '{}');
     const linked = path.join(root, 'linked.jsonl');

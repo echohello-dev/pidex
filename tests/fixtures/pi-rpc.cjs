@@ -6,15 +6,31 @@ const args = process.argv.slice(2);
 let file = args.includes('--session')
   ? args[args.indexOf('--session') + 1]
   : undefined;
-let messages = file
+// Match Pi: loading a file chooses its last non-header entry and follows
+// parentId, rather than combining abandoned branches into one transcript.
+let records = file
   ? fs
       .readFileSync(file, 'utf8')
       .trim()
       .split('\n')
+      .filter(Boolean)
       .map((line) => JSON.parse(line))
-      .filter((entry) => entry.type === 'message')
-      .map((entry) => entry.message)
   : [];
+const branchMessages = () => {
+  const entries = records.filter((entry) => entry.type !== 'session');
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const branch = [];
+  const seen = new Set();
+  let current = entries.at(-1);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    if (current.type === 'message') branch.unshift(current.message);
+    current = byId.get(current.parentId);
+  }
+  return branch;
+};
+let messages = branchMessages();
+let promptSeq = 0;
 let streaming = false;
 let model = {
   id: 'claude-sonnet',
@@ -37,11 +53,17 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
   if (process.env.PIDEX_RPC_LOG)
     fs.appendFileSync(
       process.env.PIDEX_RPC_LOG,
-      JSON.stringify(command) + '\n',
+      JSON.stringify({ ...command, sessionFile: file }) + '\n',
     );
   switch (command.type) {
     case 'get_state':
       reply({ model, isStreaming: streaming, sessionFile: file });
+      break;
+    case 'get_entries':
+      reply({
+        entries: [],
+        leafId: records.filter((e) => e.type !== 'session').at(-1)?.id ?? null,
+      });
       break;
     case 'get_messages':
       reply({ messages });
@@ -90,6 +112,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       const entries = [
         {
           type: 'session',
+          version: 3,
           id: 'fork',
           timestamp: new Date().toISOString(),
           cwd: process.cwd(),
@@ -124,10 +147,23 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         });
         break;
       }
-      messages.push({
+      const message = {
         role: 'user',
         content: [{ type: 'text', text: command.message }],
-      });
+      };
+      if (file) {
+        const entry = {
+          type: 'message',
+          id: `prompt-${process.pid}-${++promptSeq}`,
+          parentId:
+            records.filter((e) => e.type !== 'session').at(-1)?.id ?? null,
+          message,
+        };
+        records.push(entry);
+        // Accept fixtures with or without a final newline.
+        fs.appendFileSync(file, '\n' + JSON.stringify(entry) + '\n');
+      }
+      messages.push(message);
       reply();
       streaming = true;
       event('agent_start');

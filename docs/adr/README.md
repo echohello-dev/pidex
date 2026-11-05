@@ -25,3 +25,4 @@ Each ADR follows this shape:
 | [0010](0010-distribution-channels.md) | Ship desktop installers and public package channels | Accepted |
 | [0011](0011-virtualized-transcript.md) | Virtualize the session transcript | Accepted |
 | [0012](0012-release-please-calver.md) | Release Please with a CalVer adapter | Accepted |
+| [0013](0013-session-branch-selection.md) | Explicit archive branch selection over Pi RPC | Proposed |

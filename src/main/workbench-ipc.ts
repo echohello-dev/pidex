@@ -1,3 +1,4 @@
+import { loadArchive, selectedPath, readSessionTree } from './session-tree';
 import { app, dialog, ipcMain, shell, type BrowserWindow } from 'electron';
 import fs from 'fs/promises';
 import os from 'os';
@@ -11,7 +12,6 @@ import {
   inside,
   inspectWorkspace,
   listSkills,
-  readSession,
   readText,
   validateDefaults,
   workspacePath,
@@ -111,7 +111,12 @@ export function registerWorkbench(
     } else throw new Error('Unsupported Git action.');
     return inspectWorkspace(cwd);
   });
-  handle('session:preview', async (file) => readSession(file));
+  handle('session:tree', async (file) => readSessionTree(file));
+  handle('session:preview', async (file, entryId) =>
+    selectedPath(await loadArchive(file), entryId)
+      .filter((e) => e.type === 'message')
+      .map((e) => e.message),
+  );
   handle('workspace:skills', async (cwd) =>
     listSkills(await knownWorkspace(cwd)),
   );

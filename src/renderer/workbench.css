@@ -1458,3 +1458,70 @@ html[data-reduced-motion='true'] .wb-shell *::after {
     scroll-behavior: auto !important;
   }
 }
+
+.wb-entry-tree {
+  border-top: 1px solid var(--line, #30343a);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.wb-entry-tree label {
+  display: grid;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+.wb-entry-tree select {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface, #171b20);
+  color: inherit;
+  border: 1px solid var(--line, #30343a);
+  padding: 7px;
+  font: inherit;
+}
+.wb-entry-scroll {
+  max-height: 360px;
+  overflow: auto;
+}
+.wb-entry-node {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  height: 54px;
+  text-align: left;
+  padding: 8px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.wb-entry-node span,
+.wb-entry-node small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-entry-node small {
+  opacity: 0.65;
+  font-size: 10px;
+}
+.wb-entry-node:hover {
+  background: #ffffff08;
+}
+.wb-entry-node.is-active {
+  background: #ffffff0d;
+  border-left-color: #99b9a5;
+}
+.wb-branch-notice {
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 12px 24px;
+  margin: 0;
+  border-bottom: 1px solid #ffffff12;
+  color: #b9c7bd;
+}
+.wb-history-heading .wb-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

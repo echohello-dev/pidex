@@ -1,3 +1,4 @@
+import type { SessionTree } from '../main/session-tree';
 import type {
   Defaults,
   GitChange,
@@ -30,6 +31,7 @@ type SessionInfo = {
   model: string;
   timestamp: string;
   messageCount: number;
+  parentSession?: string;
 };
 
 type SessionState = {
@@ -77,7 +79,11 @@ type PidexApi = {
     action: 'stage' | 'stage-all' | 'unstage' | 'commit',
     file?: string,
   ) => Promise<Result<WorkspaceDetails>>;
-  previewSession: (file: string) => Promise<Result<unknown[]>>;
+  sessionTree: (file: string) => Promise<Result<SessionTree>>;
+  previewSession: (
+    file: string,
+    entryId?: string | null,
+  ) => Promise<Result<unknown[]>>;
   skills: (cwd: string) => Promise<Result<SkillInfo[]>>;
   openProject: (cwd: string) => Promise<Result<void>>;
   attachFiles: () => Promise<Result<string[]>>;
@@ -94,6 +100,7 @@ type PidexApi = {
   openSession: (req: {
     cwd: string;
     sessionFile?: string;
+    entryId?: string | null;
     fork?: boolean;
   }) => Promise<OpenResult>;
   sendPrompt: (req: {

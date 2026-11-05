@@ -24,6 +24,7 @@ type SessionInfo = {
   model: string;
   timestamp: string;
   messageCount: number;
+  parentSession?: string;
 };
 
 function readLines(file: string, maxBytes = 256 * 1024): string[] {
@@ -42,13 +43,14 @@ function readLines(file: string, maxBytes = 256 * 1024): string[] {
 function textOf(content: unknown): string {
   if (!Array.isArray(content)) return '';
   return content
-    .filter(p => p && p.type === 'text' && typeof p.text === 'string')
-    .map(p => p.text as string)
+    .filter((p) => p && p.type === 'text' && typeof p.text === 'string')
+    .map((p) => p.text as string)
     .join('\n');
 }
 
 function parseSession(file: string): SessionInfo | null {
   try {
+    file = fs.realpathSync(file);
     const lines = readLines(file);
     let id = '';
     let cwd = '';
@@ -56,6 +58,7 @@ function parseSession(file: string): SessionInfo | null {
     let title = '';
     let model = '';
     let messageCount = 0;
+    let parentSession: string | undefined;
     for (const line of lines) {
       if (!line) continue;
       let entry: Record<string, unknown>;
@@ -66,6 +69,17 @@ function parseSession(file: string): SessionInfo | null {
       }
       if (entry.type === 'session') {
         id = String(entry.id ?? '');
+        parentSession =
+          typeof entry.parentSession === 'string'
+            ? entry.parentSession
+            : undefined;
+        if (parentSession) {
+          try {
+            parentSession = fs.realpathSync(parentSession);
+          } catch {
+            /* A missing source remains visible. */
+          }
+        }
         cwd = String(entry.cwd ?? '');
         timestamp = String(entry.timestamp ?? '');
         continue;
@@ -76,21 +90,34 @@ function parseSession(file: string): SessionInfo | null {
       }
       if (entry.type === 'message') {
         messageCount += 1;
-        const message = entry.message as { role?: string; content?: unknown } | undefined;
+        const message = entry.message as
+          { role?: string; content?: unknown } | undefined;
         if (!title && message?.role === 'user') {
-          title = textOf(message.content).replace(/\s+/g, ' ').trim().slice(0, 90);
+          title = textOf(message.content)
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 90);
         }
       }
     }
     if (!id) return null;
-    return { id, file, cwd, title: title || '(empty session)', model, timestamp, messageCount };
+    return {
+      id,
+      file,
+      cwd,
+      title: title || '(empty session)',
+      model,
+      timestamp,
+      messageCount,
+      parentSession,
+    };
   } catch {
     return null;
   }
 }
 
 function gitBranch(cwd: string): Promise<string> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     execFile(
       'git',
       ['-C', cwd, 'branch', '--show-current'],
@@ -102,27 +129,30 @@ function gitBranch(cwd: string): Promise<string> {
   });
 }
 
-async function listWorkspaces(extraCwds: string[] = []): Promise<WorkspaceInfo[]> {
+async function listWorkspaces(
+  extraCwds: string[] = [],
+): Promise<WorkspaceInfo[]> {
   const byDir = new Map<string, WorkspaceInfo>();
   if (fs.existsSync(SESSIONS_ROOT)) {
     const dirs = fs
       .readdirSync(SESSIONS_ROOT, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
 
     for (const dirName of dirs) {
       const dirPath = path.join(SESSIONS_ROOT, dirName);
       const files = fs
         .readdirSync(dirPath)
-        .filter(f => f.endsWith('.jsonl'))
-        .map(f => path.join(dirPath, f));
+        .filter((f) => f.endsWith('.jsonl'))
+        .map((f) => path.join(dirPath, f));
       if (files.length === 0) continue;
 
       let cwd = '';
       let lastActive = '';
       for (const file of files) {
         const stat = fs.statSync(file);
-        if (stat.mtime.toISOString() > lastActive) lastActive = stat.mtime.toISOString();
+        if (stat.mtime.toISOString() > lastActive)
+          lastActive = stat.mtime.toISOString();
         if (!cwd) {
           for (const line of readLines(file, 64 * 1024)) {
             if (!line) continue;
@@ -151,7 +181,7 @@ async function listWorkspaces(extraCwds: string[] = []): Promise<WorkspaceInfo[]
     }
   }
 
-  const knownCwds = new Set([...byDir.values()].map(w => w.cwd));
+  const knownCwds = new Set([...byDir.values()].map((w) => w.cwd));
   for (const cwd of extraCwds) {
     if (knownCwds.has(cwd) || !fs.existsSync(cwd)) continue;
     const dirName = `--${cwd.replace(/\//g, '-')}--`;
@@ -176,8 +206,8 @@ function listSessions(dirName: string): SessionInfo[] {
   if (!dirPath.startsWith(SESSIONS_ROOT) || !fs.existsSync(dirPath)) return [];
   const sessions = fs
     .readdirSync(dirPath)
-    .filter(f => f.endsWith('.jsonl'))
-    .map(f => parseSession(path.join(dirPath, f)))
+    .filter((f) => f.endsWith('.jsonl'))
+    .map((f) => parseSession(path.join(dirPath, f)))
     .filter((s): s is SessionInfo => s !== null);
   sessions.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   return sessions;

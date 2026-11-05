@@ -1,3 +1,4 @@
+import { forkArchive, loadArchive, selectedPath } from './session-tree';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -104,19 +105,51 @@ ipcMain.handle('pidex:sessions', (_e, dirName: string) => {
 
 ipcMain.handle(
   'pidex:session/open',
-  async (_e, req: { cwd: string; sessionFile?: string; fork?: boolean }) => {
+  async (
+    _e,
+    req: {
+      cwd: string;
+      sessionFile?: string;
+      entryId?: string | null;
+      fork?: boolean;
+    },
+  ) => {
     const cwd = typeof req?.cwd === 'string' ? req.cwd : '';
-    const sessionFile =
+    let sessionFile =
       typeof req?.sessionFile === 'string' ? req.sessionFile : undefined;
     if (!cwd || !fs.existsSync(cwd)) {
       return { error: 'workspace path does not exist' };
     }
+    let expectedEntryId: string | null | undefined;
+    let cloneCurrent = false;
     if (sessionFile) {
       try {
-        await sessionPath(sessionFile);
-      } catch {
+        sessionFile = await sessionPath(sessionFile);
+        const archive = await loadArchive(sessionFile);
+        if (!archive.header || archive.header.version !== 3 || archive.damaged)
+          throw new Error(
+            'Continuing requires an intact Pi v3 archive. Open older archives in Pi to migrate them first.',
+          );
+        if (
+          req.entryId !== undefined &&
+          req.entryId !== null &&
+          typeof req.entryId !== 'string'
+        )
+          throw new Error('Invalid selected entry.');
+        const selected = selectedPath(archive, req.entryId).at(-1)?.id;
+        expectedEntryId = selected ?? null;
+        cloneCurrent = Boolean(
+          req.fork && selected === archive.entries.at(-1)?.id,
+        );
+        if (req.fork && !selected)
+          throw new Error('This session has no entry to fork.');
+        if (selected && selected !== archive.entries.at(-1)?.id) {
+          sessionFile = await forkArchive(sessionFile, selected);
+        }
+      } catch (error) {
         return {
-          error: 'session file outside pi sessions root or unavailable',
+          error:
+            error instanceof Error ? error.message : 'Session unavailable.',
         };
       }
     }
@@ -134,18 +167,6 @@ ipcMain.handle(
     session.onExit = (sessionId) =>
       sendToRenderer('pidex:session:exit', { sessionId });
     sessions.set(id, session);
-
-    if (req.fork && sessionFile) {
-      const cloned = await session.command({ type: 'clone' });
-      if (
-        !cloned.success ||
-        (cloned.data as { cancelled?: boolean } | undefined)?.cancelled
-      ) {
-        sessions.delete(id);
-        session.dispose();
-        return { error: cloned.error ?? 'Session fork was cancelled.' };
-      }
-    }
 
     if (!sessionFile) {
       const defaults = await sessionDefaults(cwd);
@@ -174,15 +195,57 @@ ipcMain.handle(
       }
     }
 
+    if (expectedEntryId !== undefined) {
+      const position = await session.command({
+        type: 'get_entries',
+        ...(expectedEntryId ? { since: expectedEntryId } : {}),
+      });
+      const data = position.data as
+        { leafId?: string | null; entries?: { type?: string }[] } | undefined;
+      // Pi may initialize model/thinking metadata in an otherwise empty session.
+      const matches =
+        expectedEntryId === null
+          ? Array.isArray(data?.entries) &&
+            !data.entries.some((e) => e.type === 'message')
+          : data?.leafId === expectedEntryId;
+      if (!position.success || !matches) {
+        sessions.delete(id);
+        session.dispose();
+        return {
+          error:
+            position.error ??
+            'The runtime branch moved since selection. Refresh history and select the branch again.',
+        };
+      }
+    }
+
+    if (cloneCurrent) {
+      const cloned = await session.command({ type: 'clone' });
+      if (
+        !cloned.success ||
+        (cloned.data as { cancelled?: boolean } | undefined)?.cancelled
+      ) {
+        sessions.delete(id);
+        session.dispose();
+        return { error: cloned.error ?? 'Session fork was cancelled.' };
+      }
+    }
+
     const [state, messages] = await Promise.all([
       session.getState(),
       session.getMessages(),
     ]);
     const launchError = session.launchError();
-    if (launchError) {
+    if (launchError || !state.success || !messages.success) {
       sessions.delete(id);
       session.dispose();
-      return { error: launchError };
+      return {
+        error:
+          launchError ??
+          state.error ??
+          messages.error ??
+          'Could not read Pi session state.',
+      };
     }
     return {
       sessionId: id,

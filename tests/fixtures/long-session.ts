@@ -3,6 +3,7 @@ export function longSession(cwd: string, turns = 1500) {
   const records: object[] = [
     {
       type: 'session',
+      version: 3,
       id: 'long-session',
       cwd,
       timestamp: new Date().toISOString(),
