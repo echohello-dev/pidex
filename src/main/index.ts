@@ -126,6 +126,7 @@ ipcMain.handle(
       return { error: 'workspace path does not exist' };
     }
     let expectedEntryId: string | null | undefined;
+    let extractedFork = false;
     if (sessionFile) {
       try {
         sessionFile = await sessionPath(sessionFile);
@@ -146,12 +147,73 @@ ipcMain.handle(
           throw new Error('This session has no entry to fork.');
         if (selected && (req.fork || selected !== archive.entries.at(-1)?.id)) {
           sessionFile = await forkArchive(sessionFile, selected);
+          extractedFork = true;
         }
       } catch (error) {
         return {
           error:
             error instanceof Error ? error.message : 'Session unavailable.',
         };
+      }
+    }
+
+    // Archive ownership is authoritative here, rather than inferred from a
+    // renderer snapshot that becomes stale as soon as a prompt advances Pi.
+    async function readRuntime(runtime: RpcSession, reused = false) {
+      const state = await runtime.getState();
+      if (!state.success || runtime.launchError())
+        return {
+          error:
+            state.error ??
+            runtime.launchError() ??
+            'Could not read Pi session state.',
+        };
+      if (sessionFile && runtime.archiveFile !== sessionFile)
+        return {
+          error:
+            'The open runtime switched archives. Select this archive again.',
+        };
+      if (
+        reused &&
+        (state.data as { isStreaming?: boolean } | undefined)?.isStreaming
+      )
+        return {
+          error:
+            'This archive is running in an open tab. Stop it before resuming, or fork this selection.',
+        };
+      if (expectedEntryId !== undefined) {
+        const position = await runtime.command({
+          type: 'get_entries',
+          ...(expectedEntryId ? { since: expectedEntryId } : {}),
+        });
+        if (
+          !position.success ||
+          !runtimeMatchesSelection(expectedEntryId, position.data)
+        )
+          return {
+            error:
+              position.error ??
+              'The runtime branch moved since selection. Refresh history and select the branch again, or fork this entry.',
+          };
+      }
+      const messages = await runtime.getMessages();
+      if (!messages.success)
+        return { error: messages.error ?? 'Could not read Pi history.' };
+      return {
+        sessionId: runtime.id,
+        state: state.data,
+        messages:
+          (messages.data as { messages?: unknown[] } | undefined)?.messages ??
+          [],
+      };
+    }
+    if (sessionFile && !extractedFork) {
+      for (const runtime of sessions.values()) {
+        // Extension commands can switch a runtime's archive. Refresh its real
+        // state before deciding whether this file already has a live owner.
+        const state = await runtime.getState();
+        if (state.success && runtime.archiveFile === sessionFile)
+          return readRuntime(runtime, true);
       }
     }
 
@@ -165,8 +227,10 @@ ipcMain.handle(
     }
     session.onEvent = (sessionId, event) =>
       sendToRenderer('pidex:session:event', { sessionId, event });
-    session.onExit = (sessionId) =>
+    session.onExit = (sessionId) => {
+      sessions.delete(sessionId);
       sendToRenderer('pidex:session:exit', { sessionId });
+    };
     sessions.set(id, session);
 
     if (!sessionFile) {
@@ -196,48 +260,12 @@ ipcMain.handle(
       }
     }
 
-    if (expectedEntryId !== undefined) {
-      const position = await session.command({
-        type: 'get_entries',
-        ...(expectedEntryId ? { since: expectedEntryId } : {}),
-      });
-      if (
-        !position.success ||
-        !runtimeMatchesSelection(expectedEntryId, position.data)
-      ) {
-        sessions.delete(id);
-        session.dispose();
-        return {
-          error:
-            position.error ??
-            'The runtime branch moved since selection. Refresh history and select the branch again.',
-        };
-      }
-    }
-
-    const [state, messages] = await Promise.all([
-      session.getState(),
-      session.getMessages(),
-    ]);
-    const launchError = session.launchError();
-    if (launchError || !state.success || !messages.success) {
+    const result = await readRuntime(session);
+    if ('error' in result) {
       sessions.delete(id);
       session.dispose();
-      return {
-        error:
-          launchError ??
-          state.error ??
-          messages.error ??
-          'Could not read Pi session state.',
-      };
     }
-    return {
-      sessionId: id,
-      state: state.success ? state.data : null,
-      messages: messages.success
-        ? ((messages.data as { messages?: unknown[] })?.messages ?? [])
-        : [],
-    };
+    return result;
   },
 );
 

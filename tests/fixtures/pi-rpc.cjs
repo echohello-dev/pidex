@@ -65,7 +65,11 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
   if (process.env.PIDEX_RPC_LOG)
     fs.appendFileSync(
       process.env.PIDEX_RPC_LOG,
-      JSON.stringify({ ...command, sessionFile: file }) + '\n',
+      JSON.stringify({
+        ...command,
+        sessionFile: file,
+        runtimePid: process.pid,
+      }) + '\n',
     );
   switch (command.type) {
     case 'get_state':

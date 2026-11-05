@@ -16,7 +16,6 @@ export type View =
 type SessionTab = {
   runtimeId: string;
   file?: string;
-  entryId?: string | null;
   startedAt?: string;
   cwd: string;
   title: string;
@@ -258,14 +257,8 @@ export function useWorkbench() {
     const existing =
       !fork &&
       info &&
-      tabs.find(
-        (t) =>
-          t.cwd === ws.cwd &&
-          t.file === info.file &&
-          t.entryId === entryId &&
-          !t.exited,
-      );
-    if (existing) {
+      tabs.find((t) => t.cwd === ws.cwd && t.file === info.file && !t.exited);
+    if (existing && entryId === undefined) {
       setActiveId(existing.runtimeId);
       return existing;
     }
@@ -283,7 +276,7 @@ export function useWorkbench() {
         throw new Error(result.error ?? 'Could not open this session.');
       const id = result.sessionId;
       if (currentCwd.current !== ws.cwd) {
-        await api.closeSession(id);
+        if (!tabs.some((t) => t.runtimeId === id)) await api.closeSession(id);
         return null;
       }
       // Mount before loading commands so live events cannot be lost while that request runs.
@@ -291,7 +284,6 @@ export function useWorkbench() {
         runtimeId: id,
         cwd: ws.cwd,
         file: result.state?.sessionFile ?? info?.file,
-        entryId,
         startedAt: entryId ?? undefined,
         title: info
           ? `${info.title}${fork || (result.state?.sessionFile && result.state.sessionFile !== info.file) ? ' (fork)' : ''}`
@@ -302,7 +294,20 @@ export function useWorkbench() {
         running: Boolean(result.state?.isStreaming),
         exited: exitedSessions.current.has(id),
       };
-      setTabs((prev) => [...prev, tab]);
+      setTabs((prev) =>
+        prev.some((t) => t.runtimeId === id)
+          ? prev.map((t) =>
+              t.runtimeId === id
+                ? {
+                    ...t,
+                    running: tab.running,
+                    model: tab.model,
+                    exited: tab.exited,
+                  }
+                : t,
+            )
+          : [...prev, tab],
+      );
       setActiveId(id);
       void api
         .sessionCommands(id)
@@ -400,7 +405,6 @@ export function useWorkbench() {
                   title:
                     t.title === 'New session' ? text.slice(0, 90) : t.title,
                   running: true,
-                  entryId: undefined,
                   entries: [...t.entries, { key, kind: 'user', text }],
                 }
               : t,

@@ -71,6 +71,7 @@ function childEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
 class RpcSession {
   readonly id: string;
   readonly cwd: string;
+  archiveFile?: string;
   private proc: ChildProcess;
   private buffer = '';
   private seq = 0;
@@ -91,6 +92,7 @@ class RpcSession {
   ) {
     this.id = id;
     this.cwd = cwd;
+    this.archiveFile = sessionFile;
     const bin = resolvePi();
     if (!bin) throw new Error(PI_MISSING);
     const args = ['--mode', 'rpc'];
@@ -204,8 +206,27 @@ class RpcSession {
     return this.closed ? this.failed : null;
   }
 
-  getState() {
-    return this.command({ type: 'get_state' });
+  async getState() {
+    const response = await this.command({ type: 'get_state' });
+    const file = (response.data as { sessionFile?: unknown } | undefined)
+      ?.sessionFile;
+    if (response.success && typeof file === 'string') {
+      try {
+        this.archiveFile = fs.realpathSync(file);
+      } catch {
+        try {
+          this.archiveFile = path.join(
+            fs.realpathSync(path.dirname(file)),
+            path.basename(file),
+          );
+        } catch {
+          this.archiveFile = path.resolve(file);
+        }
+      }
+    }
+    if (response.success && typeof file !== 'string')
+      this.archiveFile = undefined;
+    return response;
   }
 
   getMessages() {

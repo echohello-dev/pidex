@@ -119,6 +119,7 @@ describe('session branches in Electron', () => {
     proofVideo = page.video();
     if (proofDir) await fs.mkdir(proofDir, { recursive: true });
     page.setDefaultTimeout(15000);
+    await page.setViewportSize({ width: 1100, height: 700 });
     page.on('pageerror', (error) => errors.push(error.message));
     await page
       .getByRole('heading', { name: 'Start a session', exact: true })
@@ -272,6 +273,64 @@ describe('session branches in Electron', () => {
     expect(resumed).toContain('old-tip');
     expect(errors).toEqual([]);
   });
+  it('reuses the live archive owner after sending and reselecting its latest tip', async () => {
+    const canonical = await fs.realpath(source);
+    const previous = (await readLog())
+      .filter((c) => c.type === 'prompt' && c.sessionFile === canonical)
+      .at(-1);
+    const tabsBefore = await page
+      .locator('.wb-sidebar .wb-session-item')
+      .filter({ hasText: 'this window' })
+      .count();
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page
+      .getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem')
+      .filter({ hasText: 'Explore parser branches' })
+      .first()
+      .click();
+    await page
+      .locator('.wb-transcript')
+      .getByText('Continue latest tip', { exact: true })
+      .waitFor();
+    await page.getByLabel('Message pi').fill('Resume this live branch again');
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await page
+      .getByRole('heading', { name: 'Explore parser branches', exact: true })
+      .waitFor();
+    await page.getByRole('button', { name: 'Stop', exact: true }).waitFor();
+    const records = (await fs.readFile(source, 'utf8'))
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    const blocked = await page.evaluate(
+      async ({ cwd, source, entryId }) =>
+        window.pidex.openSession({ cwd, sessionFile: source, entryId }),
+      {
+        cwd: records[0].cwd as string,
+        source,
+        entryId: records.at(-1).id as string,
+      },
+    );
+    expect(blocked.error).toContain('running in an open tab');
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    const prompts = (await readLog()).filter(
+      (c) => c.type === 'prompt' && c.sessionFile === canonical,
+    );
+    expect(prompts.at(-1).runtimePid).toBe(previous.runtimePid);
+    expect(new Set(prompts.map((c) => c.runtimePid)).size).toBe(1);
+    expect(
+      await page
+        .locator('.wb-sidebar .wb-session-item')
+        .filter({ hasText: 'this window' })
+        .count(),
+    ).toBe(tabsBefore);
+    expect(await fs.readFile(source, 'utf8')).toContain(
+      'Resume this live branch again',
+    );
+    expect(errors).toEqual([]);
+  });
+
   it('handles empty sessions and rejects stale entry selections without opening an unrelated leaf', async () => {
     const original = await fs.readFile(source, 'utf8');
     const cwd = JSON.parse(original.split('\n')[0]).cwd as string;

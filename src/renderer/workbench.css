@@ -790,8 +790,9 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   color: var(--copy);
 }
 .wb-history-list {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: 100px;
+  max-height: 30vh;
   overflow-y: auto;
 }
 .wb-day-label {
@@ -1460,6 +1461,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 
 .wb-entry-tree {
+  flex-shrink: 0;
   border-top: 1px solid var(--line, #30343a);
   margin-top: 12px;
   padding-top: 12px;
