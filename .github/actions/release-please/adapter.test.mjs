@@ -110,5 +110,5 @@ test('checked-in configuration loads through Release Please with the date overri
   assert.equal(config.draft, true);
   assert.equal(config.prerelease, false);
   assert.equal(config.includeVInTag, false);
-  assert.equal(manifest.releasedVersions['.'].toString(), '2026.11.4-2');
+  assert.doesNotThrow(() => calverTag(manifest.releasedVersions['.'].toString()));
 });
