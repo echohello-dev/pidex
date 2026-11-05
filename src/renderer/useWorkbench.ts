@@ -298,12 +298,14 @@ export function useWorkbench() {
         prev.some((t) => t.runtimeId === id)
           ? prev.map((t) =>
               t.runtimeId === id
-                ? {
-                    ...t,
-                    running: tab.running,
-                    model: tab.model,
-                    exited: tab.exited,
-                  }
+                ? t.file !== tab.file
+                  ? tab
+                  : {
+                      ...t,
+                      running: tab.running,
+                      model: tab.model,
+                      exited: tab.exited,
+                    }
                 : t,
             )
           : [...prev, tab],

@@ -13,6 +13,7 @@ let app: ElectronApplication;
 let page: Page;
 let fixture: string;
 let source: string;
+let switched: string;
 let log: string;
 const errors: string[] = [];
 const proofDir = process.env.PIDEX_BRANCH_PROOF_DIR;
@@ -95,6 +96,28 @@ describe('session branches in Electron', () => {
         timestamp: '2026-11-04T01:00:00Z',
       }) + '\n',
     );
+    switched = path.join(archives, 'switched.jsonl');
+    await fs.writeFile(
+      switched,
+      [
+        {
+          type: 'session',
+          version: 3,
+          id: 'switched',
+          cwd: project,
+          timestamp: '2026-11-03T01:00:00Z',
+        },
+        message('b-user', null, 'user', 'Alternate archive after switch'),
+        message(
+          'b-tip',
+          'b-user',
+          'assistant',
+          'Only the alternate archive history belongs here.',
+        ),
+      ]
+        .map((record) => JSON.stringify(record))
+        .join('\n') + '\n',
+    );
     app = await electron.launch({
       executablePath: require('electron'),
       args: ['.'],
@@ -113,6 +136,7 @@ describe('session branches in Electron', () => {
         PIDEX_SESSIONS_ROOT: path.join(fixture, 'sessions'),
         PIDEX_PI: path.join(ROOT, 'tests/fixtures/pi-rpc.cjs'),
         PIDEX_RPC_LOG: log,
+        PIDEX_RPC_SWITCH_FILE: switched,
       },
     });
     page = await app.firstWindow();
@@ -376,6 +400,112 @@ describe('session branches in Electron', () => {
     expect(
       (await readLog()).filter((c) => c.type === 'prompt').at(-1).sessionFile,
     ).toBe(await fs.realpath(path.join(path.dirname(source), 'empty.jsonl')));
+    expect(errors).toEqual([]);
+  });
+  it('refreshes identity and history when an existing runtime switched archives', async () => {
+    const canonicalSource = await fs.realpath(source);
+    const sourcePid = (await readLog())
+      .filter((c) => c.type === 'prompt' && c.sessionFile === canonicalSource)
+      .at(-1)?.runtimePid;
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page
+      .getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem')
+      .filter({ hasText: 'Explore parser branches' })
+      .first()
+      .click();
+    await page.getByLabel('Message pi').fill('Switch archive for test');
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await page
+      .getByRole('heading', { name: 'Explore parser branches', exact: true })
+      .waitFor();
+    await page.getByRole('button', { name: 'Send', exact: true }).waitFor();
+    const tabsBefore = await page
+      .locator('.wb-sidebar .wb-session-item')
+      .filter({ hasText: 'this window' })
+      .count();
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page
+      .getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Alternate archive after switch/ })
+      .click();
+    await page
+      .locator('.wb-transcript')
+      .getByText('Only the alternate archive history belongs here.')
+      .waitFor();
+    await page.getByLabel('Message pi').fill('Continue the switched archive');
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await page
+      .getByRole('heading', {
+        name: 'Alternate archive after switch',
+        exact: true,
+      })
+      .waitFor();
+    await page
+      .locator('.wb-transcript')
+      .getByText('Only the alternate archive history belongs here.')
+      .waitFor();
+    expect(
+      await page
+        .locator('.wb-transcript')
+        .getByText('The latest branch uses a buffered parser.')
+        .count(),
+    ).toBe(0);
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    const prompt = (await readLog())
+      .filter(
+        (c) =>
+          c.type === 'prompt' && c.message === 'Continue the switched archive',
+      )
+      .at(-1);
+    expect(prompt.runtimePid).toBe(sourcePid);
+    expect(prompt.sessionFile).toBe(await fs.realpath(switched));
+    expect(
+      await page
+        .locator('.wb-sidebar .wb-session-item')
+        .filter({ hasText: 'this window' })
+        .count(),
+    ).toBe(tabsBefore);
+    expect(errors).toEqual([]);
+  });
+
+  it('fails closed on an unresponsive owner without launching a competing writer', async () => {
+    await page.getByLabel('Message pi').fill('Simulate owner state failure');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    const before = await fs.readFile(switched, 'utf8');
+    const canonical = await fs.realpath(switched);
+    const ownerPid = (await readLog())
+      .filter((c) => c.type === 'prompt' && c.sessionFile === canonical)
+      .at(-1).runtimePid;
+    const promptCount = (await readLog()).filter(
+      (c) => c.type === 'prompt',
+    ).length;
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page
+      .getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Alternate archive after switch/ })
+      .click();
+    await page
+      .getByLabel('Message pi')
+      .fill('This must not start a second writer');
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await page
+      .getByRole('alert')
+      .getByText(/Could not verify archive ownership/)
+      .waitFor();
+    expect(await fs.readFile(switched, 'utf8')).toBe(before);
+    const records = await readLog();
+    expect(records.filter((c) => c.type === 'prompt')).toHaveLength(
+      promptCount,
+    );
+    expect(
+      new Set(
+        records
+          .filter((c) => c.sessionFile === canonical)
+          .map((c) => c.runtimePid),
+      ),
+    ).toEqual(new Set([ownerPid]));
     expect(errors).toEqual([]);
   });
 });

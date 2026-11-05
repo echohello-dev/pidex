@@ -210,6 +210,16 @@ class RpcSession {
     const response = await this.command({ type: 'get_state' });
     const file = (response.data as { sessionFile?: unknown } | undefined)
       ?.sessionFile;
+    if (
+      response.success &&
+      this.archiveFile &&
+      (typeof file !== 'string' || !file)
+    )
+      return {
+        ...response,
+        success: false,
+        error: 'Pi did not return its active archive path.',
+      };
     if (response.success && typeof file === 'string') {
       try {
         this.archiveFile = fs.realpathSync(file);
@@ -224,6 +234,11 @@ class RpcSession {
         }
       }
     }
+    if (response.success && typeof file === 'string')
+      response.data = {
+        ...(response.data as Record<string, unknown>),
+        sessionFile: this.archiveFile,
+      };
     if (response.success && typeof file !== 'string')
       this.archiveFile = undefined;
     return response;

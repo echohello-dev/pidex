@@ -44,6 +44,7 @@ if (file) {
 let messages = branchMessages();
 let promptSeq = 0;
 let streaming = false;
+let failState = false;
 let model = {
   id: 'claude-sonnet',
   name: 'Claude Sonnet',
@@ -73,7 +74,15 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
     );
   switch (command.type) {
     case 'get_state':
-      reply({ model, isStreaming: streaming, sessionFile: file });
+      if (failState)
+        output({
+          type: 'response',
+          id: command.id,
+          command: command.type,
+          success: false,
+          error: 'Fixture state refresh failure.',
+        });
+      else reply({ model, isStreaming: streaming, sessionFile: file });
       break;
     case 'get_entries':
       {
@@ -160,6 +169,23 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       reply();
       break;
     case 'prompt': {
+      if (
+        command.message === 'Switch archive for test' &&
+        process.env.PIDEX_RPC_SWITCH_FILE
+      ) {
+        file = fs.realpathSync(process.env.PIDEX_RPC_SWITCH_FILE);
+        records = fs
+          .readFileSync(file, 'utf8')
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+        messages = branchMessages();
+        reply();
+        event('agent_end');
+        break;
+      }
+      if (command.message === 'Simulate owner state failure') failState = true;
       if (command.message === 'reject this prompt') {
         output({
           type: 'response',

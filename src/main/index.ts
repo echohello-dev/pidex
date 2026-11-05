@@ -212,7 +212,13 @@ ipcMain.handle(
         // Extension commands can switch a runtime's archive. Refresh its real
         // state before deciding whether this file already has a live owner.
         const state = await runtime.getState();
-        if (state.success && runtime.archiveFile === sessionFile)
+        if (!state.success) {
+          if (runtime.launchError()) continue;
+          return {
+            error: `Could not verify archive ownership. Close the unresponsive session tab before resuming. ${state.error ?? ''}`,
+          };
+        }
+        if (runtime.archiveFile === sessionFile)
           return readRuntime(runtime, true);
       }
     }
