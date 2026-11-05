@@ -8,6 +8,7 @@ import {
   loadArchive,
   parseArchive,
   selectedPath,
+  runtimeMatchesSelection,
 } from '../../src/main/session-tree';
 
 const message = (id: string, parentId: string | null, text = id) => ({
@@ -169,5 +170,39 @@ describe('Pi archive branch selection', () => {
       'Invalid session',
     );
     expect(await fs.readdir(root)).toEqual(['link.jsonl']);
+  });
+  it('allows only linear model/thinking startup entries after a selection', () => {
+    const setup = {
+      type: 'thinking_level_change',
+      id: 'setup',
+      parentId: 'old',
+    };
+    expect(runtimeMatchesSelection('old', { entries: [], leafId: 'old' })).toBe(
+      true,
+    );
+    expect(
+      runtimeMatchesSelection('old', { entries: [setup], leafId: 'setup' }),
+    ).toBe(true);
+    expect(
+      runtimeMatchesSelection(null, {
+        entries: [{ ...setup, parentId: null }],
+        leafId: 'setup',
+      }),
+    ).toBe(true);
+    for (const entry of [
+      { ...setup, type: 'message' },
+      { ...setup, type: 'custom' },
+      { ...setup, parentId: 'unrelated' },
+    ])
+      expect(
+        runtimeMatchesSelection('old', { entries: [entry], leafId: 'setup' }),
+      ).toBe(false);
+    expect(
+      runtimeMatchesSelection('old', { entries: [], leafId: 'unrelated' }),
+    ).toBe(false);
+    expect(runtimeMatchesSelection(null, { entries: [], leafId: null })).toBe(
+      true,
+    );
+    expect(runtimeMatchesSelection('old', { leafId: 'old' })).toBe(false);
   });
 });

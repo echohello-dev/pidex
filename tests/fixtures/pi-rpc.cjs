@@ -29,6 +29,18 @@ const branchMessages = () => {
   }
   return branch;
 };
+// Pi can append setup metadata while opening a session. Model that behavior
+// so forks must avoid loading the source, and position checks allow only setup.
+if (file) {
+  const entry = {
+    type: 'thinking_level_change',
+    id: `setup-${process.pid}`,
+    parentId: records.filter((e) => e.type !== 'session').at(-1)?.id ?? null,
+    thinkingLevel: 'medium',
+  };
+  records.push(entry);
+  fs.appendFileSync(file, '\n' + JSON.stringify(entry) + '\n');
+}
 let messages = branchMessages();
 let promptSeq = 0;
 let streaming = false;
@@ -60,10 +72,17 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       reply({ model, isStreaming: streaming, sessionFile: file });
       break;
     case 'get_entries':
-      reply({
-        entries: [],
-        leafId: records.filter((e) => e.type !== 'session').at(-1)?.id ?? null,
-      });
+      {
+        const entries = records.filter((e) => e.type !== 'session');
+        const index = command.since
+          ? entries.findIndex((e) => e.id === command.since)
+          : -1;
+        reply({
+          entries: entries.slice(index + 1),
+          leafId: entries.at(-1)?.id ?? null,
+        });
+      }
+
       break;
     case 'get_messages':
       reply({ messages });

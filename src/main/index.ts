@@ -1,4 +1,9 @@
-import { forkArchive, loadArchive, selectedPath } from './session-tree';
+import {
+  forkArchive,
+  loadArchive,
+  selectedPath,
+  runtimeMatchesSelection,
+} from './session-tree';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -121,7 +126,6 @@ ipcMain.handle(
       return { error: 'workspace path does not exist' };
     }
     let expectedEntryId: string | null | undefined;
-    let cloneCurrent = false;
     if (sessionFile) {
       try {
         sessionFile = await sessionPath(sessionFile);
@@ -138,12 +142,9 @@ ipcMain.handle(
           throw new Error('Invalid selected entry.');
         const selected = selectedPath(archive, req.entryId).at(-1)?.id;
         expectedEntryId = selected ?? null;
-        cloneCurrent = Boolean(
-          req.fork && selected === archive.entries.at(-1)?.id,
-        );
         if (req.fork && !selected)
           throw new Error('This session has no entry to fork.');
-        if (selected && selected !== archive.entries.at(-1)?.id) {
+        if (selected && (req.fork || selected !== archive.entries.at(-1)?.id)) {
           sessionFile = await forkArchive(sessionFile, selected);
         }
       } catch (error) {
@@ -200,15 +201,10 @@ ipcMain.handle(
         type: 'get_entries',
         ...(expectedEntryId ? { since: expectedEntryId } : {}),
       });
-      const data = position.data as
-        { leafId?: string | null; entries?: { type?: string }[] } | undefined;
-      // Pi may initialize model/thinking metadata in an otherwise empty session.
-      const matches =
-        expectedEntryId === null
-          ? Array.isArray(data?.entries) &&
-            !data.entries.some((e) => e.type === 'message')
-          : data?.leafId === expectedEntryId;
-      if (!position.success || !matches) {
+      if (
+        !position.success ||
+        !runtimeMatchesSelection(expectedEntryId, position.data)
+      ) {
         sessions.delete(id);
         session.dispose();
         return {
@@ -216,18 +212,6 @@ ipcMain.handle(
             position.error ??
             'The runtime branch moved since selection. Refresh history and select the branch again.',
         };
-      }
-    }
-
-    if (cloneCurrent) {
-      const cloned = await session.command({ type: 'clone' });
-      if (
-        !cloned.success ||
-        (cloned.data as { cancelled?: boolean } | undefined)?.cancelled
-      ) {
-        sessions.delete(id);
-        session.dispose();
-        return { error: cloned.error ?? 'Session fork was cancelled.' };
       }
     }
 

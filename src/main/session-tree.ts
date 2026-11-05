@@ -210,3 +210,30 @@ export async function forkArchive(
   );
   return target;
 }
+
+/** Pi initializes model/thinking settings on open. Those entries may advance the
+ * leaf without changing the selected conversation. Reject all other movement,
+ * including messages, branching metadata, unknown records and broken chains. */
+export function runtimeMatchesSelection(
+  entryId: string | null,
+  data: unknown,
+): boolean {
+  if (!data || typeof data !== 'object') return false;
+  const position = data as { entries?: unknown; leafId?: unknown };
+  if (!Array.isArray(position.entries)) return false;
+  let parent = entryId;
+  for (const value of position.entries) {
+    if (!value || typeof value !== 'object') return false;
+    const entry = value as { type?: unknown; id?: unknown; parentId?: unknown };
+    if (
+      (entry.type !== 'model_change' &&
+        entry.type !== 'thinking_level_change') ||
+      typeof entry.id !== 'string' ||
+      !entry.id ||
+      entry.parentId !== parent
+    )
+      return false;
+    parent = entry.id;
+  }
+  return position.leafId === parent;
+}

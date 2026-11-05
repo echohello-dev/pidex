@@ -173,12 +173,15 @@ describe('session branches in Electron', () => {
     const forkRecords = (await fs.readFile(forkPath, 'utf8'))
       .trim()
       .split('\n')
+      .filter(Boolean)
       .map((l) => JSON.parse(l));
     expect(forkRecords[0].parentSession).toBe(await fs.realpath(source));
-    expect(forkRecords.slice(1).map((e) => e.id)).toEqual([
-      'task',
-      'old-answer',
-    ]);
+    expect(
+      forkRecords
+        .slice(1)
+        .filter((e) => e.type === 'message')
+        .map((e) => e.id),
+    ).toEqual(['task', 'old-answer']);
     expect(await fs.readFile(source, 'utf8')).toBe(original);
     await page.getByLabel('Message pi').fill('Continue the fork');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
