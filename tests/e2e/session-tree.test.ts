@@ -15,6 +15,8 @@ let fixture: string;
 let source: string;
 let log: string;
 const errors: string[] = [];
+const proofDir = process.env.PIDEX_BRANCH_PROOF_DIR;
+let proofVideo: ReturnType<Page['video']>;
 const message = (
   id: string,
   parentId: string | null,
@@ -97,6 +99,12 @@ describe('session branches in Electron', () => {
       executablePath: require('electron'),
       args: ['.'],
       cwd: ROOT,
+      recordVideo: proofDir
+        ? {
+            dir: path.join(fixture, 'video'),
+            size: { width: 1280, height: 840 },
+          }
+        : undefined,
       env: {
         ...process.env,
         PIDEX_E2E_CWD: project,
@@ -108,6 +116,8 @@ describe('session branches in Electron', () => {
       },
     });
     page = await app.firstWindow();
+    proofVideo = page.video();
+    if (proofDir) await fs.mkdir(proofDir, { recursive: true });
     page.setDefaultTimeout(15000);
     page.on('pageerror', (error) => errors.push(error.message));
     await page
@@ -116,6 +126,10 @@ describe('session branches in Electron', () => {
   });
   afterAll(async () => {
     await app?.close();
+    if (proofDir && proofVideo)
+      await proofVideo.saveAs(
+        path.join(proofDir, 'session-tree-navigation.webm'),
+      );
     if (fixture) await fs.rm(fixture, { recursive: true, force: true });
   });
 
@@ -142,6 +156,10 @@ describe('session branches in Electron', () => {
         .getByRole('treeitem', { name: /Streaming branch is ready/ })
         .getAttribute('aria-selected'),
     ).toBe('true');
+    if (proofDir)
+      await page.screenshot({
+        path: path.join(proofDir, 'selected-branch.png'),
+      });
     // Select an ancestor, not just a leaf. Preview and fork must stop here.
     await page
       .getByRole('treeitem', { name: /assistant: The original branch/ })
@@ -165,6 +183,10 @@ describe('session branches in Electron', () => {
         exact: true,
       })
       .waitFor();
+    if (proofDir)
+      await page.screenshot({
+        path: path.join(proofDir, 'selected-entry-fork.png'),
+      });
     const stateRequest = (await readLog())
       .filter((c) => c.type === 'get_state' && c.sessionFile)
       .at(-1);
