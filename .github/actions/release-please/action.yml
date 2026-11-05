@@ -1,0 +1,39 @@
+name: Release Please with CalVer
+description: Run Release Please with pidex's UTC versions and padded Git tags
+inputs:
+  token:
+    description: GitHub token for release PRs and draft releases
+    required: true
+  release-tag:
+    description: Existing draft tag to resume after a failed build
+    default: ''
+  dispatch-checks:
+    description: Explicitly run PR checks when using the default GITHUB_TOKEN
+    default: 'true'
+outputs:
+  release_created:
+    value: ${{ steps.release.outputs.release_created }}
+    description: Whether installers should be built
+  tag:
+    value: ${{ steps.release.outputs.tag }}
+    description: Padded CalVer Git tag
+  semver:
+    value: ${{ steps.release.outputs.semver }}
+    description: Version for electron-builder
+  sha:
+    value: ${{ steps.release.outputs.sha }}
+    description: Exact release commit
+runs:
+  using: composite
+  steps:
+    - name: Install Release Please
+      shell: bash
+      run: npm ci --ignore-scripts --prefix "$GITHUB_ACTION_PATH"
+    - name: Release Please
+      id: release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+        DISPATCH_CHECKS: ${{ inputs.dispatch-checks }}
+      run: node "$GITHUB_ACTION_PATH/index.mjs"

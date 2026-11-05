@@ -1,0 +1,11 @@
+{
+  "name": "pidex-release-please",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node adapter.test.mjs"
+  },
+  "dependencies": {
+    "release-please": "17.11.2"
+  }
+}
