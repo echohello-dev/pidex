@@ -93,6 +93,8 @@ $ chmod +x pidex.AppImage && ./pidex.AppImage
 
 A `.deb` and a GHCR image (`ghcr.io/echohello-dev/pidex`) ship alongside. Docker needs an X11 socket; prefer the AppImage on a real desktop. Full matrix in [docs/distribution.md](docs/distribution.md).
 
+Releases use Release Please PRs with CalVer tags (`YYYY.0M.0D`, with `-N` for another release that day). Merging the release PR builds and publishes the installers. See the [release workflow](docs/distribution.md#release-workflow).
+
 ## Quick Start
 
 From source, use [mise](https://mise.jdx.dev/) to install the Node and Bun versions pinned in `.mise.toml`. Git is needed for workspace changes and commits.

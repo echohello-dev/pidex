@@ -1,8 +1,37 @@
 # Distribution
 
-pidex ships from GitHub Releases on every push to `main`. Tags stay CalVer (`YYYY.0M.0D`, see [ADR 0009](adr/0009-calver-releases.md)). The packager matrix and public channels are [ADR 0010](adr/0010-distribution-channels.md).
+pidex ships from GitHub Releases when a Release Please PR is merged. Tags stay CalVer (`YYYY.0M.0D`, with `-N` for same-day releases). [ADR 0012](adr/0012-release-please-calver.md) describes the adapter. The packager matrix and public channels are [ADR 0010](adr/0010-distribution-channels.md).
 
 Signing is conditional on the release workflow configuration. Builds without Developer ID or Authenticode secrets are published unsigned. For an unsigned build, macOS may require right-click → Open, and Windows SmartScreen may ask you to keep the file. See [Signing](#signing) for the supported configuration.
+
+## Release workflow
+
+1. Merge work into `main` with Conventional Commit titles (`feat:`, `fix:`, `docs:`, `ci:`, and so on). The release workflow opens or updates a Release Please PR containing `CHANGELOG.md`, `package.json`, and `.release-please-manifest.json`.
+2. Review that PR and its CI / Electron checks, then merge it when ready to release. Ordinary pushes no longer publish installers.
+3. Release Please creates a draft and tags the merged PR commit. The existing matrix builds Windows, macOS, and Linux packages from that exact commit, then publishes Docker, checksums, and store manifests. The release becomes public only after all jobs pass.
+
+The repository's [Release Please action](../.github/actions/release-please/action.yml) wraps the pinned upstream `release-please` library. The stock `googleapis/release-please-action` does not expose custom strategy registration. Our adapter uses Release Please's extension API to retain padded Git tags and sets its supported `release-as` override to the next UTC date version. Changelog comparison links use the same padded tags.
+
+The version is the UTC date of the release PR's most recent update, with `-2`, `-3`, and so on if that date is already reserved by a tag or the version manifest. Merging later preserves the reviewed version; dispatch the release workflow with no inputs before merging if you want to refresh a pending PR's date. Installer versions remain unpadded (`2026.11.5-2`), while the public Git tag is `2026.11.05-2`. Same-day suffixes remain stable GitHub releases, not prereleases. The bootstrap manifest starts at the existing `2026.11.04-2` release.
+
+Enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** for the default `GITHUB_TOKEN`. Bot-created PR events do not start workflows, so the adapter explicitly dispatches `ci.yml` and `e2e.yml` on the release PR branch. Alternatively, provide `RELEASE_PLEASE_TOKEN` from a GitHub App or PAT with repository contents, issues, and pull-request write access; its PR events trigger checks normally. No new token is required for the default setup.
+
+If packaging fails, use **Re-run failed jobs** on the original run. To resume a draft from a new run, dispatch `release.yml` on `main` with `release_tag` set to the existing padded tag. Recovery refuses published releases and builds the tagged commit rather than current `main`. Release runs are serialized to prevent duplicate draft creation. An empty dispatch manages the pending release PR and does not force a new release.
+
+Test the adapter independently of Electron:
+
+```bash
+$ npm ci --ignore-scripts --prefix .github/actions/release-please
+$ npm test --prefix .github/actions/release-please
+```
+
+For a read-only API preview, with `GH_TOKEN` set and all tags fetched:
+
+```bash
+$ GITHUB_REPOSITORY=echohello-dev/pidex node .github/actions/release-please/index.mjs --dry-run
+```
+
+The dry run reads the release config from the remote target branch (`main` by default; override with `TARGET_BRANCH`). It builds candidate PRs and releases without changing GitHub.
 
 ## GitHub Releases
 

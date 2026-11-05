@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing draft CalVer tag to resume (leave empty to manage the release PR)
+        type: string
+        default: ''
+
+concurrency:
+  group: pidex-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -14,78 +23,36 @@ env:
 
 jobs:
   tag:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
     outputs:
-      tag: ${{ steps.calver.outputs.tag }}
-      semver: ${{ steps.calver.outputs.semver }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag }}
+      semver: ${{ steps.release.outputs.semver }}
+      sha: ${{ steps.release.outputs.sha }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
-
-      - name: compute calver tag
-        id: calver
-        run: |
-          set -euo pipefail
-          base="$(date -u +%Y.%m.%d)"
-          git fetch --tags --quiet
-          tag="$base"
-          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
-            n=2
-            while git rev-parse -q --verify "refs/tags/$base-$n" > /dev/null; do
-              n=$((n + 1))
-            done
-            tag="$base-$n"
-          fi
-          if [[ "$tag" =~ ^([0-9]{4})\.([0-9]{2})\.([0-9]{2})(-([0-9]+))?$ ]]; then
-            semver="$((10#${BASH_REMATCH[1]})).$((10#${BASH_REMATCH[2]})).$((10#${BASH_REMATCH[3]}))"
-            if [[ -n "${BASH_REMATCH[5]:-}" ]]; then
-              semver="${semver}-${BASH_REMATCH[5]}"
-            fi
-          else
-            echo "invalid calver tag: $tag" >&2
-            exit 1
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "semver=$semver" >> "$GITHUB_OUTPUT"
-
-      - name: create draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.calver.outputs.tag }}
-        run: |
-          set -euo pipefail
-          notes="$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="$TAG" --jq .body)"
-          {
-            echo "## Install"
-            echo
-            echo "| Platform | Artefact |"
-            echo "|---|---|"
-            echo "| macOS Apple silicon | \`pidex-mac-arm64.dmg\` |"
-            echo "| macOS Intel | \`pidex-mac-x64.dmg\` |"
-            echo "| Windows | \`pidex-win-x64.exe\` |"
-            echo "| Linux | \`pidex-linux-x86_64.AppImage\` |"
-            echo "| Docker | \`docker pull ghcr.io/echohello-dev/pidex:${TAG}\` |"
-            echo
-            echo "macOS via Homebrew:"
-            echo
-            echo '```'
-            echo "brew tap echohello-dev/tap"
-            echo "brew install --cask pidex"
-            echo '```'
-            echo
-            echo "Windows via the same tap (WinGet cannot add a GitHub repo as a source):"
-            echo
-            echo '```'
-            echo "irm https://raw.githubusercontent.com/echohello-dev/homebrew-tap/main/winget/install-pidex.ps1 | iex"
-            echo '```'
-            echo
-            echo "$notes"
-          } > /tmp/notes.md
-          gh release create "$TAG" --draft --title "$TAG" --notes-file /tmp/notes.md
+      - uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        with:
+          install: true
+      - name: Release Please with CalVer
+        id: release
+        uses: ./.github/actions/release-please
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          release-tag: ${{ inputs.release_tag }}
+          dispatch-checks: ${{ secrets.RELEASE_PLEASE_TOKEN == '' }}
 
   package:
     needs: tag
+    if: needs.tag.outputs.release_created == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -102,6 +69,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
       - uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
         with:
           install: true
@@ -204,6 +173,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: linux-unpacked
@@ -235,6 +206,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
       - uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
         with:
           install: true
@@ -279,6 +252,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
       - name: publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
