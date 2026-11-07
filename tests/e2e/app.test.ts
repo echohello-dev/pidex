@@ -94,7 +94,13 @@ describe('Figma workbench in Electron', () => {
         Date.now() - (i + 1) * 15 * 60_000,
       ).toISOString();
       const records = [
-        { type: 'session', id: `session-${i}`, timestamp, cwd: project },
+        {
+          type: 'session',
+          version: 3,
+          id: `session-${i}`,
+          timestamp,
+          cwd: project,
+        },
         {
           type: 'model_change',
           id: 'm',
@@ -245,6 +251,7 @@ describe('Figma workbench in Electron', () => {
       .filter((c) => c.type === 'get_state').length;
     await win.getByRole('button', { name: /^Sessions/ }).click();
     await win
+      .locator('.wb-transcript')
       .getByText('The composer now keeps a visible focus ring', {
         exact: false,
       })
@@ -357,11 +364,13 @@ describe('Figma workbench in Electron', () => {
       .getByRole('heading', { name: 'Fix composer focus (fork)', exact: true })
       .waitFor();
     expect(await fs.readFile(source, 'utf8')).toBe(before);
+    const forks = await fs.readdir(path.dirname(source));
+    const fork = forks.find(
+      (file) => !['0.jsonl', '1.jsonl', '2.jsonl'].includes(file),
+    );
+    expect(fork).toBeTruthy();
     expect(
-      await fs.readFile(
-        path.join(fixtureRoot, 'sessions', 'workspace', 'fork.jsonl'),
-        'utf8',
-      ),
+      await fs.readFile(path.join(path.dirname(source), fork!), 'utf8'),
     ).toContain('The composer now keeps');
   });
 

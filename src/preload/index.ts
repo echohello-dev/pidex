@@ -21,8 +21,9 @@ contextBridge.exposeInMainWorld('pidex', {
     ipcRenderer.invoke('pidex:workspace:patch', cwd, file, staged, untracked),
   gitAction: (cwd: string, action: string, file?: string) =>
     ipcRenderer.invoke('pidex:workspace:git', cwd, action, file),
-  previewSession: (file: string) =>
-    ipcRenderer.invoke('pidex:session:preview', file),
+  sessionTree: (file: string) => ipcRenderer.invoke('pidex:session:tree', file),
+  previewSession: (file: string, entryId?: string | null) =>
+    ipcRenderer.invoke('pidex:session:preview', file, entryId),
   skills: (cwd: string) => ipcRenderer.invoke('pidex:workspace:skills', cwd),
   openProject: (cwd: string) => ipcRenderer.invoke('pidex:workspace:open', cwd),
   attachFiles: () => ipcRenderer.invoke('pidex:workspace:attach'),
@@ -34,8 +35,12 @@ contextBridge.exposeInMainWorld('pidex', {
   setModel: (id: string, provider: string, model: string) =>
     ipcRenderer.invoke('pidex:session:model', id, provider, model),
   sessions: (dirName: string) => ipcRenderer.invoke('pidex:sessions', dirName),
-  openSession: (req: { cwd: string; sessionFile?: string; fork?: boolean }) =>
-    ipcRenderer.invoke('pidex:session/open', req),
+  openSession: (req: {
+    cwd: string;
+    sessionFile?: string;
+    entryId?: string | null;
+    fork?: boolean;
+  }) => ipcRenderer.invoke('pidex:session/open', req),
   sendPrompt: (req: { sessionId: string; text: string; streaming: boolean }) =>
     ipcRenderer.invoke('pidex:session/send', req),
   abortSession: (sessionId: string) =>

@@ -1,3 +1,9 @@
+import {
+  forkArchive,
+  loadArchive,
+  selectedPath,
+  runtimeMatchesSelection,
+} from './session-tree';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -104,20 +110,116 @@ ipcMain.handle('pidex:sessions', (_e, dirName: string) => {
 
 ipcMain.handle(
   'pidex:session/open',
-  async (_e, req: { cwd: string; sessionFile?: string; fork?: boolean }) => {
+  async (
+    _e,
+    req: {
+      cwd: string;
+      sessionFile?: string;
+      entryId?: string | null;
+      fork?: boolean;
+    },
+  ) => {
     const cwd = typeof req?.cwd === 'string' ? req.cwd : '';
-    const sessionFile =
+    let sessionFile =
       typeof req?.sessionFile === 'string' ? req.sessionFile : undefined;
     if (!cwd || !fs.existsSync(cwd)) {
       return { error: 'workspace path does not exist' };
     }
+    let expectedEntryId: string | null | undefined;
+    let extractedFork = false;
     if (sessionFile) {
       try {
-        await sessionPath(sessionFile);
-      } catch {
+        sessionFile = await sessionPath(sessionFile);
+        const archive = await loadArchive(sessionFile);
+        if (!archive.header || archive.header.version !== 3 || archive.damaged)
+          throw new Error(
+            'Continuing requires an intact Pi v3 archive. Open older archives in Pi to migrate them first.',
+          );
+        if (
+          req.entryId !== undefined &&
+          req.entryId !== null &&
+          typeof req.entryId !== 'string'
+        )
+          throw new Error('Invalid selected entry.');
+        const selected = selectedPath(archive, req.entryId).at(-1)?.id;
+        expectedEntryId = selected ?? null;
+        if (req.fork && !selected)
+          throw new Error('This session has no entry to fork.');
+        if (selected && (req.fork || selected !== archive.entries.at(-1)?.id)) {
+          sessionFile = await forkArchive(sessionFile, selected);
+          extractedFork = true;
+        }
+      } catch (error) {
         return {
-          error: 'session file outside pi sessions root or unavailable',
+          error:
+            error instanceof Error ? error.message : 'Session unavailable.',
         };
+      }
+    }
+
+    // Archive ownership is authoritative here, rather than inferred from a
+    // renderer snapshot that becomes stale as soon as a prompt advances Pi.
+    async function readRuntime(runtime: RpcSession, reused = false) {
+      const state = await runtime.getState();
+      if (!state.success || runtime.launchError())
+        return {
+          error:
+            state.error ??
+            runtime.launchError() ??
+            'Could not read Pi session state.',
+        };
+      if (sessionFile && runtime.archiveFile !== sessionFile)
+        return {
+          error:
+            'The open runtime switched archives. Select this archive again.',
+        };
+      if (
+        reused &&
+        (state.data as { isStreaming?: boolean } | undefined)?.isStreaming
+      )
+        return {
+          error:
+            'This archive is running in an open tab. Stop it before resuming, or fork this selection.',
+        };
+      if (expectedEntryId !== undefined) {
+        const position = await runtime.command({
+          type: 'get_entries',
+          ...(expectedEntryId ? { since: expectedEntryId } : {}),
+        });
+        if (
+          !position.success ||
+          !runtimeMatchesSelection(expectedEntryId, position.data)
+        )
+          return {
+            error:
+              position.error ??
+              'The runtime branch moved since selection. Refresh history and select the branch again, or fork this entry.',
+          };
+      }
+      const messages = await runtime.getMessages();
+      if (!messages.success)
+        return { error: messages.error ?? 'Could not read Pi history.' };
+      return {
+        sessionId: runtime.id,
+        state: state.data,
+        messages:
+          (messages.data as { messages?: unknown[] } | undefined)?.messages ??
+          [],
+      };
+    }
+    if (sessionFile && !extractedFork) {
+      for (const runtime of sessions.values()) {
+        // Extension commands can switch a runtime's archive. Refresh its real
+        // state before deciding whether this file already has a live owner.
+        const state = await runtime.getState();
+        if (!state.success) {
+          if (runtime.launchError()) continue;
+          return {
+            error: `Could not verify archive ownership. Close the unresponsive session tab before resuming. ${state.error ?? ''}`,
+          };
+        }
+        if (runtime.archiveFile === sessionFile)
+          return readRuntime(runtime, true);
       }
     }
 
@@ -131,21 +233,11 @@ ipcMain.handle(
     }
     session.onEvent = (sessionId, event) =>
       sendToRenderer('pidex:session:event', { sessionId, event });
-    session.onExit = (sessionId) =>
+    session.onExit = (sessionId) => {
+      sessions.delete(sessionId);
       sendToRenderer('pidex:session:exit', { sessionId });
+    };
     sessions.set(id, session);
-
-    if (req.fork && sessionFile) {
-      const cloned = await session.command({ type: 'clone' });
-      if (
-        !cloned.success ||
-        (cloned.data as { cancelled?: boolean } | undefined)?.cancelled
-      ) {
-        sessions.delete(id);
-        session.dispose();
-        return { error: cloned.error ?? 'Session fork was cancelled.' };
-      }
-    }
 
     if (!sessionFile) {
       const defaults = await sessionDefaults(cwd);
@@ -174,23 +266,12 @@ ipcMain.handle(
       }
     }
 
-    const [state, messages] = await Promise.all([
-      session.getState(),
-      session.getMessages(),
-    ]);
-    const launchError = session.launchError();
-    if (launchError) {
+    const result = await readRuntime(session);
+    if ('error' in result) {
       sessions.delete(id);
       session.dispose();
-      return { error: launchError };
     }
-    return {
-      sessionId: id,
-      state: state.success ? state.data : null,
-      messages: messages.success
-        ? ((messages.data as { messages?: unknown[] })?.messages ?? [])
-        : [],
-    };
+    return result;
   },
 );
 

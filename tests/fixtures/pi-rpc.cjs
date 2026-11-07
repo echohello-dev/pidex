@@ -6,16 +6,45 @@ const args = process.argv.slice(2);
 let file = args.includes('--session')
   ? args[args.indexOf('--session') + 1]
   : undefined;
-let messages = file
+// Match Pi: loading a file chooses its last non-header entry and follows
+// parentId, rather than combining abandoned branches into one transcript.
+let records = file
   ? fs
       .readFileSync(file, 'utf8')
       .trim()
       .split('\n')
+      .filter(Boolean)
       .map((line) => JSON.parse(line))
-      .filter((entry) => entry.type === 'message')
-      .map((entry) => entry.message)
   : [];
+const branchMessages = () => {
+  const entries = records.filter((entry) => entry.type !== 'session');
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const branch = [];
+  const seen = new Set();
+  let current = entries.at(-1);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    if (current.type === 'message') branch.unshift(current.message);
+    current = byId.get(current.parentId);
+  }
+  return branch;
+};
+// Pi can append setup metadata while opening a session. Model that behavior
+// so forks must avoid loading the source, and position checks allow only setup.
+if (file) {
+  const entry = {
+    type: 'thinking_level_change',
+    id: `setup-${process.pid}`,
+    parentId: records.filter((e) => e.type !== 'session').at(-1)?.id ?? null,
+    thinkingLevel: 'medium',
+  };
+  records.push(entry);
+  fs.appendFileSync(file, '\n' + JSON.stringify(entry) + '\n');
+}
+let messages = branchMessages();
+let promptSeq = 0;
 let streaming = false;
+let failState = false;
 let model = {
   id: 'claude-sonnet',
   name: 'Claude Sonnet',
@@ -37,11 +66,36 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
   if (process.env.PIDEX_RPC_LOG)
     fs.appendFileSync(
       process.env.PIDEX_RPC_LOG,
-      JSON.stringify(command) + '\n',
+      JSON.stringify({
+        ...command,
+        sessionFile: file,
+        runtimePid: process.pid,
+      }) + '\n',
     );
   switch (command.type) {
     case 'get_state':
-      reply({ model, isStreaming: streaming, sessionFile: file });
+      if (failState)
+        output({
+          type: 'response',
+          id: command.id,
+          command: command.type,
+          success: false,
+          error: 'Fixture state refresh failure.',
+        });
+      else reply({ model, isStreaming: streaming, sessionFile: file });
+      break;
+    case 'get_entries':
+      {
+        const entries = records.filter((e) => e.type !== 'session');
+        const index = command.since
+          ? entries.findIndex((e) => e.id === command.since)
+          : -1;
+        reply({
+          entries: entries.slice(index + 1),
+          leafId: entries.at(-1)?.id ?? null,
+        });
+      }
+
       break;
     case 'get_messages':
       reply({ messages });
@@ -90,6 +144,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       const entries = [
         {
           type: 'session',
+          version: 3,
           id: 'fork',
           timestamp: new Date().toISOString(),
           cwd: process.cwd(),
@@ -114,6 +169,23 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       reply();
       break;
     case 'prompt': {
+      if (
+        command.message === 'Switch archive for test' &&
+        process.env.PIDEX_RPC_SWITCH_FILE
+      ) {
+        file = fs.realpathSync(process.env.PIDEX_RPC_SWITCH_FILE);
+        records = fs
+          .readFileSync(file, 'utf8')
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+        messages = branchMessages();
+        reply();
+        event('agent_end');
+        break;
+      }
+      if (command.message === 'Simulate owner state failure') failState = true;
       if (command.message === 'reject this prompt') {
         output({
           type: 'response',
@@ -124,10 +196,23 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         });
         break;
       }
-      messages.push({
+      const message = {
         role: 'user',
         content: [{ type: 'text', text: command.message }],
-      });
+      };
+      if (file) {
+        const entry = {
+          type: 'message',
+          id: `prompt-${process.pid}-${++promptSeq}`,
+          parentId:
+            records.filter((e) => e.type !== 'session').at(-1)?.id ?? null,
+          message,
+        };
+        records.push(entry);
+        // Accept fixtures with or without a final newline.
+        fs.appendFileSync(file, '\n' + JSON.stringify(entry) + '\n');
+      }
+      messages.push(message);
       reply();
       streaming = true;
       event('agent_start');

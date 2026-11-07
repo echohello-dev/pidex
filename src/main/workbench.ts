@@ -259,45 +259,10 @@ export async function readSession(
   file: string,
   sessionsRoot = SESSIONS_ROOT,
 ): Promise<unknown[]> {
-  const target = await sessionPath(file, sessionsRoot);
-  const stat = await fs.stat(target);
-  if (stat.size > 16 * MAX_TEXT)
-    throw new Error(
-      'This session is too large to preview. Resume it to continue.',
-    );
-  const records: {
-    id?: string;
-    parentId?: string;
-    type?: string;
-    message?: unknown;
-  }[] = [];
-  for (const line of (await fs.readFile(target, 'utf8')).split('\n')) {
-    try {
-      const record = JSON.parse(line);
-      if (
-        record &&
-        typeof record === 'object' &&
-        !Array.isArray(record) &&
-        typeof record.id === 'string'
-      )
-        records.push(record);
-    } catch {
-      /* Partial final writes are expected. */
-    }
-  }
-  // Follow the current branch rather than mixing messages from abandoned branches.
-  const byId = new Map(records.filter((r) => r.id).map((r) => [r.id, r]));
-  let current = records.at(-1);
-  const branch: unknown[] = [];
-  const seen = new Set<string>();
-  while (current) {
-    if (current.id && seen.has(current.id)) break;
-    if (current.id) seen.add(current.id);
-    if (current.type === 'message' && current.message)
-      branch.unshift(current.message);
-    current = current.parentId ? byId.get(current.parentId) : undefined;
-  }
-  return branch;
+  const { loadArchive, selectedPath } = await import('./session-tree.js');
+  return selectedPath(await loadArchive(file, sessionsRoot))
+    .filter((entry) => entry.type === 'message')
+    .map((entry) => entry.message);
 }
 
 export async function listSkills(cwd: string): Promise<SkillInfo[]> {

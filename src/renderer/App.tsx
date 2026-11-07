@@ -1,3 +1,4 @@
+import { SessionTree, EntryTree } from './components/SessionTree';
 import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
 import welcomeMark from './assets/workbench/welcome-mark.svg';
@@ -69,7 +70,10 @@ function App() {
       onModel={b.changeModel}
       running={view === 'session' && active?.running}
       disabled={
-        !ws || (view === 'session' && active?.exited) || b.previewLoading
+        !ws ||
+        (view === 'session' && active?.exited) ||
+        b.previewLoading ||
+        (view === 'history' && !preview?.ready)
       }
       busy={b.busy}
       placeholder={placeholder}
@@ -499,6 +503,12 @@ function App() {
                       >
                         Review {details.changes.length} files
                       </BracketButton>
+                      {active.startedAt && (
+                        <p className="wb-meta">
+                          Opened at entry {active.startedAt.slice(0, 8)}. The
+                          live branch advances as you send messages.
+                        </p>
+                      )}
                       <span className="wb-eyebrow">Activity</span>
                       <p className="wb-meta">
                         {active.entries.filter((e) => e.kind === 'tool').length}{' '}
@@ -539,39 +549,13 @@ function App() {
                       label="Search sessions"
                     />
                     <div className="wb-history-list">
-                      {(allHistory
-                        ? filteredSessions
-                        : filteredSessions.slice(0, 30)
-                      ).map((s, i, arr) => {
-                        const day = new Date(s.timestamp).toLocaleDateString();
-                        const prev =
-                          i > 0
-                            ? new Date(
-                                arr[i - 1].timestamp,
-                              ).toLocaleDateString()
-                            : '';
-                        return (
-                          <div key={s.id}>
-                            {day !== prev && (
-                              <p className="wb-eyebrow wb-day-label">
-                                {day === new Date().toLocaleDateString()
-                                  ? 'Today'
-                                  : day}
-                              </p>
-                            )}
-                            <button
-                              type="button"
-                              className={`wb-session-item${preview?.info.id === s.id ? ' is-active' : ''}`}
-                              onClick={() => void b.showPreview(s)}
-                            >
-                              <span>{s.title}</span>
-                              <small>
-                                {timeAgo(s.timestamp)} / {s.messageCount} msgs
-                              </small>
-                            </button>
-                          </div>
-                        );
-                      })}
+                      <SessionTree
+                        sessions={sessions}
+                        query={sessionQuery}
+                        limit={allHistory ? undefined : 30}
+                        selectedFile={preview?.info.file}
+                        onSelect={(s) => void b.showPreview(s)}
+                      />
                       {!filteredSessions.length && (
                         <p className="wb-meta">No sessions found.</p>
                       )}
@@ -579,6 +563,13 @@ function App() {
                     <BracketButton onClick={() => setAllHistory((v) => !v)}>
                       {allHistory ? 'Show recent' : 'Show all sessions'}
                     </BracketButton>
+                    {preview?.tree && (
+                      <EntryTree
+                        tree={preview.tree}
+                        selectedId={preview.entryId}
+                        onSelect={(id) => void b.showPreview(preview.info, id)}
+                      />
+                    )}
                   </aside>
                   <section className="wb-conversation">
                     {preview ? (
@@ -588,8 +579,17 @@ function App() {
                             <h2 title={preview.info.title}>
                               {preview.info.title}
                             </h2>
-                            <p className="wb-meta">
-                              {preview.info.model || 'Pi'} / saved locally
+                            <p
+                              className="wb-meta"
+                              title={`${preview.info.model || 'Pi'} / Selected ${preview.entryId ?? 'empty'}${preview.entryId === preview.tree?.leafId ? ' / Archive tip' : ''}`}
+                            >
+                              {preview.info.model || 'Pi'} /{' '}
+                              {preview.entryId
+                                ? `Selected ${preview.entryId.slice(0, 8)}`
+                                : 'Empty session'}
+                              {preview.entryId === preview.tree?.leafId
+                                ? ' / Archive tip'
+                                : ''}
                             </p>
                           </div>
                           <BracketButton
@@ -599,8 +599,21 @@ function App() {
                             Review changes
                           </BracketButton>
                         </div>
+                        {preview.tree?.warning && (
+                          <p className="wb-meta" role="status">
+                            {preview.tree.warning}
+                          </p>
+                        )}
+                        {preview.entryId &&
+                          preview.entryId !== preview.tree?.leafId && (
+                            <p className="wb-branch-notice">
+                              Pi RPC cannot resume an earlier entry in place.
+                              Continuing creates a new fork from this selection
+                              and preserves the source.
+                            </p>
+                          )}
                         <Transcript
-                          key={preview.info.file}
+                          key={`${preview.info.file}:${preview.entryId}`}
                           entries={preview.entries}
                         >
                           {b.previewLoading ? (
@@ -611,7 +624,12 @@ function App() {
                             <>
                               <div className="wb-fork-actions">
                                 <BracketButton
-                                  disabled={b.busy || !preview.entries.length}
+                                  disabled={
+                                    b.busy ||
+                                    !preview.ready ||
+                                    !preview.tree?.canContinue ||
+                                    !preview.entryId
+                                  }
                                   onClick={b.forkSession}
                                 >
                                   Fork from here
@@ -623,7 +641,13 @@ function App() {
                             </>
                           )}
                         </Transcript>
-                        {composer('Continue this session…', 'Resume')}
+                        {composer(
+                          'Continue selected branch…',
+                          preview.entryId &&
+                            preview.entryId !== preview.tree?.leafId
+                            ? 'Resume in new fork'
+                            : 'Resume',
+                        )}
                       </>
                     ) : (
                       <EmptyState title="Your session history">

@@ -1,3 +1,4 @@
+import type { SessionTree } from '../main/session-tree';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyEvent, entriesFromMessages, type Entry } from './timeline';
 import type {
@@ -15,6 +16,7 @@ export type View =
 type SessionTab = {
   runtimeId: string;
   file?: string;
+  startedAt?: string;
   cwd: string;
   title: string;
   model: string;
@@ -56,6 +58,9 @@ export function useWorkbench() {
   const [preview, setPreview] = useState<{
     info: SessionInfo;
     entries: Entry[];
+    tree?: SessionTree;
+    entryId?: string | null;
+    ready?: boolean;
   } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -76,7 +81,7 @@ export function useWorkbench() {
     tabs.find((t) => t.runtimeId === activeId && t.cwd === ws?.cwd) ?? null;
   const draftKey =
     view === 'history'
-      ? `preview:${preview?.info.file ?? ''}`
+      ? `preview:${preview?.info.file ?? ''}:${preview?.entryId ?? ''}`
       : active && view !== 'new'
         ? active.runtimeId
         : `new:${ws?.cwd ?? ''}`;
@@ -155,6 +160,7 @@ export function useWorkbench() {
     setDetails(EMPTY_DETAILS);
     setSessions([]);
     setPreview(null);
+    setPreviewLoading(false);
     setModels([]);
     setModelsLoading(Boolean(ws));
     setModelError('');
@@ -245,13 +251,14 @@ export function useWorkbench() {
   const openSession = async (
     info?: SessionInfo,
     fork = false,
+    entryId?: string | null,
   ): Promise<SessionTab | null> => {
     if (!ws || opening.current) return null;
     const existing =
       !fork &&
       info &&
       tabs.find((t) => t.cwd === ws.cwd && t.file === info.file && !t.exited);
-    if (existing) {
+    if (existing && entryId === undefined) {
       setActiveId(existing.runtimeId);
       return existing;
     }
@@ -263,29 +270,46 @@ export function useWorkbench() {
         cwd: ws.cwd,
         sessionFile: info?.file,
         fork,
+        entryId,
       });
       if (result.error || !result.sessionId)
         throw new Error(result.error ?? 'Could not open this session.');
       const id = result.sessionId;
       if (currentCwd.current !== ws.cwd) {
-        await api.closeSession(id);
+        if (!tabs.some((t) => t.runtimeId === id)) await api.closeSession(id);
         return null;
       }
       // Mount before loading commands so live events cannot be lost while that request runs.
       const tab: SessionTab = {
         runtimeId: id,
         cwd: ws.cwd,
-        file: fork
-          ? result.state?.sessionFile
-          : (info?.file ?? result.state?.sessionFile),
-        title: info ? `${info.title}${fork ? ' (fork)' : ''}` : 'New session',
+        file: result.state?.sessionFile ?? info?.file,
+        startedAt: entryId ?? undefined,
+        title: info
+          ? `${info.title}${fork || (result.state?.sessionFile && result.state.sessionFile !== info.file) ? ' (fork)' : ''}`
+          : 'New session',
         model: result.state?.model?.id ?? info?.model ?? '',
         entries: entriesFromMessages(result.messages ?? []),
         commands: [],
         running: Boolean(result.state?.isStreaming),
         exited: exitedSessions.current.has(id),
       };
-      setTabs((prev) => [...prev, tab]);
+      setTabs((prev) =>
+        prev.some((t) => t.runtimeId === id)
+          ? prev.map((t) =>
+              t.runtimeId === id
+                ? t.file !== tab.file
+                  ? tab
+                  : {
+                      ...t,
+                      running: tab.running,
+                      model: tab.model,
+                      exited: tab.exited,
+                    }
+                : t,
+            )
+          : [...prev, tab],
+      );
       setActiveId(id);
       void api
         .sessionCommands(id)
@@ -309,21 +333,34 @@ export function useWorkbench() {
       if (tab) setView('session');
     });
   const forkSession = () =>
-    preview &&
+    preview?.ready &&
+    preview.tree?.canContinue &&
     run(async () => {
-      const tab = await openSession(preview.info, true);
+      const tab = await openSession(preview.info, true, preview.entryId);
       if (tab) setView('session');
     });
   const showPreview = useCallback(
-    async (info: SessionInfo) => {
+    async (info: SessionInfo, entryId?: string) => {
       const seq = ++previewSeq.current;
-      setPreview({ info, entries: [] });
+      setPreview({ info, entries: [], entryId });
       setPreviewLoading(true);
       setError('');
       try {
-        const messages = unwrap(await api.previewSession(info.file));
+        const tree = unwrap(await api.sessionTree(info.file));
+        const selectedId = entryId === undefined ? tree.leafId : entryId;
+        if (previewSeq.current !== seq) return;
+        setPreview({ info, tree, entryId: selectedId, entries: [] });
+        const messages = unwrap(
+          await api.previewSession(info.file, selectedId),
+        );
         if (previewSeq.current === seq)
-          setPreview({ info, entries: entriesFromMessages(messages) });
+          setPreview({
+            info,
+            tree,
+            entryId: selectedId,
+            ready: tree.canContinue,
+            entries: entriesFromMessages(messages),
+          });
       } catch (e) {
         if (previewSeq.current === seq) report(e);
       } finally {
@@ -340,12 +377,23 @@ export function useWorkbench() {
   const send = (raw?: string) =>
     run(async () => {
       const text = (raw ?? draft).trim();
-      if (!text || busy || !ws || sending.current) return;
+      if (
+        !text ||
+        busy ||
+        !ws ||
+        sending.current ||
+        (view === 'history' && !preview?.ready)
+      )
+        return;
       sending.current = true;
       try {
         let tab = view === 'new' ? null : active;
         if (view === 'history' && preview)
-          tab = await openSession(preview.info);
+          tab = await openSession(
+            preview.info,
+            preview.entryId !== preview.tree?.leafId,
+            preview.entryId,
+          );
         else if (!tab || tab.exited) tab = await openSession();
         if (!tab || tab.exited) return;
         const key = `local-${crypto.randomUUID()}`;
