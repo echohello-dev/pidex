@@ -114,6 +114,58 @@ describe('entriesFromMessages', () => {
     }
   });
 
+  it('keeps full edit input with old and new text', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'call_edit',
+            name: 'edit',
+            arguments: {
+              path: '/repo/src/app.ts',
+              oldText: 'const before = 1;',
+              newText: 'const after = 2;',
+            },
+          },
+        ],
+      },
+    ];
+    const [entry] = entriesFromMessages(messages);
+    if (entry?.kind === 'tool') {
+      expect(entry.args).toBe('/repo/src/app.ts');
+      expect(entry.input).toContain('/repo/src/app.ts');
+      expect(entry.input).toContain('const before = 1;');
+      expect(entry.input).toContain('const after = 2;');
+    } else {
+      expect.fail('expected tool entry');
+    }
+  });
+
+  it('does not truncate long input for other tools', () => {
+    const long = 'x'.repeat(300);
+    const messages = [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'call_long',
+            name: 'custom_lookup',
+            arguments: { query: long },
+          },
+        ],
+      },
+    ];
+    const [entry] = entriesFromMessages(messages);
+    if (entry?.kind === 'tool') {
+      expect(entry.input).toContain(long);
+    } else {
+      expect.fail('expected tool entry');
+    }
+  });
+
   it('interleaves user, assistant, tool, toolResult entries', () => {
     const messages = [
       { role: 'user', content: [{ type: 'text', text: 'do it' }] },
@@ -246,6 +298,7 @@ describe('applyEvent', () => {
     if (entry?.kind === 'tool') {
       expect(entry.tool).toBe('bash');
       expect(entry.args).toBe('ls');
+      expect(entry.input).toBe('ls');
       expect(entry.running).toBe(true);
     } else {
       expect.fail('expected tool');
@@ -260,6 +313,7 @@ describe('applyEvent', () => {
         toolId: 'c1',
         tool: 'bash',
         args: 'ls',
+        input: 'ls',
         output: '',
         running: true,
         ok: true,
@@ -287,6 +341,7 @@ describe('applyEvent', () => {
         toolId: 'c1',
         tool: 'bash',
         args: 'ls',
+        input: 'ls',
         output: '',
         running: true,
         ok: true,
