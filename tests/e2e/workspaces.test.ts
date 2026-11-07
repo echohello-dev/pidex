@@ -320,6 +320,7 @@ describe('grouped roots in Electron', () => {
   });
 
   it('retains a late opening in the background without submitting the source draft to another root', async () => {
+    await page.setViewportSize({ width: 900, height: 600 });
     await root(api);
     await page
       .getByRole('button', { name: 'New session', exact: true })
@@ -381,6 +382,7 @@ describe('grouped roots in Electron', () => {
     await fs.mkdir(shots, { recursive: true });
     await page.screenshot({ path: path.join(shots, 'background-roots.png') });
     await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    await page.setViewportSize({ width: 1100, height: 700 });
   });
 
   it('keeps root defaults and unsaved settings drafts separate across switches', async () => {

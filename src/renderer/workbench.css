@@ -189,6 +189,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow-y: auto;
   gap: 8px;
   padding: 12px;
   border-right: 1px solid var(--line-soft);
@@ -256,8 +257,8 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   color: var(--accent);
 }
 .wb-sidebar-scroll {
-  min-height: 0;
-  flex: 1;
+  min-height: 128px;
+  flex: 1 0 128px;
   overflow-y: auto;
 }
 .wb-sidebar-scroll > .wb-eyebrow {
