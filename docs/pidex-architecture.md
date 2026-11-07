@@ -23,6 +23,7 @@ The renderer has context isolation enabled and Node integration disabled. Filesy
 
 | File | Responsibility |
 |---|---|
+| `src/main/workspaces.ts` | Versioned root/group registry, legacy migration, root defaults and selection |
 | `src/main/index.ts` | Windows, workspace registration, active session lifecycle, prompt/abort/close IPC |
 | `src/main/rpc.ts` | Pi executable discovery, child processes, request IDs, response timeouts, event forwarding |
 | `src/main/sessions.ts` | Discover workspaces and read session metadata from Pi JSONL archives |
@@ -40,7 +41,9 @@ Shared schemas and a separate runtime-adapter package were early proposals; the 
 
 ## Session lifecycle
 
-Opening or resuming a session starts a Pi subprocess in the workspace directory. Resume supplies a validated session file. Fork asks Pi to clone the selected archive before returning the new session state. New sessions apply the workspace's saved model and reasoning defaults.
+New sessions start a Pi subprocess in the selected root and apply its saved model/reasoning defaults. Resume validates both the archive path and its header cwd against that root. Pi uses the archive's stored cwd, so browsing another root cannot relocate a session. Forks extract #33's selected chain before Pi starts, preserve the source and verify the loaded runtime leaf. Main serializes opens and reuses verified archive owners rather than launching competing writers. Before a prompt or model change, main refreshes runtime state and refuses a changed or unavailable execution root.
+
+Groups organize roots for navigation. Switching group/root leaves processes running and restores the target root's view and drafts. A launch finishing after navigation becomes a background tab; its original unsent prompt is not submitted elsewhere. Open sessions are reachable across groups. Late root requests cannot replace another root's files/defaults/history. No simultaneous multi-cwd execution or sibling instruction loading is added.
 
 Main requests `get_state`, `get_messages`, and available commands. The renderer converts the returned messages into user, assistant, and tool entries. Subsequent Pi events arrive through `pidex:session:event`; `timeline.ts` applies text/thinking deltas and tool start/update/end events. Main forwards the RPC events rather than translating them into a second event protocol.
 
@@ -54,6 +57,7 @@ The authoritative channel definitions are in `src/preload/index.ts`. Important g
 
 | Bridge methods | Main channels | Purpose |
 |---|---|---|
+| `workspaceCatalog`, `saveWorkspaceGroup`, `selectWorkspace` | `pidex:workspace:catalog`, `:group`, `:select` | Read groups/roots, edit membership and persist selection |
 | `workspaces`, `addWorkspace`, `sessions` | `pidex:workspaces`, `pidex:workspace:add`, `pidex:sessions` | Discover and select local work |
 | `openSession`, `sendPrompt`, `abortSession`, `closeSession` | `pidex:session/open`, `/send`, `/abort`, `/close` | Drive active Pi sessions |
 | `previewSession` | `pidex:session:preview` | Read archive messages without starting Pi |
@@ -61,17 +65,17 @@ The authoritative channel definitions are in `src/preload/index.ts`. Important g
 | `models`, `setModel`, `settings`, `saveSettings` | `pidex:models:list`, `pidex:session:model`, `pidex:settings:get`, `:save` | Model discovery and per-workspace defaults |
 | `onSessionEvent`, `onSessionExit` | `pidex:session:event`, `pidex:session:exit` | Subscribe to runtime events; each subscription returns cleanup |
 
-Workspace helpers validate known workspaces and file containment. Realpath checks reject previews outside the workspace, including symlinks that escape it. Text previews are limited to 1 MB and reject binary files. Git commands use argument arrays, literal pathspecs where needed, and disable external diff/textconv helpers. Session previews validate the Pi archive root and JSONL extension and reject archives larger than 16 MB; resuming uses Pi directly.
+Workspace helpers validate known workspaces and file containment. Realpath checks reject previews outside the workspace, including symlinks that escape it. Text previews are limited to 1 MB and reject binary files. Git commands use argument arrays, literal pathspecs where needed, and disable external diff/textconv helpers. Session previews validate the Pi archive root and JSONL extension and reject archives larger than 16 MB; continuation preserves the validated selected archive chain. A nested folder can stage only its own files; a commit is blocked when the shared index includes staged sibling files.
 
 ## Local state
 
-Pi session archives live under `~/.pi/agent/sessions`. pidex discovers workspace paths from session headers and merges manually added folders. Custom workspace paths and per-workspace session defaults live in Electron's user-data directory as `workspaces.json` and `session-defaults.json`.
+Pi session archives live under `~/.pi/agent/sessions`. pidex discovers workspace paths from session headers and merges manually added folders. Stable UUID roots, named groups, per-root defaults and selected group/root live in Electron userData as `workspace-registry.json`. The first load migrates `workspaces.json` and `session-defaults.json`, retaining originals and `.bak` copies. Writes use a temporary file and atomic rename; invalid/unknown schema data fails closed. Synchronous main-process transactions serialize mutations, and group edits compare prior membership before saving. Available aliases deduplicate by realpath; missing paths remain as roots and preserve history. Independent nested folders remain separate roots. Initially missing paths are canonicalized when they become available, retaining their root IDs and original path aliases. Resolved paths stay pinned; retargeting one does not relocate its sessions. Each archive is indexed by its own cwd across all supported store subdirectories, with stat-based metadata caching. Native session ID and canonical archive locator remain separate; durable pidex archive handles are deferred.
 
 History preview follows the archive's current parent chain so abandoned branches are not mixed into the displayed conversation. Archive metadata scans read a bounded prefix, so displayed message counts and model metadata can be incomplete for large sessions. The full active branch is read separately for preview.
 
 Workspace inspection reads the file tree and Git branch/status. It refreshes on focus, view/runtime-state changes, and every 15 seconds. There is no filesystem watcher. File discovery skips common dependency/build directories and symlinks and is capped at 3,000 files and seven directory levels.
 
-Drafts, open tabs, transcript selection, and expanded rows are in-memory UI state. Scroll position and expansion are not persisted when a transcript is reopened.
+Per-root views, new-session/history drafts, unsaved settings drafts, open tabs, transcript selection, and expanded rows are in-memory UI state. Restoring an interrupted history load retries the saved archive/entry, while completed error states require explicit retry. Settings cache only dirty drafts; clean views follow saved defaults. Changes views remount per root and late mutation results are checked against their original navigation generation. Scroll position and expansion are not persisted when a transcript is reopened.
 
 ## Transcript rendering
 

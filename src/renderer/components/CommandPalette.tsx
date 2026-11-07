@@ -88,14 +88,14 @@ export function CommandPalette({
         run: () => onCommand(`/${c.name} `),
       })),
       ...workspaces.map((ws) => ({
-        id: ws.cwd,
+        id: ws.dirName,
         title: ws.name,
         detail: ws.cwd,
         category: 'Projects' as const,
         run: () => onWorkspace(ws),
       })),
       ...sessions.map((s) => ({
-        id: s.id,
+        id: `session:${s.file}`,
         title: s.title,
         detail: `${s.messageCount} messages / ${s.model || 'Pi'}`,
         category: 'Sessions' as const,

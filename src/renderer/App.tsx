@@ -1,3 +1,4 @@
+import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { SessionTree, EntryTree } from './components/SessionTree';
 import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
@@ -28,7 +29,8 @@ function App() {
   const [palette, setPalette] = useState(false);
   const [sessionQuery, setSessionQuery] = useState('');
   const [allHistory, setAllHistory] = useState(false);
-  const [paletteFile, setPaletteFile] = useState('');
+  const [paletteFiles, setPaletteFiles] = useState<Record<string, string>>({});
+  const paletteFile = paletteFiles[b.selected] ?? '';
   const [resetSettings, setResetSettings] = useState(0);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -59,29 +61,35 @@ function App() {
   });
 
   const composer = (placeholder?: string, label?: string) => (
-    <Composer
-      draft={b.draft}
-      onDraft={b.onDraft}
-      onSend={b.send}
-      onStop={() => active && b.run(() => api.abortSession(active.runtimeId))}
-      onAttach={b.attach}
-      model={b.currentModel}
-      models={b.models}
-      onModel={b.changeModel}
-      running={view === 'session' && active?.running}
-      disabled={
-        !ws ||
-        (view === 'session' && active?.exited) ||
-        b.previewLoading ||
-        (view === 'history' && !preview?.ready)
-      }
-      busy={b.busy}
-      placeholder={placeholder}
-      label={label}
-      commands={active?.commands ?? []}
-      modelDisabled={view === 'history'}
-      allowDefaultModel={view === 'new' || !active}
-    />
+    <div className="wb-composer-target">
+      <p className="wb-execution-root" title={ws?.cwd}>
+        Run in {ws?.name ?? 'chosen root'} · {branch} · {ws?.cwd}
+      </p>
+      <Composer
+        draft={b.draft}
+        onDraft={b.onDraft}
+        onSend={b.send}
+        onStop={() => active && b.run(() => api.abortSession(active.runtimeId))}
+        onAttach={b.attach}
+        model={b.currentModel}
+        models={b.models}
+        onModel={b.changeModel}
+        running={view === 'session' && active?.running}
+        disabled={
+          !ws ||
+          ws.availability !== 'available' ||
+          (view === 'session' && active?.exited) ||
+          b.previewLoading ||
+          (view === 'history' && !preview?.ready)
+        }
+        busy={b.busy}
+        placeholder={placeholder}
+        label={label}
+        commands={active?.commands ?? []}
+        modelDisabled={view === 'history'}
+        allowDefaultModel={view === 'new' || !active}
+      />
+    </div>
   );
   const filteredSessions = sessions.filter((s) =>
     `${s.title} ${s.model}`.toLowerCase().includes(sessionQuery.toLowerCase()),
@@ -97,7 +105,7 @@ function App() {
   }[view];
   const branch = details.branch || ws?.branch || 'local';
   const context = `${ws?.name ?? 'pidex'} / ${branch} / ${view === 'history' ? `${sessions.length} sessions` : view === 'changes' ? `${details.changes.length} changes` : view === 'settings' ? 'workspace defaults' : 'local workspace'}`;
-  const live = b.tabs.filter((t) => t.cwd === ws?.cwd && !t.exited);
+  const live = b.tabs;
   const exportSession = () => {
     if (!preview) return;
     const text = preview.entries
@@ -165,15 +173,16 @@ function App() {
       <div className="wb-body">
         {sidebar && (
           <aside className="wb-sidebar" aria-label="Workspace navigation">
-            <button
-              type="button"
-              className="wb-project-select"
-              onClick={() => setPalette(true)}
-            >
-              <Icon name="folder-open" />
-              <span>{ws?.name ?? 'Choose a project'}</span>
-              <Icon name="chevron-down" />
-            </button>
+            <WorkspaceNavigation
+              roots={b.workspaces}
+              groups={b.groups}
+              groupId={b.groupId}
+              rootId={b.selected}
+              onGroup={b.selectGroup}
+              onRoot={b.selectWorkspace}
+              onSave={b.saveGroup}
+              onAdd={() => void b.addWorkspace()}
+            />
             <p className="wb-meta wb-branch">{branch} / local workspace</p>
             <BracketButton
               primary
@@ -181,7 +190,7 @@ function App() {
                 b.setActiveId(null);
                 b.navigate('new');
               }}
-              disabled={!ws}
+              disabled={!ws || ws.availability !== 'available'}
             >
               New session
             </BracketButton>
@@ -211,28 +220,29 @@ function App() {
               </NavItem>
             </nav>
             <div className="wb-sidebar-scroll">
-              <p className="wb-eyebrow">Recent sessions</p>
-              {live
-                .filter((t) => !sessions.some((s) => s.file === t.file))
-                .map((t) => (
-                  <button
-                    key={t.runtimeId}
-                    type="button"
-                    className={`wb-session-item${active?.runtimeId === t.runtimeId && view === 'session' ? ' is-active' : ''}`}
-                    onClick={() => {
-                      b.setActiveId(t.runtimeId);
-                      b.navigate('session');
-                    }}
-                  >
-                    <span>{t.title}</span>
-                    <small>
-                      {t.running ? 'Working' : 'Ready'} / this window
-                    </small>
-                  </button>
-                ))}
+              <p className="wb-eyebrow">Open sessions</p>
+              {live.map((t) => (
+                <button
+                  key={t.runtimeId}
+                  type="button"
+                  className={`wb-session-item${active?.runtimeId === t.runtimeId && view === 'session' ? ' is-active' : ''}`}
+                  title={t.cwd}
+                  onClick={() => b.activateTab(t)}
+                >
+                  <span>{t.title}</span>
+                  <small>
+                    {t.exited ? 'Exited' : t.running ? 'Running' : 'Ready'} /
+                    this window
+                  </small>
+                  <small title={t.cwd}>
+                    {b.workspaces.find((w) => w.cwd === t.cwd)?.name} · {t.cwd}
+                  </small>
+                </button>
+              ))}
+              <p className="wb-eyebrow">Recent sessions · this root</p>
               {sessions.slice(0, 3).map((s) => (
                 <button
-                  key={s.id}
+                  key={s.file}
                   type="button"
                   className={`wb-session-item${active?.file === s.file && view === 'session' ? ' is-active' : ''}`}
                   onClick={() => b.showSession(s)}
@@ -252,19 +262,6 @@ function App() {
                   Your sessions will appear here.
                 </p>
               )}
-              <p className="wb-eyebrow wb-other-projects">Other projects</p>
-              {b.workspaces
-                .filter((w) => w.dirName !== b.selected)
-                .map((w) => (
-                  <NavItem
-                    key={w.dirName}
-                    icon="folder"
-                    detail={w.sessionCount}
-                    onClick={() => b.selectWorkspace(w)}
-                  >
-                    {w.name}
-                  </NavItem>
-                ))}
               <NavItem icon="plus" onClick={() => void b.addWorkspace()}>
                 Open project
               </NavItem>
@@ -342,6 +339,21 @@ function App() {
                   </BracketButton>
                 )}
               </header>
+              {ws.availability !== 'available' && (
+                <div className="wb-root-unavailable" role="status">
+                  <strong>
+                    {ws.availability === 'missing'
+                      ? 'Missing folder'
+                      : 'Folder unavailable'}
+                  </strong>
+                  <p>{ws.cwd}</p>
+                  <p>
+                    Restore the original folder to start or continue a session.
+                    Saved history remains available; adding another root does
+                    not relocate it.
+                  </p>
+                </div>
+              )}
               {view === 'new' && (
                 <div className="wb-start-scroll">
                   <div className="wb-start">
@@ -365,11 +377,17 @@ function App() {
                             if (next) b.selectWorkspace(next);
                           }}
                         >
-                          {b.workspaces.map((w) => (
-                            <option key={w.dirName} value={w.dirName}>
-                              {w.name} / {w.branch || 'local'}
-                            </option>
-                          ))}
+                          {b.workspaces
+                            .filter((w) =>
+                              b.groups
+                                .find((g) => g.id === b.groupId)
+                                ?.rootIds.includes(w.dirName),
+                            )
+                            .map((w) => (
+                              <option key={w.dirName} value={w.dirName}>
+                                {w.name} / {w.branch || 'local'} / {w.cwd}
+                              </option>
+                            ))}
                         </select>
                         <Icon name="chevron-down" />
                       </label>
@@ -532,6 +550,7 @@ function App() {
                 ))}
               {view === 'changes' && (
                 <ChangesView
+                  key={ws.dirName}
                   cwd={ws.cwd}
                   details={details}
                   onDetails={b.setDetails}
@@ -627,6 +646,7 @@ function App() {
                                   disabled={
                                     b.busy ||
                                     !preview.ready ||
+                                    ws.availability !== 'available' ||
                                     !preview.tree?.canContinue ||
                                     !preview.entryId
                                   }
@@ -657,20 +677,24 @@ function App() {
                   </section>
                 </div>
               )}
-              {view === 'settings' && (
-                <SettingsView
-                  key={ws.cwd}
-                  cwd={ws.cwd}
-                  models={b.models}
-                  modelError={b.modelError}
-                  modelsLoading={b.modelsLoading}
-                  defaults={b.defaults}
-                  resetSignal={resetSettings}
-                  onSaved={b.setDefaults}
-                  report={b.report}
-                  onFiles={() => b.navigate('files')}
-                />
-              )}
+              {view === 'settings' &&
+                (b.defaultsRoot !== ws.dirName ? (
+                  <p className="wb-meta">Loading root defaults…</p>
+                ) : (
+                  <SettingsView
+                    key={ws.cwd}
+                    draftCache={b.settingsDrafts.current}
+                    cwd={ws.cwd}
+                    models={b.models}
+                    modelError={b.modelError}
+                    modelsLoading={b.modelsLoading}
+                    defaults={b.defaults}
+                    resetSignal={resetSettings}
+                    onSaved={(value) => b.setRootDefaults(ws.cwd, value)}
+                    report={b.report}
+                    onFiles={() => b.navigate('files')}
+                  />
+                ))}
               {view === 'skills' && (
                 <SkillsView
                   key={ws.cwd}
@@ -681,13 +705,21 @@ function App() {
                 />
               )}
               {view === 'files' && (
-                <FilesView
-                  key={ws.cwd}
-                  cwd={ws.cwd}
-                  files={details.files}
-                  initialFile={paletteFile}
-                  report={b.report}
-                />
+                <>
+                  {details.filesTruncated && (
+                    <p className="wb-root-unavailable" role="status">
+                      File list limited to 3,000 files and seven directory
+                      levels. Select a deeper root to browse more.
+                    </p>
+                  )}
+                  <FilesView
+                    key={ws.cwd}
+                    cwd={ws.cwd}
+                    files={details.files}
+                    initialFile={paletteFile}
+                    report={b.report}
+                  />
+                </>
               )}
             </>
           )}
@@ -721,15 +753,17 @@ function App() {
         <span className={active?.exited ? 'wb-muted' : ''}>
           {!ws
             ? 'RUNTIME IDLE'
-            : active?.exited
-              ? 'PI EXITED'
-              : active?.running
-                ? 'PI WORKING'
-                : b.busy
-                  ? 'PI CONNECTING'
-                  : b.modelError && !active
-                    ? 'PI UNAVAILABLE'
-                    : 'PI READY'}
+            : ws.availability !== 'available'
+              ? 'ROOT UNAVAILABLE'
+              : active?.exited
+                ? 'PI EXITED'
+                : active?.running
+                  ? 'PI WORKING'
+                  : b.busy
+                    ? 'PI CONNECTING'
+                    : b.modelError && !active
+                      ? 'PI UNAVAILABLE'
+                      : 'PI READY'}
         </span>
         <span>
           {view === 'history'
@@ -748,7 +782,10 @@ function App() {
           onSession={b.showSession}
           onNavigate={b.navigate}
           onFile={(file) => {
-            setPaletteFile(file);
+            setPaletteFiles((previous) => ({
+              ...previous,
+              [b.selected]: file,
+            }));
             b.navigate('files');
           }}
           onCommand={b.useSkill}

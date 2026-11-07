@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Deterministic Pi RPC peer for UI tests. It never calls a model or executes tools.
 const fs = require('node:fs');
+const path = require('node:path');
 const readline = require('node:readline');
 const args = process.argv.slice(2);
 let file = args.includes('--session')
@@ -40,6 +41,32 @@ if (file) {
   };
   records.push(entry);
   fs.appendFileSync(file, '\n' + JSON.stringify(entry) + '\n');
+} else if (!args.includes('--no-session')) {
+  // Pi assigns a path immediately, but does not persist setup-only sessions.
+  const directory = path.join(
+    process.env.PIDEX_SESSIONS_ROOT ??
+      process.env.PIDEX_E2E_USER_DATA ??
+      require('node:os').tmpdir(),
+    'rpc-new',
+  );
+  fs.mkdirSync(directory, { recursive: true });
+  const id = require('node:crypto').randomUUID();
+  file = path.join(directory, `${id}.jsonl`);
+  records = [
+    {
+      type: 'session',
+      version: 3,
+      id,
+      cwd: process.cwd(),
+      timestamp: new Date().toISOString(),
+    },
+    {
+      type: 'thinking_level_change',
+      id: `setup-${process.pid}`,
+      parentId: null,
+      thinkingLevel: 'medium',
+    },
+  ];
 }
 let messages = branchMessages();
 let promptSeq = 0;
@@ -70,6 +97,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         ...command,
         sessionFile: file,
         runtimePid: process.pid,
+        cwd: process.cwd(),
       }) + '\n',
     );
   switch (command.type) {
@@ -82,7 +110,24 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
           success: false,
           error: 'Fixture state refresh failure.',
         });
-      else reply({ model, isStreaming: streaming, sessionFile: file });
+      else if (process.env.PIDEX_RPC_STATE_DELAY_CWD === process.cwd())
+        setTimeout(
+          () =>
+            reply({
+              model,
+              isStreaming: streaming,
+              sessionFile: file,
+              messageCount: messages.length,
+            }),
+          500,
+        );
+      else
+        reply({
+          model,
+          isStreaming: streaming,
+          sessionFile: file,
+          messageCount: messages.length,
+        });
       break;
     case 'get_entries':
       {
@@ -169,6 +214,14 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       reply();
       break;
     case 'prompt': {
+      if (command.message === 'Switch to missing archive for test') {
+        file = `${file}.missing`;
+        records = [];
+        messages = [];
+        reply();
+        event('agent_end');
+        break;
+      }
       if (
         command.message === 'Switch archive for test' &&
         process.env.PIDEX_RPC_SWITCH_FILE
@@ -210,7 +263,13 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         };
         records.push(entry);
         // Accept fixtures with or without a final newline.
-        fs.appendFileSync(file, '\n' + JSON.stringify(entry) + '\n');
+        if (fs.existsSync(file))
+          fs.appendFileSync(file, '\n' + JSON.stringify(entry) + '\n');
+        else
+          fs.writeFileSync(
+            file,
+            records.map((record) => JSON.stringify(record)).join('\n') + '\n',
+          );
       }
       messages.push(message);
       reply();

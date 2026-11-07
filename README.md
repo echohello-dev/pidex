@@ -42,19 +42,24 @@ These are captures of real Electron interactions with a temporary Git workspace 
 
 ## What works today
 
-- Add local workspaces and discover existing Pi sessions.
+- Group existing local folders into named workspaces and discover Pi sessions by their original working directory.
 - Start, stop, steer, resume, and fork sessions; preview history before launching Pi.
 - Browse linked session archives and branch entries; preview and continue the selected path.
 - Render streamed Markdown, thinking, and expandable tool output.
 - Browse files, review diffs, stage changes, and commit.
 - Discover workspace and global skills, switch models, and save model and reasoning defaults per workspace.
-- Use quick switch for workspaces, sessions, files, and commands.
+- Switch roots while sessions run in the background; retain per-root drafts, views and model defaults.
+- Use quick switch for roots, sessions, files, and commands.
 
 Session history shows source/fork relationships and an entry tree with selected and archive-tip markers. Select a branch tip or an earlier entry to preview its parent chain. Resume at the archive tip continues in place; **Resume in new fork** continues a historical selection in a separate archive and preserves the source. **Fork from here** uses the selected entry. Pi 1.5.0 RPC does not expose arbitrary-entry navigation, so forks extract a native branch archive before launching Pi so even runtime startup writes preserve the source. Continuation requires an intact Pi v3 archive within the 16 MiB browsing limit. See [ADR 0013](docs/adr/0013-session-branch-selection.md) for runtime semantics and limits.
 
+Use **Create workspace** or **Edit workspace** in the sidebar to name a group and select its roots. **Add root** chooses an existing folder. Each session runs in one root; the composer shows its path. Switching roots leaves open sessions running and makes them available under **Open sessions**. Files, Changes, History and defaults remain scoped to the selected root. A missing folder retains readable history, but cannot start or resume Pi until its original path is available. Adding another folder does not relocate a session. Group membership does not change Pi's tool permissions or load sibling roots into its context.
+
+Existing `workspaces.json` and `session-defaults.json` records migrate to `workspace-registry.json` in Electron userData. Original files and `.bak` copies remain intact. Workspace groups and selection persist; live processes and drafts do not restart after app quit. A package folder shares its Git worktree's index: pidex refuses its commit when staged changes exist outside that folder. Open the repository top level to review the whole index.
+
 Active sessions and history use a virtualized transcript. A local development benchmark with 4,500 mixed entries opened in about 1.4 seconds, down from 8.3 seconds, and mounted fewer than 100 transcript DOM nodes instead of 39,000. Timings vary by machine and load; see [ADR 0011](docs/adr/0011-virtualized-transcript.md) for the method and limits.
 
-Recovery summaries and work-state signals, folder-to-folder context migration, and multi-root workflows remain on the [issue tracker](https://github.com/echohello-dev/pidex/issues).
+Automatic repository/worktree grouping, group-wide history, recovery summaries, and folder-to-folder context transfer remain on the [issue tracker](https://github.com/echohello-dev/pidex/issues).
 
 ## Install
 

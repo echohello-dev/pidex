@@ -1,46 +1,29 @@
 import { loadArchive, selectedPath, readSessionTree } from './session-tree';
-import { app, dialog, ipcMain, shell, type BrowserWindow } from 'electron';
+import { dialog, ipcMain, shell, type BrowserWindow } from 'electron';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { RpcSession } from './rpc';
-import { listWorkspaces } from './sessions';
+import type { WorkspaceRegistry } from './workspaces';
 import {
-  DEFAULTS,
+  assertCommitScope,
   filePatch,
   git,
   inside,
   inspectWorkspace,
   listSkills,
   readText,
-  validateDefaults,
   workspacePath,
-  type Defaults,
 } from './workbench';
 
 export function registerWorkbench(
   getWindow: () => BrowserWindow | null,
-  customWorkspaces: () => string[],
+  registry: () => WorkspaceRegistry,
   sessions: Map<string, RpcSession>,
+  validateRuntime: (runtime: RpcSession) => Promise<void>,
 ) {
-  const settingsFile = () =>
-    path.join(app.getPath('userData'), 'session-defaults.json');
   async function knownWorkspace(cwd: unknown): Promise<string> {
-    if (typeof cwd !== 'string') throw new Error('Choose a workspace first.');
-    const known = await listWorkspaces(customWorkspaces());
-    if (!known.some((w) => w.cwd === cwd))
-      throw new Error('Unknown workspace.');
-    return cwd;
-  }
-  async function readDefaults(): Promise<Record<string, Defaults>> {
-    try {
-      const parsed = JSON.parse(await fs.readFile(settingsFile(), 'utf8'));
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? parsed
-        : {};
-    } catch {
-      return {};
-    }
+    return registry().resolve(cwd).path;
   }
   const handle = (
     channel: string,
@@ -107,6 +90,7 @@ export function registerWorkbench(
     } else if (action === 'commit') {
       if (typeof file !== 'string' || !file.trim())
         throw new Error('Enter a commit message.');
+      await assertCommitScope(cwd);
       await git(cwd, ['commit', '-m', file.trim()]);
     } else throw new Error('Unsupported Git action.');
     return inspectWorkspace(cwd);
@@ -135,20 +119,11 @@ export function registerWorkbench(
   });
   handle(
     'settings:get',
-    async (cwd) =>
-      (await readDefaults())[await knownWorkspace(cwd)] ?? DEFAULTS,
+    async (cwd) => registry().resolve(cwd, false).defaults,
   );
-  handle('settings:save', async (cwd, value) => {
-    cwd = await knownWorkspace(cwd);
-    const settings = await readDefaults();
-    const defaults = validateDefaults(value);
-    settings[cwd] = defaults;
-    await fs.mkdir(app.getPath('userData'), { recursive: true });
-    const tmp = `${settingsFile()}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(settings, null, 2));
-    await fs.rename(tmp, settingsFile());
-    return defaults;
-  });
+  handle('settings:save', async (cwd, value) =>
+    registry().saveDefaults(cwd, value),
+  );
   handle('settings:providers', async () => {
     const dir = path.join(os.homedir(), '.pi', 'agent');
     await fs.mkdir(dir, { recursive: true });
@@ -157,7 +132,14 @@ export function registerWorkbench(
   });
   handle('models:list', async (cwd) => {
     cwd = await knownWorkspace(cwd);
-    const existing = [...sessions.values()].find((s) => s.cwd === cwd);
+    let existing = [...sessions.values()].find((s) => s.cwd === cwd);
+    if (existing) {
+      try {
+        await validateRuntime(existing);
+      } catch {
+        existing = undefined;
+      }
+    }
     const runtime =
       existing ?? new RpcSession('model-probe', cwd, undefined, true);
     try {
@@ -187,6 +169,7 @@ export function registerWorkbench(
   handle('session:model', async (id, provider, modelId) => {
     const runtime = sessions.get(id);
     if (!runtime) throw new Error('Resume the session to change its model.');
+    await validateRuntime(runtime);
     const result = await runtime.command({
       type: 'set_model',
       provider,
@@ -195,18 +178,4 @@ export function registerWorkbench(
     if (!result.success)
       throw new Error(result.error ?? 'Could not change model.');
   });
-}
-
-export async function sessionDefaults(cwd: string): Promise<Defaults> {
-  try {
-    const all = JSON.parse(
-      await fs.readFile(
-        path.join(app.getPath('userData'), 'session-defaults.json'),
-        'utf8',
-      ),
-    );
-    return validateDefaults(all[cwd] ?? DEFAULTS);
-  } catch {
-    return DEFAULTS;
-  }
 }
