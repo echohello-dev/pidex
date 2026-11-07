@@ -1,3 +1,4 @@
+import type { WorkspaceGroup, Availability } from '../main/workspaces';
 import type { SessionTree } from '../main/session-tree';
 import type {
   Defaults,
@@ -16,6 +17,7 @@ type ModelInfo = {
 };
 
 type WorkspaceInfo = {
+  availability: Availability;
   dirName: string;
   name: string;
   cwd: string;
@@ -25,6 +27,7 @@ type WorkspaceInfo = {
 };
 
 type SessionInfo = {
+  cwd: string;
   id: string;
   file: string;
   title: string;
@@ -43,6 +46,7 @@ type SessionState = {
 };
 
 type OpenResult = {
+  cwd?: string;
   sessionId?: string;
   state?: SessionState | null;
   messages?: unknown[];
@@ -61,11 +65,25 @@ type SessionEventPayload = {
   event: Record<string, unknown> & { type: string };
 };
 
+type WorkspaceCatalog = {
+  roots: WorkspaceInfo[];
+  groups: WorkspaceGroup[];
+  selected?: { groupId: string; rootId: string };
+};
+type GroupInput = {
+  id?: string;
+  name: string;
+  rootIds: string[];
+  expectedRoots?: string[];
+};
 type PidexApi = {
   platform: string;
   versions: { electron: string; node: string };
   workspaces: () => Promise<WorkspaceInfo[]>;
-  addWorkspace: () => Promise<{ cwd?: string; error?: string }>;
+  workspaceCatalog: () => Promise<WorkspaceCatalog>;
+  saveWorkspaceGroup: (group: GroupInput) => Promise<WorkspaceCatalog>;
+  selectWorkspace: (groupId: string, rootId: string) => Promise<void>;
+  addWorkspace: (groupId?: string) => Promise<{ cwd?: string; error?: string }>;
   inspectWorkspace: (cwd: string) => Promise<Result<WorkspaceDetails>>;
   readFile: (cwd: string, file: string) => Promise<Result<string>>;
   filePatch: (
@@ -123,6 +141,9 @@ declare global {
 
 export type {
   WorkspaceInfo,
+  WorkspaceCatalog,
+  WorkspaceGroup,
+  GroupInput,
   SessionInfo,
   SessionState,
   OpenResult,

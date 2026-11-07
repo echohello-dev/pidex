@@ -48,6 +48,32 @@ describe('command palette', () => {
     );
   });
 
+  it('distinguishes archive occurrences with copied native IDs', () => {
+    const callbacks = props();
+    const first = {
+      cwd: '/code/api',
+      id: 'copied-id',
+      file: '/sessions/first.jsonl',
+      title: 'First archive',
+      model: '',
+      timestamp: '',
+      messageCount: 1,
+    };
+    const second = {
+      ...first,
+      file: '/sessions/second.jsonl',
+      title: 'Second archive',
+    };
+    const { rerender } = render(
+      <CommandPalette {...callbacks} sessions={[first, second]} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Sessions/ }));
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+    rerender(<CommandPalette {...callbacks} sessions={[second]} />);
+    fireEvent.click(screen.getByRole('option', { name: /Second archive/ }));
+    expect(callbacks.onSession).toHaveBeenCalledExactlyOnceWith(second);
+  });
+
   it('handles an empty search without invoking an action and closes on Escape', () => {
     const callbacks = props();
     render(<CommandPalette {...callbacks} />);

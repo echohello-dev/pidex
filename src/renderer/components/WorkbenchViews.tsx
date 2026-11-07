@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PierrePatch } from './PierreDiff';
 import { BracketButton } from './BracketButton';
 import { EmptyState, Icon, NavItem, SearchField } from './WorkbenchControls';
@@ -11,6 +11,14 @@ import type {
   SlashCommand,
   WorkspaceDetails,
 } from '../api';
+
+function sameDefaults(left: Defaults, right: Defaults): boolean {
+  return (
+    left.model === right.model &&
+    left.provider === right.provider &&
+    left.thinking === right.thinking
+  );
+}
 
 function Select({
   label,
@@ -481,6 +489,7 @@ export function SkillsView({
 }
 
 export function SettingsView({
+  draftCache,
   cwd,
   models,
   modelError,
@@ -491,6 +500,7 @@ export function SettingsView({
   report,
   onFiles,
 }: {
+  draftCache?: Map<string, Defaults>;
   cwd: string;
   models: ModelInfo[];
   modelError: string;
@@ -501,7 +511,8 @@ export function SettingsView({
   report: (e: unknown) => void;
   onFiles: () => void;
 }) {
-  const [draft, setDraft] = useState(defaults);
+  const [draft, setDraft] = useState(() => draftCache?.get(cwd) ?? defaults);
+  const lastDefaults = useRef(defaults);
   const [busy, setBusy] = useState(false);
   const [category, setCategory] = useState('Models & access');
   const [saved, setSaved] = useState(false);
@@ -510,8 +521,12 @@ export function SettingsView({
   );
   const previousReset = useState(resetSignal)[0];
   useEffect(() => {
-    setDraft(defaults);
-  }, [defaults]);
+    const next = sameDefaults(draft, lastDefaults.current) ? defaults : draft;
+    lastDefaults.current = defaults;
+    if (!sameDefaults(draft, next)) setDraft(next);
+    if (sameDefaults(next, defaults)) draftCache?.delete(cwd);
+    else draftCache?.set(cwd, next);
+  }, [defaults, draft, draftCache, cwd]);
   useEffect(() => {
     if (resetSignal !== previousReset) {
       setDraft({ ...DEFAULTS });
@@ -582,7 +597,10 @@ export function SettingsView({
               <div className="wb-settings-scope">
                 <span className="wb-eyebrow">Apply to</span>
                 <div className="wb-static-select">This workspace</div>
-                <p className="wb-meta">Global Pi defaults remain available.</p>
+                <p className="wb-meta">
+                  New-session defaults for {cwd}. Global Pi defaults remain
+                  available.
+                </p>
               </div>
               <div className="wb-section-heading">
                 <h2>Providers</h2>

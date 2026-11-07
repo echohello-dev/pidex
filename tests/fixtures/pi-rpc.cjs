@@ -70,6 +70,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         ...command,
         sessionFile: file,
         runtimePid: process.pid,
+        cwd: process.cwd(),
       }) + '\n',
     );
   switch (command.type) {
@@ -82,6 +83,11 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
           success: false,
           error: 'Fixture state refresh failure.',
         });
+      else if (process.env.PIDEX_RPC_STATE_DELAY_CWD === process.cwd())
+        setTimeout(
+          () => reply({ model, isStreaming: streaming, sessionFile: file }),
+          500,
+        );
       else reply({ model, isStreaming: streaming, sessionFile: file });
       break;
     case 'get_entries':

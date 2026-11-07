@@ -109,6 +109,76 @@ describe('workspace settings', () => {
     expect(callbacks.onSaved).not.toHaveBeenCalled();
   });
 
+  it('does not resurrect clean cached defaults after the model changes outside Settings', async () => {
+    const saveSettings = vi
+      .fn<PidexApi['saveSettings']>()
+      .mockImplementation(async (_cwd, value) => ({ data: value }));
+    vi.stubGlobal('pidex', { saveSettings } satisfies Partial<PidexApi>);
+    const cache = new Map<string, Defaults>();
+    const callbacks = props();
+    const first = {
+      model: 'sonnet',
+      provider: 'anthropic',
+      thinking: 'medium',
+    };
+    const second = {
+      model: 'other',
+      provider: 'anthropic',
+      thinking: 'medium',
+    };
+    const models = [
+      ...callbacks.models,
+      { id: 'other', name: 'Other', provider: 'anthropic' },
+    ];
+    const { unmount } = render(
+      <SettingsView
+        {...callbacks}
+        defaults={first}
+        models={models}
+        draftCache={cache}
+      />,
+    );
+    unmount();
+    render(
+      <SettingsView
+        {...callbacks}
+        defaults={second}
+        models={models}
+        draftCache={cache}
+      />,
+    );
+    expect(screen.getByLabelText('Default model')).toHaveValue(
+      'anthropic/other',
+    );
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Reasoning effort'), {
+      target: { value: 'high' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(saveSettings).toHaveBeenCalledWith('/project', {
+        ...second,
+        thinking: 'high',
+      }),
+    );
+  });
+
+  it('retains genuine dirty drafts but removes them from the cache when canceled', () => {
+    const cache = new Map<string, Defaults>();
+    const callbacks = props();
+    const { unmount } = render(
+      <SettingsView {...callbacks} draftCache={cache} />,
+    );
+    fireEvent.change(screen.getByLabelText('Reasoning effort'), {
+      target: { value: 'high' },
+    });
+    unmount();
+    render(<SettingsView {...callbacks} draftCache={cache} />);
+    expect(screen.getByLabelText('Reasoning effort')).toHaveValue('high');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(cache.has('/project')).toBe(false);
+  });
+
   it('persists the reduced motion preference and reads it when reopened', () => {
     const { unmount } = render(<SettingsView {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Appearance' }));

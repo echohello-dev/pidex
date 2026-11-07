@@ -313,11 +313,15 @@ describe('Figma workbench in Electron', () => {
     );
     const settings = JSON.parse(
       await fs.readFile(
-        path.join(fixtureRoot, 'user-data', 'session-defaults.json'),
+        path.join(fixtureRoot, 'user-data', 'workspace-registry.json'),
         'utf8',
       ),
     );
-    expect(settings[project].thinking).toBe('high');
+    const canonicalProject = await fs.realpath(project);
+    expect(
+      settings.roots.find((r: { path: string }) => r.path === canonicalProject)
+        .defaults.thinking,
+    ).toBe('high');
   });
 
   it('supports quick-switch keyboard navigation, files, skills and collapsed navigation', async () => {
@@ -430,7 +434,7 @@ describe('Figma workbench in Electron', () => {
       env: {
         ...process.env,
         NODE_ENV: 'development',
-        PIDEX_E2E_CWD: path.join(fixtureRoot, 'missing-project'),
+        PIDEX_E2E_CWD: '',
         PIDEX_E2E_RENDERER_URL: inject('rendererUrl'),
         PIDEX_E2E_USER_DATA: userData,
         PIDEX_SESSIONS_ROOT: archive,

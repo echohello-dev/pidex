@@ -1527,3 +1527,143 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* A group organizes roots; the execution destination remains explicit. */
+.wb-root-navigation {
+  padding: 0 12px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.wb-root-group {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.wb-root-group select,
+.wb-group-editor input[type='text'],
+.wb-group-editor input:not([type]) {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface, #161b22);
+  color: var(--copy);
+  border: 1px solid var(--line);
+  padding: 7px;
+  border-radius: 4px;
+}
+.wb-group-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.wb-group-actions button,
+.wb-add-root {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.wb-group-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.wb-root-list {
+  max-height: 150px;
+  overflow: auto;
+  margin-top: 8px;
+}
+.wb-root-list > button {
+  display: grid;
+  width: 100%;
+  text-align: left;
+  padding: 7px;
+  gap: 3px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--copy);
+  background: transparent;
+  cursor: pointer;
+}
+.wb-root-list > button[aria-current] {
+  background: #1c2624;
+  border-color: #3b6653;
+}
+.wb-root-list small,
+.wb-group-editor small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--muted);
+}
+.wb-group-editor {
+  margin: 10px 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+}
+.wb-group-editor fieldset {
+  border: 0;
+  padding: 8px 0;
+  max-height: 160px;
+  overflow: auto;
+}
+.wb-group-editor fieldset label {
+  display: flex;
+  gap: 6px;
+  padding: 5px 0;
+}
+.wb-group-editor fieldset span {
+  min-width: 0;
+}
+.wb-execution-root {
+  margin: 6px 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.wb-root-unavailable {
+  margin: 16px 28px;
+  padding: 12px;
+  border: 1px solid #806233;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.wb-sidebar > .wb-root-navigation {
+  flex-shrink: 0;
+}
+
+.wb-composer-target {
+  min-width: 0;
+  flex-shrink: 0;
+  display: grid;
+  gap: 6px;
+}
+.wb-composer-target .wb-execution-root {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 16px;
+  margin: 0;
+}
+.wb-sidebar-scroll .wb-session-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fit destination context into the conversation's existing 16px composer gap. */
+.wb-conversation .wb-composer-target {
+  position: relative;
+  display: block;
+}
+.wb-conversation .wb-composer-target .wb-execution-root {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  right: 0;
+}

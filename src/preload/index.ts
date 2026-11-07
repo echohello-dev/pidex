@@ -12,7 +12,13 @@ contextBridge.exposeInMainWorld('pidex', {
     node: process.versions.node,
   },
   workspaces: () => ipcRenderer.invoke('pidex:workspaces'),
-  addWorkspace: () => ipcRenderer.invoke('pidex:workspace:add'),
+  workspaceCatalog: () => ipcRenderer.invoke('pidex:workspace:catalog'),
+  saveWorkspaceGroup: (group: unknown) =>
+    ipcRenderer.invoke('pidex:workspace:group', group),
+  selectWorkspace: (groupId: string, rootId: string) =>
+    ipcRenderer.invoke('pidex:workspace:select', groupId, rootId),
+  addWorkspace: (groupId?: string) =>
+    ipcRenderer.invoke('pidex:workspace:add', groupId),
   inspectWorkspace: (cwd: string) =>
     ipcRenderer.invoke('pidex:workspace:inspect', cwd),
   readFile: (cwd: string, file: string) =>

@@ -29,6 +29,7 @@ export type WorkspaceDetails = {
   changes: GitChange[];
   files: string[];
   gitError?: string;
+  filesTruncated?: boolean;
 };
 export type Defaults = { model: string; provider: string; thinking: string };
 export type SkillInfo = {
@@ -93,6 +94,21 @@ export async function git(cwd: string, args: string[]): Promise<string> {
   return stdout;
 }
 
+/** A folder narrows stage-all, but Git commit always consumes the whole index. */
+export async function assertCommitScope(cwd: string): Promise<void> {
+  const top = (await git(cwd, ['rev-parse', '--show-toplevel'])).trim();
+  const root = await fs.realpath(cwd);
+  const files = (
+    await git(top, ['diff', '--cached', '--name-only', '-z', '--no-renames'])
+  )
+    .split('\0')
+    .filter(Boolean);
+  if (files.some((file) => !inside(root, path.resolve(top, file))))
+    throw new Error(
+      'The staged index includes changes outside this root. Open the repository top-level folder to review and commit the whole index.',
+    );
+}
+
 export function parseNumstat(text: string, staged: boolean): GitChange[] {
   return text
     .split('\0')
@@ -113,10 +129,16 @@ export function parseNumstat(text: string, staged: boolean): GitChange[] {
     });
 }
 
-async function listFiles(cwd: string): Promise<string[]> {
+async function listFiles(
+  cwd: string,
+): Promise<{ files: string[]; filesTruncated: boolean }> {
   const files: string[] = [];
+  let filesTruncated = false;
   async function walk(relative: string, depth: number) {
-    if (depth > 7 || files.length >= 3000) return;
+    if (depth > 7 || files.length >= 3000) {
+      filesTruncated = true;
+      return;
+    }
     const entries = await fs.readdir(path.join(cwd, relative), {
       withFileTypes: true,
     });
@@ -126,6 +148,10 @@ async function listFiles(cwd: string): Promise<string[]> {
         a.name.localeCompare(b.name),
     );
     for (const entry of entries) {
+      if (files.length >= 3000) {
+        filesTruncated = true;
+        break;
+      }
       if (
         OMIT.has(entry.name) ||
         entry.isSymbolicLink() ||
@@ -138,11 +164,11 @@ async function listFiles(cwd: string): Promise<string[]> {
     }
   }
   await walk('', 0);
-  return files;
+  return { files, filesTruncated };
 }
 
 export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
-  const files = await listFiles(cwd);
+  const { files, filesTruncated } = await listFiles(cwd);
   try {
     const [branch, working, staged, untracked] = await Promise.all([
       git(cwd, ['branch', '--show-current']),
@@ -174,6 +200,7 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
     return {
       branch: branch.trim(),
       files,
+      filesTruncated,
       changes: [
         ...parseNumstat(working, false),
         ...parseNumstat(staged, true),
@@ -194,6 +221,7 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
       branch: '',
       changes: [],
       files,
+      filesTruncated,
       gitError: 'Git changes are unavailable for this folder.',
     };
   }

@@ -26,3 +26,4 @@ Each ADR follows this shape:
 | [0011](0011-virtualized-transcript.md) | Virtualize the session transcript | Accepted |
 | [0012](0012-release-please-calver.md) | Release Please with a CalVer adapter | Accepted |
 | [0013](0013-session-branch-selection.md) | Explicit archive branch selection over Pi RPC | Proposed |
+| [0014](0014-workspace-root-groups.md) | Group roots without changing session execution scope | Proposed |

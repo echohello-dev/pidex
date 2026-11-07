@@ -129,89 +129,113 @@ function gitBranch(cwd: string): Promise<string> {
   });
 }
 
+/** Paths identify locators, not registry roots. Missing paths remain discoverable. */
+function canonicalCwd(cwd: string): string {
+  try {
+    return fs.realpathSync(cwd);
+  } catch {
+    return path.resolve(cwd);
+  }
+}
+
+const metadata = new Map<string, { stamp: string; info: SessionInfo | null }>();
+function discoverSessions(root = SESSIONS_ROOT): SessionInfo[] {
+  const result = new Map<string, SessionInfo>();
+  const seen = new Set<string>();
+  let canonicalRoot: string;
+  try {
+    canonicalRoot = fs.realpathSync(root);
+  } catch {
+    return [];
+  }
+  function scan(directory: string, descend: boolean) {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const file = path.join(directory, entry.name);
+      if (entry.isDirectory() && descend) {
+        scan(file, false);
+        continue;
+      }
+      if (!entry.isFile() || !file.endsWith('.jsonl')) continue;
+      try {
+        const canonical = fs.realpathSync(file);
+        const relative = path.relative(canonicalRoot, canonical);
+        if (relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+          continue;
+        const stat = fs.statSync(canonical);
+        const stamp = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}`;
+        seen.add(canonical);
+        const cached = metadata.get(canonical);
+        const info =
+          cached?.stamp === stamp ? cached.info : parseSession(canonical);
+        metadata.set(canonical, { stamp, info });
+        if (info && path.isAbsolute(info.cwd)) result.set(canonical, info);
+      } catch {
+        /* One unavailable archive must not hide its siblings. */
+      }
+    }
+  }
+  scan(root, true);
+  for (const file of metadata.keys())
+    if (!seen.has(file)) metadata.delete(file);
+  return [...result.values()].sort((a, b) =>
+    b.timestamp.localeCompare(a.timestamp),
+  );
+}
+
+function matchingSessions(
+  cwd: string,
+  aliases: string[],
+  archives: SessionInfo[],
+): SessionInfo[] {
+  const canonical = canonicalCwd(cwd);
+  const known = new Set([cwd, ...aliases].map((alias) => path.resolve(alias)));
+  return archives.filter(
+    (s) => known.has(path.resolve(s.cwd)) || canonicalCwd(s.cwd) === canonical,
+  );
+}
+function sessionsForRoot(
+  cwd: string,
+  root = SESSIONS_ROOT,
+  aliases: string[] = [],
+): SessionInfo[] {
+  return matchingSessions(cwd, aliases, discoverSessions(root));
+}
+
 async function listWorkspaces(
   extraCwds: string[] = [],
 ): Promise<WorkspaceInfo[]> {
-  const byDir = new Map<string, WorkspaceInfo>();
-  if (fs.existsSync(SESSIONS_ROOT)) {
-    const dirs = fs
-      .readdirSync(SESSIONS_ROOT, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name);
-
-    for (const dirName of dirs) {
-      const dirPath = path.join(SESSIONS_ROOT, dirName);
-      const files = fs
-        .readdirSync(dirPath)
-        .filter((f) => f.endsWith('.jsonl'))
-        .map((f) => path.join(dirPath, f));
-      if (files.length === 0) continue;
-
-      let cwd = '';
-      let lastActive = '';
-      for (const file of files) {
-        const stat = fs.statSync(file);
-        if (stat.mtime.toISOString() > lastActive)
-          lastActive = stat.mtime.toISOString();
-        if (!cwd) {
-          for (const line of readLines(file, 64 * 1024)) {
-            if (!line) continue;
-            try {
-              const entry = JSON.parse(line);
-              if (entry.type === 'session' && typeof entry.cwd === 'string') {
-                cwd = entry.cwd;
-                break;
-              }
-            } catch {
-              break;
-            }
-          }
-        }
-      }
-      if (!cwd) continue;
-      const branch = fs.existsSync(cwd) ? await gitBranch(cwd) : '';
-      byDir.set(dirName, {
-        dirName,
-        name: path.basename(cwd),
-        cwd,
-        branch,
-        sessionCount: files.length,
-        lastActive,
-      });
-    }
-  }
-
-  const knownCwds = new Set([...byDir.values()].map((w) => w.cwd));
-  for (const cwd of extraCwds) {
-    if (knownCwds.has(cwd) || !fs.existsSync(cwd)) continue;
-    const dirName = `--${cwd.replace(/\//g, '-')}--`;
-    const branch = await gitBranch(cwd);
-    byDir.set(dirName, {
-      dirName,
+  const archives = discoverSessions();
+  const cwds = new Set(
+    [...extraCwds, ...archives.map((s) => s.cwd)].map(canonicalCwd),
+  );
+  const result: WorkspaceInfo[] = [];
+  for (const cwd of cwds) {
+    const owned = archives.filter((s) => canonicalCwd(s.cwd) === cwd);
+    result.push({
+      dirName: cwd,
       name: path.basename(cwd),
       cwd,
-      branch,
-      sessionCount: 0,
-      lastActive: '',
+      branch: fs.existsSync(cwd) ? await gitBranch(cwd) : '',
+      sessionCount: owned.length,
+      lastActive: owned[0]?.timestamp ?? '',
     });
   }
-
-  const workspaces = [...byDir.values()];
-  workspaces.sort((a, b) => b.lastActive.localeCompare(a.lastActive));
-  return workspaces;
+  return result.sort((a, b) => b.lastActive.localeCompare(a.lastActive));
 }
 
-function listSessions(dirName: string): SessionInfo[] {
-  const dirPath = path.join(SESSIONS_ROOT, dirName);
-  if (!dirPath.startsWith(SESSIONS_ROOT) || !fs.existsSync(dirPath)) return [];
-  const sessions = fs
-    .readdirSync(dirPath)
-    .filter((f) => f.endsWith('.jsonl'))
-    .map((f) => parseSession(path.join(dirPath, f)))
-    .filter((s): s is SessionInfo => s !== null);
-  sessions.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  return sessions;
-}
-
-export { listWorkspaces, listSessions, parseSession, SESSIONS_ROOT };
+export {
+  listWorkspaces,
+  sessionsForRoot,
+  matchingSessions,
+  discoverSessions,
+  canonicalCwd,
+  parseSession,
+  SESSIONS_ROOT,
+};
 export type { WorkspaceInfo, SessionInfo };

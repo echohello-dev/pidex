@@ -14,6 +14,7 @@ import {
 import type { SessionInfo } from '../../src/renderer/api';
 import type { SessionTree as Tree } from '../../src/main/session-tree';
 const info = (file: string, parentSession?: string): SessionInfo => ({
+  cwd: '/project',
   id: file,
   file,
   title: file,

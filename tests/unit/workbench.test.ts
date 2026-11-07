@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import {
+  assertCommitScope,
   filePatch,
   git,
   inspectWorkspace,
@@ -241,6 +242,43 @@ describe('workspace inspection and preview', () => {
     const linked = path.join(root, 'linked.jsonl');
     await fs.symlink(secret, linked);
     await expect(readSession(linked, root)).rejects.toThrow('Invalid session');
+  });
+
+  it('reports a truncated deep file list instead of presenting it as complete', async () => {
+    const root = await fixture();
+    await fs.writeFile(path.join(root, 'visible.ts'), 'visible');
+    const deep = path.join(root, ...Array.from({ length: 9 }, () => 'nested'));
+    await fs.mkdir(deep, { recursive: true });
+    await fs.writeFile(path.join(deep, 'hidden.ts'), 'hidden');
+    const snapshot = await inspectWorkspace(root);
+    expect(snapshot.files).toContain('visible.ts');
+    expect(snapshot.files.some((file) => file.endsWith('hidden.ts'))).toBe(
+      false,
+    );
+    expect(snapshot.filesTruncated).toBe(true);
+  });
+
+  it('keeps package stage-all scoped and refuses a commit containing staged sibling files', async () => {
+    const root = await fixture();
+    await git(root, ['init', '-b', 'main']);
+    const api = path.join(root, 'packages', 'api');
+    const web = path.join(root, 'packages', 'web');
+    await fs.mkdir(api, { recursive: true });
+    await fs.mkdir(web);
+    await fs.writeFile(path.join(web, 'outside.ts'), 'outside');
+    await git(web, ['add', '--all', '--', '.']);
+    await fs.writeFile(path.join(api, 'inside.ts'), 'inside');
+    await fs.writeFile(path.join(root, 'untouched.ts'), 'untouched');
+    await git(api, ['add', '--all', '--', '.']);
+    const staged = await git(root, ['diff', '--cached', '--name-only']);
+    expect(staged).toContain('packages/api/inside.ts');
+    expect(staged).toContain('packages/web/outside.ts');
+    expect(staged).not.toContain('untouched.ts');
+    await expect(assertCommitScope(api)).rejects.toThrow('outside this root');
+    expect(await git(root, ['diff', '--cached', '--name-only'])).toBe(staged);
+    await expect(assertCommitScope(root)).resolves.toBeUndefined();
+    await git(root, ['rm', '--cached', '--', 'packages/web/outside.ts']);
+    await expect(assertCommitScope(api)).resolves.toBeUndefined();
   });
 
   it('bounds stored model identifiers without mutating the supplied defaults', () => {
