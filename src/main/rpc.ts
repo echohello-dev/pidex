@@ -72,6 +72,8 @@ class RpcSession {
   readonly id: string;
   readonly cwd: string;
   archiveFile?: string;
+  private mayBeUnpersisted: boolean;
+  private initialArchiveFile?: string;
   private proc: ChildProcess;
   private buffer = '';
   private seq = 0;
@@ -93,6 +95,7 @@ class RpcSession {
     this.id = id;
     this.cwd = cwd;
     this.archiveFile = sessionFile;
+    this.mayBeUnpersisted = !sessionFile && !ephemeral;
     const bin = resolvePi();
     if (!bin) throw new Error(PI_MISSING);
     const args = ['--mode', 'rpc'];
@@ -241,7 +244,39 @@ class RpcSession {
       };
     if (response.success && typeof file !== 'string')
       this.archiveFile = undefined;
+    // Pi allocates a new archive path before persisting setup-only sessions.
+    // Pin that first path, and permanently require an archive after messages,
+    // a path change, or observing anything on disk (including invalid files).
+    if (response.success && this.mayBeUnpersisted) {
+      this.initialArchiveFile ??= this.archiveFile;
+      const messageCount = (response.data as { messageCount?: unknown })
+        ?.messageCount;
+      if (
+        !this.archiveFile ||
+        this.archiveFile !== this.initialArchiveFile ||
+        messageCount !== 0
+      ) {
+        this.mayBeUnpersisted = false;
+      }
+      this.hasUnpersistedArchive();
+    }
     return response;
+  }
+
+  hasUnpersistedArchive(): boolean {
+    if (
+      !this.mayBeUnpersisted ||
+      !this.initialArchiveFile ||
+      this.archiveFile !== this.initialArchiveFile
+    )
+      return false;
+    try {
+      fs.lstatSync(this.initialArchiveFile);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
+    }
+    this.mayBeUnpersisted = false;
+    return false;
   }
 
   getMessages() {

@@ -144,6 +144,7 @@ async function runtimeRoot(runtime: RpcSession) {
   const owner = workspaceRegistry().resolve(runtime.cwd);
   if (runtime.archiveFile) {
     const header = parseSession(runtime.archiveFile);
+    if (!header && runtime.hasUnpersistedArchive()) return;
     if (
       !header ||
       canonicalCwd(header.cwd) !== runtime.cwd ||

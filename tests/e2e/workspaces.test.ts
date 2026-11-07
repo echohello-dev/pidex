@@ -135,6 +135,196 @@ describe('grouped roots in Electron', () => {
     if (fixture) await fs.rm(fixture, { recursive: true, force: true });
   });
 
+  it('opens a fresh runtime with an assigned but unpersisted archive and accepts its first prompt', async () => {
+    const opened = await page.evaluate(
+      (cwd) => window.pidex.openSession({ cwd }),
+      api,
+    );
+    expect(opened.error).toBeUndefined();
+    const file = opened.state?.sessionFile;
+    expect(file).toEqual(expect.any(String));
+    await expect(fs.stat(file!)).rejects.toHaveProperty('code', 'ENOENT');
+    try {
+      await page.evaluate(
+        (id) => window.pidex.setModel(id!, 'openai', 'gpt-test'),
+        opened.sessionId,
+      );
+      await expect(fs.stat(file!)).rejects.toHaveProperty('code', 'ENOENT');
+      const sent = await page.evaluate(
+        (sessionId) =>
+          window.pidex.sendPrompt({
+            sessionId: sessionId!,
+            text: 'Persist my first prompt',
+            streaming: false,
+          }),
+        opened.sessionId,
+      );
+      expect(sent.success).toBe(true);
+      const entries = (await fs.readFile(file!, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      expect(entries[0].cwd).toBe(api);
+      expect(
+        entries.some(
+          (entry) =>
+            entry.message?.content?.[0]?.text === 'Persist my first prompt',
+        ),
+      ).toBe(true);
+      await fs.unlink(file!);
+      const refused = await page.evaluate(
+        (sessionId) =>
+          window.pidex.sendPrompt({
+            sessionId: sessionId!,
+            text: 'Do not recreate a persisted archive',
+            streaming: false,
+          }),
+        opened.sessionId,
+      );
+      expect(refused.error).toContain('changed execution roots');
+      expect(
+        (await records()).some(
+          (record) => record.message === 'Do not recreate a persisted archive',
+        ),
+      ).toBe(false);
+    } finally {
+      await page.evaluate(
+        (id) => window.pidex.closeSession(id!),
+        opened.sessionId,
+      );
+    }
+  });
+
+  it('does not treat a missing resumed archive as a fresh unpersisted runtime', async () => {
+    const file = path.join(
+      fixture,
+      'sessions',
+      'mixed',
+      'deleted-after-resume.jsonl',
+    );
+    await fs.writeFile(file, header('deleted-after-resume', api));
+    const opened = await page.evaluate(
+      ({ cwd, sessionFile }) => window.pidex.openSession({ cwd, sessionFile }),
+      { cwd: api, sessionFile: file },
+    );
+    expect(opened.error).toBeUndefined();
+    try {
+      await fs.unlink(file);
+      const refused = await page.evaluate(
+        (sessionId) =>
+          window.pidex.sendPrompt({
+            sessionId: sessionId!,
+            text: 'Do not recreate a resumed archive',
+            streaming: false,
+          }),
+        opened.sessionId,
+      );
+      expect(refused.error).toContain('changed execution roots');
+      expect(
+        (await records()).some(
+          (record) => record.message === 'Do not recreate a resumed archive',
+        ),
+      ).toBe(false);
+    } finally {
+      await page.evaluate(
+        (id) => window.pidex.closeSession(id!),
+        opened.sessionId,
+      );
+    }
+  });
+
+  it('does not extend the fresh-runtime exception to a switched missing archive', async () => {
+    const opened = await page.evaluate(
+      (cwd) => window.pidex.openSession({ cwd }),
+      api,
+    );
+    expect(opened.error).toBeUndefined();
+    try {
+      const switched = await page.evaluate(
+        (sessionId) =>
+          window.pidex.sendPrompt({
+            sessionId: sessionId!,
+            text: 'Switch to missing archive for test',
+            streaming: false,
+          }),
+        opened.sessionId,
+      );
+      expect(switched.success).toBe(true);
+      const refused = await page.evaluate(
+        (sessionId) =>
+          window.pidex.sendPrompt({
+            sessionId: sessionId!,
+            text: 'Do not send to an unverified archive',
+            streaming: false,
+          }),
+        opened.sessionId,
+      );
+      expect(refused.error).toContain('changed execution roots');
+      expect(
+        (await records()).some(
+          (record) => record.message === 'Do not send to an unverified archive',
+        ),
+      ).toBe(false);
+    } finally {
+      await page.evaluate(
+        (id) => window.pidex.closeSession(id!),
+        opened.sessionId,
+      );
+    }
+  });
+
+  it.each(['malformed', 'foreign', 'persisted-empty'])(
+    'validates a fresh archive once it exists on disk (%s)',
+    async (kind) => {
+      const opened = await page.evaluate(
+        (cwd) => window.pidex.openSession({ cwd }),
+        api,
+      );
+      expect(opened.error).toBeUndefined();
+      const file = opened.state!.sessionFile!;
+      try {
+        await fs.writeFile(
+          file,
+          kind === 'malformed'
+            ? '{}\n'
+            : JSON.stringify({
+                type: 'session',
+                version: 3,
+                id: kind,
+                cwd: kind === 'foreign' ? web : api,
+              }) + '\n',
+        );
+        if (kind === 'persisted-empty') {
+          await page.evaluate(
+            (id) => window.pidex.setModel(id!, 'openai', 'gpt-test'),
+            opened.sessionId,
+          );
+          await fs.unlink(file);
+        }
+        const text = `Do not send to ${kind} archive`;
+        const refused = await page.evaluate(
+          ({ sessionId, text }) =>
+            window.pidex.sendPrompt({
+              sessionId: sessionId!,
+              text,
+              streaming: false,
+            }),
+          { sessionId: opened.sessionId, text },
+        );
+        expect(refused.error).toContain('changed execution roots');
+        expect(
+          (await records()).some((record) => record.message === text),
+        ).toBe(false);
+      } finally {
+        await page.evaluate(
+          (id) => window.pidex.closeSession(id!),
+          opened.sessionId,
+        );
+        await fs.rm(file, { force: true });
+      }
+    },
+  );
+
   it('creates and renames a group of existing roots while keeping root history separate', async () => {
     await page
       .getByRole('button', { name: 'Create workspace', exact: true })
