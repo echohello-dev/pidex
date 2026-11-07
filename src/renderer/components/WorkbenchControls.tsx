@@ -310,10 +310,17 @@ export const TranscriptRow = memo(function TranscriptRow({
             {entry.running ? 'Running' : entry.ok ? 'Done' : 'Failed'}
           </small>
         </summary>
-        <pre>
-          {entry.output ||
-            (entry.running ? 'Waiting for output…' : 'No output.')}
-        </pre>
+        <div className="wb-tool-section">
+          <h3>Input</h3>
+          <pre>{entry.input || 'No input.'}</pre>
+        </div>
+        <div className="wb-tool-section">
+          <h3>Output</h3>
+          <pre>
+            {entry.output ||
+              (entry.running ? 'Waiting for output…' : 'No output.')}
+          </pre>
+        </div>
       </details>
     );
   return (

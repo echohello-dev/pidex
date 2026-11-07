@@ -9,6 +9,7 @@ type Entry =
       toolId: string;
       tool: string;
       args: string;
+      input: string;
       output: string;
       running: boolean;
       ok: boolean;
@@ -55,6 +56,33 @@ function toolArgsSummary(name: string, args: Record<string, unknown> | undefined
   return JSON.stringify(args).slice(0, 120);
 }
 
+function toolInputText(name: string, args: Record<string, unknown> | undefined): string {
+  if (!args) return '';
+  if (name === 'bash') return String(args.command ?? '');
+  if (name === 'read' || name === 'write' || name === 'edit') {
+    const p = String(args.path ?? args.file ?? '');
+    const parts = [p];
+    if (name === 'write' && typeof args.content === 'string')
+      parts.push('', args.content);
+    if (name === 'edit') {
+      if (typeof args.oldText === 'string') parts.push('', 'Old:', args.oldText);
+      if (typeof args.newText === 'string') parts.push('', 'New:', args.newText);
+    }
+    if (name === 'read') {
+      const range: string[] = [];
+      if (typeof args.offset === 'number') range.push(`offset ${args.offset}`);
+      if (typeof args.limit === 'number') range.push(`limit ${args.limit}`);
+      if (range.length) parts.push(range.join(', '));
+    }
+    return parts.join('\n');
+  }
+  try {
+    return JSON.stringify(args, null, 2);
+  } catch {
+    return String(args);
+  }
+}
+
 function resultText(content: unknown): string {
   if (!Array.isArray(content)) return '';
   return content
@@ -92,6 +120,7 @@ function entriesFromMessages(messages: unknown[]): Entry[] {
             toolId: p.id,
             tool: p.name,
             args: toolArgsSummary(p.name, p.arguments),
+            input: toolInputText(p.name, p.arguments),
             output: '',
             running: false,
             ok: true,
@@ -177,6 +206,7 @@ function applyEvent(
         toolId: toolCallId,
         tool: toolName,
         args: toolArgsSummary(toolName, event.args as Record<string, unknown>),
+        input: toolInputText(toolName, event.args as Record<string, unknown>),
         output: '',
         running: true,
         ok: true,
