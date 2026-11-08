@@ -715,6 +715,26 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   text-transform: uppercase;
   color: var(--muted);
 }
+.wb-tool-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 12px;
+}
+.wb-tool-copy,
+.wb-tool-toggle {
+  border: 1px solid var(--line-soft);
+  background: transparent;
+  color: var(--copy);
+  font-size: 11px;
+  line-height: 16px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.wb-tool-toggle {
+  margin: 0 12px 12px;
+}
 .wb-tool-section + .wb-tool-section {
   border-top: 1px solid var(--line-soft);
 }

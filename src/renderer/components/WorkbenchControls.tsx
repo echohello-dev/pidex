@@ -276,6 +276,50 @@ export function Composer({
   );
 }
 
+export const TOOL_TEXT_PREVIEW_LIMIT = 2000;
+
+function ToolTextSection({ title, text }: { title: string; text: string }) {
+  const [showAll, setShowAll] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
+  const visible =
+    isLong && !showAll ? text.slice(0, TOOL_TEXT_PREVIEW_LIMIT) : text;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <div className="wb-tool-section">
+      <div className="wb-tool-section-head">
+        <h3>{title}</h3>
+        <button
+          type="button"
+          className="wb-tool-copy"
+          aria-label={`Copy ${title.toLowerCase()}`}
+          onClick={() => void copy()}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre>{visible}</pre>
+      {isLong && (
+        <button
+          type="button"
+          className="wb-tool-toggle"
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export const TranscriptRow = memo(function TranscriptRow({
   entry,
   expanded,
@@ -310,17 +354,14 @@ export const TranscriptRow = memo(function TranscriptRow({
             {entry.running ? 'Running' : entry.ok ? 'Done' : 'Failed'}
           </small>
         </summary>
-        <div className="wb-tool-section">
-          <h3>Input</h3>
-          <pre>{entry.input || 'No input.'}</pre>
-        </div>
-        <div className="wb-tool-section">
-          <h3>Output</h3>
-          <pre>
-            {entry.output ||
-              (entry.running ? 'Waiting for output…' : 'No output.')}
-          </pre>
-        </div>
+        <ToolTextSection title="Input" text={entry.input || 'No input.'} />
+        <ToolTextSection
+          title="Output"
+          text={
+            entry.output ||
+            (entry.running ? 'Waiting for output…' : 'No output.')
+          }
+        />
       </details>
     );
   return (

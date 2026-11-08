@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import { TranscriptRow } from '../../src/renderer/components/WorkbenchControls';
 import type { Entry } from '../../src/renderer/timeline';
 
@@ -31,6 +31,43 @@ describe('<TranscriptRow> tool card', () => {
     expect(container.textContent).toContain('const after = 2;');
     expect(container.textContent).toContain('Edited /repo/src/app.ts');
     expect(container.textContent).toContain('Done');
+  });
+
+  it('copies the exact output text and shows Copied', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const expanded = new Map<string, boolean>([[toolEntry.key, true]]);
+    const { getByRole } = render(
+      <TranscriptRow entry={toolEntry} expanded={expanded} />,
+    );
+    fireEvent.click(getByRole('button', { name: 'Copy output' }));
+    expect(writeText).toHaveBeenCalledWith('Edited /repo/src/app.ts');
+    await vi.waitFor(() =>
+      expect(getByRole('button', { name: 'Copy output' }).textContent).toBe(
+        'Copied',
+      ),
+    );
+  });
+
+  it('truncates long output and expands on Show more', () => {
+    const longOutput = `start-${'x'.repeat(2500)}-end-marker`;
+    const longEntry: Extract<Entry, { kind: 'tool' }> = {
+      ...toolEntry,
+      key: 'tool-3',
+      output: longOutput,
+    };
+    const expanded = new Map<string, boolean>([[longEntry.key, true]]);
+    const { container, getByRole } = render(
+      <TranscriptRow entry={longEntry} expanded={expanded} />,
+    );
+    expect(container.textContent).not.toContain('end-marker');
+    fireEvent.click(getByRole('button', { name: 'Show more' }));
+    expect(container.textContent).toContain('end-marker');
+    fireEvent.click(getByRole('button', { name: 'Show less' }));
+    expect(container.textContent).not.toContain('end-marker');
   });
 
   it('shows running state and waiting output while a tool runs', () => {
