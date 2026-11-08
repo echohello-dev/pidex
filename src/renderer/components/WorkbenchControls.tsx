@@ -278,12 +278,46 @@ export function Composer({
 
 export const TOOL_TEXT_PREVIEW_LIMIT = 2000;
 
-function ToolTextSection({ title, text }: { title: string; text: string }) {
-  const [showAll, setShowAll] = useState(false);
+export type DiffLine = { type: '-' | '+' | ' '; text: string };
+
+export function diffLines(oldText: string, newText: string): DiffLine[] {
+  const a = oldText === '' ? [] : oldText.split('\n');
+  const b = newText === '' ? [] : newText.split('\n');
+  if (a.length * b.length > 250_000)
+    return [
+      ...a.map((text): DiffLine => ({ type: '-', text })),
+      ...b.map((text): DiffLine => ({ type: '+', text })),
+    ];
+  const dp: Uint32Array[] = Array.from({ length: a.length + 1 }, () =>
+    new Uint32Array(b.length + 1),
+  );
+  for (let i = a.length - 1; i >= 0; i--)
+    for (let j = b.length - 1; j >= 0; j--)
+      dp[i][j] =
+        a[i] === b[j]
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const out: DiffLine[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      out.push({ type: ' ', text: a[i] });
+      i++;
+      j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      out.push({ type: '-', text: a[i++] });
+    } else {
+      out.push({ type: '+', text: b[j++] });
+    }
+  }
+  while (i < a.length) out.push({ type: '-', text: a[i++] });
+  while (j < b.length) out.push({ type: '+', text: b[j++] });
+  return out;
+}
+
+function useCopy(text: string) {
   const [copied, setCopied] = useState(false);
-  const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
-  const visible =
-    isLong && !showAll ? text.slice(0, TOOL_TEXT_PREVIEW_LIMIT) : text;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
@@ -293,6 +327,77 @@ function ToolTextSection({ title, text }: { title: string; text: string }) {
       setCopied(false);
     }
   };
+  return { copied, copy };
+}
+
+function ToolDiffSection({
+  text,
+  oldText,
+  newText,
+}: {
+  text: string;
+  oldText: string;
+  newText: string;
+}) {
+  const { copied, copy } = useCopy(text);
+  const [showAll, setShowAll] = useState(false);
+  const rows = diffLines(oldText, newText);
+  const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
+  let visible = rows;
+  if (isLong && !showAll) {
+    visible = [];
+    let used = 0;
+    for (const row of rows) {
+      used += row.text.length + 1;
+      if (used > TOOL_TEXT_PREVIEW_LIMIT) break;
+      visible.push(row);
+    }
+    if (visible.length === 0 && rows.length > 0) visible = [rows[0]];
+  }
+  return (
+    <div className="wb-tool-section">
+      <div className="wb-tool-section-head">
+        <h3>Input</h3>
+        <button
+          type="button"
+          className="wb-tool-copy"
+          aria-label="Copy input"
+          onClick={() => void copy()}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div className="wb-tool-diff">
+        {visible.map((row, index) => (
+          <div
+            key={index}
+            className={`wb-tool-diff-line wb-tool-diff-line--${row.type === '+' ? 'add' : row.type === '-' ? 'del' : 'context'}`}
+          >
+            <span aria-hidden="true">{row.type === ' ' ? ' ' : row.type}</span>
+            {row.text}
+          </div>
+        ))}
+        {visible.length === 0 && <div className="wb-tool-diff-line">No changes.</div>}
+      </div>
+      {isLong && (
+        <button
+          type="button"
+          className="wb-tool-toggle"
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ToolTextSection({ title, text }: { title: string; text: string }) {
+  const [showAll, setShowAll] = useState(false);
+  const { copied, copy } = useCopy(text);
+  const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
+  const visible =
+    isLong && !showAll ? text.slice(0, TOOL_TEXT_PREVIEW_LIMIT) : text;
   return (
     <div className="wb-tool-section">
       <div className="wb-tool-section-head">
@@ -354,7 +459,15 @@ export const TranscriptRow = memo(function TranscriptRow({
             {entry.running ? 'Running' : entry.ok ? 'Done' : 'Failed'}
           </small>
         </summary>
-        <ToolTextSection title="Input" text={entry.input || 'No input.'} />
+        {entry.oldText !== undefined || entry.newText !== undefined ? (
+          <ToolDiffSection
+            text={entry.input || 'No input.'}
+            oldText={entry.oldText ?? ''}
+            newText={entry.newText ?? ''}
+          />
+        ) : (
+          <ToolTextSection title="Input" text={entry.input || 'No input.'} />
+        )}
         <ToolTextSection
           title="Output"
           text={

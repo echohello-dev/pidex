@@ -143,6 +143,56 @@ describe('entriesFromMessages', () => {
     }
   });
 
+  it('carries old and new text for an edit tool call', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'call_edit_diff',
+            name: 'edit',
+            arguments: {
+              path: '/repo/src/app.ts',
+              oldText: 'const keep = 0;\nconst before = 1;',
+              newText: 'const keep = 0;\nconst after = 2;',
+            },
+          },
+        ],
+      },
+    ];
+    const [entry] = entriesFromMessages(messages);
+    if (entry?.kind === 'tool') {
+      expect(entry.oldText).toBe('const keep = 0;\nconst before = 1;');
+      expect(entry.newText).toBe('const keep = 0;\nconst after = 2;');
+    } else {
+      expect.fail('expected tool entry');
+    }
+  });
+
+  it('carries write content as new text against an empty old side', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'call_write_diff',
+            name: 'write',
+            arguments: { path: '/repo/new.ts', content: 'export const a = 1;' },
+          },
+        ],
+      },
+    ];
+    const [entry] = entriesFromMessages(messages);
+    if (entry?.kind === 'tool') {
+      expect(entry.oldText).toBe('');
+      expect(entry.newText).toBe('export const a = 1;');
+    } else {
+      expect.fail('expected tool entry');
+    }
+  });
+
   it('does not truncate long input for other tools', () => {
     const long = 'x'.repeat(300);
     const messages = [
@@ -302,6 +352,26 @@ describe('applyEvent', () => {
       expect(entry.running).toBe(true);
     } else {
       expect.fail('expected tool');
+    }
+  });
+
+  it('tool_execution_start carries edit old and new text', () => {
+    const { entries } = applyEvent(empty, {
+      type: 'tool_execution_start',
+      toolCallId: 'call_live_edit',
+      toolName: 'edit',
+      args: {
+        path: '/repo/src/app.ts',
+        oldText: 'const before = 1;',
+        newText: 'const after = 2;',
+      },
+    });
+    const entry = entries[0];
+    if (entry?.kind === 'tool') {
+      expect(entry.oldText).toBe('const before = 1;');
+      expect(entry.newText).toBe('const after = 2;');
+    } else {
+      expect.fail('expected tool entry');
     }
   });
 

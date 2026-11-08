@@ -746,6 +746,34 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.wb-tool-diff {
+  padding: 8px 0 12px;
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--mono, monospace);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wb-tool-diff-line {
+  padding: 0 12px;
+  display: flex;
+  gap: 8px;
+}
+.wb-tool-diff-line > span {
+  flex: 0 0 1ch;
+  user-select: none;
+}
+.wb-tool-diff-line--add {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+.wb-tool-diff-line--del {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+}
+.wb-tool-diff-line--context {
+  color: var(--copy);
+}
 .wb-tool--error {
   border-color: var(--error);
 }

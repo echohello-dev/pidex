@@ -10,6 +10,8 @@ type Entry =
       tool: string;
       args: string;
       input: string;
+      oldText?: string;
+      newText?: string;
       output: string;
       running: boolean;
       ok: boolean;
@@ -83,6 +85,21 @@ function toolInputText(name: string, args: Record<string, unknown> | undefined):
   }
 }
 
+function toolDiff(
+  name: string,
+  args: Record<string, unknown> | undefined,
+): { oldText: string; newText: string } | undefined {
+  if (!args) return undefined;
+  if (name === 'edit' && (typeof args.oldText === 'string' || typeof args.newText === 'string'))
+    return {
+      oldText: typeof args.oldText === 'string' ? args.oldText : '',
+      newText: typeof args.newText === 'string' ? args.newText : '',
+    };
+  if (name === 'write' && typeof args.content === 'string')
+    return { oldText: '', newText: args.content };
+  return undefined;
+}
+
 function resultText(content: unknown): string {
   if (!Array.isArray(content)) return '';
   return content
@@ -121,6 +138,7 @@ function entriesFromMessages(messages: unknown[]): Entry[] {
             tool: p.name,
             args: toolArgsSummary(p.name, p.arguments),
             input: toolInputText(p.name, p.arguments),
+            ...toolDiff(p.name, p.arguments),
             output: '',
             running: false,
             ok: true,
@@ -207,6 +225,7 @@ function applyEvent(
         tool: toolName,
         args: toolArgsSummary(toolName, event.args as Record<string, unknown>),
         input: toolInputText(toolName, event.args as Record<string, unknown>),
+        ...toolDiff(toolName, event.args as Record<string, unknown>),
         output: '',
         running: true,
         ok: true,
