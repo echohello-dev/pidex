@@ -19,6 +19,10 @@ import {
 } from './components/WorkbenchViews';
 import { Transcript } from './components/Transcript';
 import { CommandPalette } from './components/CommandPalette';
+import {
+  sessionExportFilename,
+  sessionExportMarkdown,
+} from './export-session';
 import { timeAgo, useWorkbench } from './useWorkbench';
 
 function App() {
@@ -108,19 +112,20 @@ function App() {
   const live = b.tabs;
   const exportSession = () => {
     if (!preview) return;
-    const text = preview.entries
-      .map((e) =>
-        e.kind === 'tool'
-          ? `## ${e.tool}\n\n${e.output}`
-          : `## ${e.kind}\n\n${e.text}`,
-      )
-      .join('\n\n');
+    const exportedAt = new Date();
+    const text = sessionExportMarkdown({
+      title: preview.info.title,
+      cwd: preview.info.cwd,
+      model: preview.info.model,
+      exportedAt,
+      entries: preview.entries,
+    });
     const url = URL.createObjectURL(
       new Blob([text], { type: 'text/markdown' }),
     );
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pidex-session.md';
+    a.download = sessionExportFilename(preview.info.title, exportedAt);
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
