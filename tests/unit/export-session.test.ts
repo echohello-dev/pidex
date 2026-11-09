@@ -48,6 +48,14 @@ describe('sessionExportMarkdown', () => {
         '',
         'It used `anthropic/claude-test`.',
         '',
+        '## Continue elsewhere',
+        '',
+        'This file is portable context, not a restorable Pi session archive.',
+        '',
+        '- Same folder (`/repo/app`): open that root in Pidex, go to Sessions, select this session, and choose Resume. Choose Resume in new fork when continuing from an earlier entry.',
+        '- New folder: open the destination folder as a root in Pidex, start a new session there, and share this file as context for the first message. Attach it or paste its contents.',
+        '- Saved history stays with the original folder, so Resume will not find this session under a new folder.',
+        '',
         '## You',
         '',
         'please fix it',
@@ -122,6 +130,34 @@ describe('sessionExportMarkdown', () => {
     expect(markdown).toContain('\n````\nbefore\n```\ncode\n```\nafter\n````');
   });
 
+  it('guides a reader to resume or hand off in a new folder', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'T',
+      cwd: '/repo/app',
+      model: '',
+      exportedAt,
+      entries: [{ key: 'u1', kind: 'user', text: 'hi' }],
+    });
+    expect(markdown).toContain('## Continue elsewhere');
+    expect(markdown).toContain('not a restorable Pi session archive');
+    expect(markdown).toContain(
+      'Saved history stays with the original folder',
+    );
+    expect(markdown).toContain('start a new session there');
+  });
+
+  it('keeps the handoff generic when the folder is unknown', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'T',
+      cwd: '  ',
+      model: '',
+      exportedAt,
+      entries: [{ key: 'u1', kind: 'user', text: 'hi' }],
+    });
+    expect(markdown).toContain('open the original root in Pidex');
+    expect(markdown).not.toContain('Same folder (`');
+  });
+
   it('handles an empty selection and a blank title', () => {
     const markdown = sessionExportMarkdown({
       title: '  ',
@@ -134,6 +170,7 @@ describe('sessionExportMarkdown', () => {
     expect(markdown).toContain('No messages in this selection.');
     expect(markdown).not.toContain('It ran in');
     expect(markdown).not.toContain('It used');
+    expect(markdown).not.toContain('Continue elsewhere');
   });
 });
 

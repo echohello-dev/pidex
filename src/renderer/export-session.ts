@@ -31,6 +31,22 @@ function toolHeading(entry: Extract<Entry, { kind: 'tool' }>): string {
   return `## ${entry.tool}${summary} (${toolStatus(entry)})`;
 }
 
+function handoffSection(cwd: string): string {
+  const folder = cwd.trim();
+  const sameFolder = folder
+    ? `Same folder (\`${folder}\`): open that root in Pidex, go to Sessions, select this session, and choose Resume. Choose Resume in new fork when continuing from an earlier entry.`
+    : 'Same folder: open the original root in Pidex, go to Sessions, select this session, and choose Resume. Choose Resume in new fork when continuing from an earlier entry.';
+  return [
+    '## Continue elsewhere',
+    '',
+    'This file is portable context, not a restorable Pi session archive.',
+    '',
+    `- ${sameFolder}`,
+    '- New folder: open the destination folder as a root in Pidex, start a new session there, and share this file as context for the first message. Attach it or paste its contents.',
+    '- Saved history stays with the original folder, so Resume will not find this session under a new folder.',
+  ].join('\n');
+}
+
 export function sessionExportMarkdown(input: SessionExportInput): string {
   const parts: string[] = [
     `# ${input.title.trim() || 'Untitled session'}`,
@@ -38,6 +54,7 @@ export function sessionExportMarkdown(input: SessionExportInput): string {
   ];
   if (input.cwd.trim()) parts.push(`It ran in \`${input.cwd.trim()}\`.`);
   if (input.model.trim()) parts.push(`It used \`${input.model.trim()}\`.`);
+  if (input.entries.length > 0) parts.push(handoffSection(input.cwd));
   if (input.entries.length === 0) {
     parts.push('No messages in this selection.');
     return `${parts.join('\n\n')}\n`;
