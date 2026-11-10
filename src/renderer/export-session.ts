@@ -1,4 +1,5 @@
 import { toolStatus, type Entry } from './timeline';
+import { sessionSummary } from './session-summary';
 
 export type SessionExportInput = {
   title: string;
@@ -43,27 +44,17 @@ function handoffSection(cwd: string): string {
 }
 
 function summarySection(entries: Entry[]): string {
-  const users = entries.filter((e) => e.kind === 'user').length;
-  const assistants = entries.filter((e) => e.kind === 'assistant').length;
-  const messages = users + assistants;
-  const tools = entries.filter(
-    (e): e is Extract<Entry, { kind: 'tool' }> => e.kind === 'tool',
-  );
+  const { users, assistants, messages, tools, toolsUsed } = sessionSummary(entries);
   const lines = [
     '## Summary',
     '',
     `- ${messages} ${messages === 1 ? 'message' : 'messages'}: ${users} from you, ${assistants} from Pi.`,
   ];
-  if (tools.length > 0) {
-    const done = tools.filter((e) => toolStatus(e) === 'Done').length;
-    const failed = tools.filter((e) => toolStatus(e) === 'Failed').length;
-    const running = tools.filter((e) => toolStatus(e) === 'Running').length;
-    const interrupted = tools.filter(
-      (e) => toolStatus(e) === 'Interrupted',
-    ).length;
+  if (tools.total > 0) {
+    const { done, failed, running, interrupted } = tools;
     lines.push(
-      `- ${tools.length} ${tools.length === 1 ? 'tool call' : 'tool calls'}: ${done} done, ${failed} failed, ${running} running${interrupted ? `, ${interrupted} interrupted` : ''}.`,
-      `- Tools used: ${[...new Set(tools.map((e) => e.tool))].join(', ')}.`,
+      `- ${tools.total} ${tools.total === 1 ? 'tool call' : 'tool calls'}: ${done} done, ${failed} failed, ${running} running${interrupted ? `, ${interrupted} interrupted` : ''}.`,
+      `- Tools used: ${toolsUsed.join(', ')}.`,
     );
   }
   return lines.join('\n');
