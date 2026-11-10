@@ -47,6 +47,30 @@ function handoffSection(cwd: string): string {
   ].join('\n');
 }
 
+function summarySection(entries: Entry[]): string {
+  const users = entries.filter((e) => e.kind === 'user').length;
+  const assistants = entries.filter((e) => e.kind === 'assistant').length;
+  const messages = users + assistants;
+  const tools = entries.filter(
+    (e): e is Extract<Entry, { kind: 'tool' }> => e.kind === 'tool',
+  );
+  const lines = [
+    '## Summary',
+    '',
+    `- ${messages} ${messages === 1 ? 'message' : 'messages'}: ${users} from you, ${assistants} from Pi.`,
+  ];
+  if (tools.length > 0) {
+    const done = tools.filter((e) => !e.running && e.ok).length;
+    const failed = tools.filter((e) => !e.running && !e.ok).length;
+    const running = tools.filter((e) => e.running).length;
+    lines.push(
+      `- ${tools.length} ${tools.length === 1 ? 'tool call' : 'tool calls'}: ${done} done, ${failed} failed, ${running} running.`,
+      `- Tools used: ${[...new Set(tools.map((e) => e.tool))].join(', ')}.`,
+    );
+  }
+  return lines.join('\n');
+}
+
 export function sessionExportMarkdown(input: SessionExportInput): string {
   const parts: string[] = [
     `# ${input.title.trim() || 'Untitled session'}`,
@@ -54,7 +78,10 @@ export function sessionExportMarkdown(input: SessionExportInput): string {
   ];
   if (input.cwd.trim()) parts.push(`It ran in \`${input.cwd.trim()}\`.`);
   if (input.model.trim()) parts.push(`It used \`${input.model.trim()}\`.`);
-  if (input.entries.length > 0) parts.push(handoffSection(input.cwd));
+  if (input.entries.length > 0) {
+    parts.push(summarySection(input.entries));
+    parts.push(handoffSection(input.cwd));
+  }
   if (input.entries.length === 0) {
     parts.push('No messages in this selection.');
     return `${parts.join('\n\n')}\n`;
