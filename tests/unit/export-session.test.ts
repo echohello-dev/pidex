@@ -48,6 +48,12 @@ describe('sessionExportMarkdown', () => {
         '',
         'It used `anthropic/claude-test`.',
         '',
+        '## Summary',
+        '',
+        '- 2 messages: 1 from you, 1 from Pi.',
+        '- 1 tool call: 1 done, 0 failed, 0 running.',
+        '- Tools used: bash.',
+        '',
         '## Continue elsewhere',
         '',
         'This file is portable context, not a restorable Pi session archive.',
@@ -158,6 +164,28 @@ describe('sessionExportMarkdown', () => {
     expect(markdown).not.toContain('Same folder (`');
   });
 
+  it('summarises tool outcomes and distinct tools in first-use order', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'T',
+      cwd: '',
+      model: '',
+      exportedAt,
+      entries: [
+        { key: 'u1', kind: 'user', text: 'hi' },
+        { ...bashDone, key: 't1' },
+        { ...bashDone, key: 't2', tool: 'read', ok: false, output: 'boom' },
+        { ...bashDone, key: 't3', tool: 'bash', running: true, output: '' },
+      ],
+    });
+    expect(markdown).toContain(
+      '- 1 message: 1 from you, 0 from Pi.',
+    );
+    expect(markdown).toContain(
+      '- 3 tool calls: 1 done, 1 failed, 1 running.',
+    );
+    expect(markdown).toContain('- Tools used: bash, read.');
+  });
+
   it('handles an empty selection and a blank title', () => {
     const markdown = sessionExportMarkdown({
       title: '  ',
@@ -171,6 +199,7 @@ describe('sessionExportMarkdown', () => {
     expect(markdown).not.toContain('It ran in');
     expect(markdown).not.toContain('It used');
     expect(markdown).not.toContain('Continue elsewhere');
+    expect(markdown).not.toContain('## Summary');
   });
 });
 
