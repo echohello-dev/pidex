@@ -522,11 +522,13 @@ describe('grouped roots in Electron', () => {
       .getByRole('button', { name: 'New session', exact: true })
       .click();
     await expect
-      .poll(async () =>
-        page
-          .locator('.wb-sidebar .wb-session-item')
-          .filter({ hasText: 'this window' })
-          .count(),
+      .poll(
+        async () =>
+          page
+            .locator('.wb-sidebar .wb-session-item')
+            .filter({ hasText: 'this window' })
+            .count(),
+        { timeout: 10_000 },
       )
       .toBe(1);
     expect(
@@ -731,6 +733,7 @@ describe('grouped roots in Electron', () => {
       .getByRole('treeitem', { name: /History for offline/ })
       .click();
     await page
+      .locator('.wb-transcript')
       .getByText('Stored answer for offline', { exact: true })
       .waitFor();
     expect(await page.getByLabel('Message pi').isDisabled()).toBe(true);

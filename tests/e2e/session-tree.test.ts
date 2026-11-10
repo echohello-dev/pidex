@@ -17,6 +17,7 @@ let switched: string;
 let log: string;
 const errors: string[] = [];
 const proofDir = process.env.PIDEX_BRANCH_PROOF_DIR;
+const summaryShots = path.join(ROOT, 'test-results/history-summary');
 let proofVideo: ReturnType<Page['video']>;
 const message = (
   id: string,
@@ -98,6 +99,31 @@ describe('session branches in Electron', () => {
     );
     switched = path.join(archives, 'switched.jsonl');
     await fs.writeFile(
+      path.join(archives, 'recovery.jsonl'),
+      [
+        { type: 'session', version: 3, id: 'recovery', cwd: project, timestamp: '2026-11-02T01:00:00Z' },
+        message('r-task', null, 'user', 'Recover interrupted build'),
+        {
+          type: 'message', id: 'r-call', parentId: 'r-task',
+          message: { role: 'assistant', content: [
+            { type: 'text', text: 'Checking the build before updating the parser.' },
+            { type: 'toolCall', id: 'build', name: 'bash', arguments: { command: 'bun run build' } },
+          ] },
+        },
+        {
+          type: 'message', id: 'r-failed', parentId: 'r-call',
+          message: { role: 'toolResult', toolCallId: 'build', isError: true,
+            content: [{ type: 'text', text: 'Build failed. Missing parser export.' }] },
+        },
+        {
+          type: 'message', id: 'r-tip', parentId: 'r-failed',
+          message: { role: 'assistant', content: [
+            { type: 'toolCall', id: 'edit', name: 'write', arguments: { path: 'parser.ts', content: 'export const parser = true;' } },
+          ] },
+        },
+      ].map((record) => JSON.stringify(record)).join('\n') + '\n',
+    );
+    await fs.writeFile(
       switched,
       [
         {
@@ -142,6 +168,7 @@ describe('session branches in Electron', () => {
     page = await app.firstWindow();
     proofVideo = page.video();
     if (proofDir) await fs.mkdir(proofDir, { recursive: true });
+    await fs.mkdir(summaryShots, { recursive: true });
     page.setDefaultTimeout(15000);
     await page.setViewportSize({ width: 1100, height: 700 });
     page.on('pageerror', (error) => errors.push(error.message));
@@ -156,6 +183,47 @@ describe('session branches in Electron', () => {
         path.join(proofDir, 'session-tree-navigation.webm'),
       );
     if (fixture) await fs.rm(fixture, { recursive: true, force: true });
+  });
+
+  it('summarises unfinished history without launching Pi and follows branch selection', async () => {
+    await page.setViewportSize({ width: 1280, height: 840 });
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page.getByRole('treeitem', { name: /Recover interrupted build/ }).click();
+    const summary = page.locator('.wb-history-summary');
+    await summary.getByText('2 messages · 2 tool calls').waitFor();
+    expect(await summary.getAttribute('open')).toBeNull();
+    await summary.locator('summary').click();
+    await summary.getByText('0 done · 1 failed · 0 running · 1 interrupted').waitFor();
+    await summary.getByText(/They may have made changes/).waitFor();
+    await page.screenshot({ path: path.join(summaryShots, 'unfinished-tools.png') });
+    // Native disclosure keeps the transcript accessible on short windows.
+    await summary.locator('summary').focus();
+    await page.keyboard.press('Enter');
+    expect(await summary.getAttribute('open')).toBeNull();
+    await page.keyboard.press('Enter');
+    expect(await summary.getAttribute('open')).not.toBeNull();
+    await page.getByRole('treeitem', { name: /Explore parser branches/ }).click();
+    await summary.locator('summary').click();
+    await summary.getByText('The latest branch uses a buffered parser.').waitFor();
+    await page.getByLabel('Branch tip').selectOption('old-tip');
+    await summary.locator('summary').click();
+    await summary.getByText('4 messages · 0 tool calls').waitFor();
+    await summary.getByText('Keep the streaming approach').waitFor();
+    await summary.getByText('Streaming branch is ready.').waitFor();
+    expect(await summary.textContent()).not.toContain('buffered parser');
+    await page.screenshot({ path: path.join(summaryShots, 'selected-branch.png') });
+    await page.getByRole('treeitem', { name: /assistant: The original branch/ }).click();
+    await summary.locator('summary').click();
+    await summary.getByText('2 messages · 0 tool calls').waitFor();
+    await summary.getByText('Explore parser branches').waitFor();
+    expect(await summary.textContent()).not.toContain('Keep the streaming approach');
+    expect((await readLog()).filter((c) => c.type === 'get_state' || c.type === 'prompt')).toEqual([]);
+    await page.getByRole('treeitem', { name: /\(empty session\)/ }).click();
+    await summary.locator('summary').click();
+    await summary.getByText('No messages in this selection.').waitFor();
+    await page.getByRole('treeitem', { name: /Explore parser branches/ }).click();
+    await page.locator('.wb-transcript').getByText('The latest branch uses a buffered parser.').waitFor();
+    await page.setViewportSize({ width: 1100, height: 700 });
   });
 
   it('previews selected branch and ancestor, forks exact selection and preserves both source branches', async () => {

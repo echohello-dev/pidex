@@ -1,5 +1,6 @@
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { SessionTree, EntryTree } from './components/SessionTree';
+import { HistorySummary } from './components/HistorySummary';
 import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
 import welcomeMark from './assets/workbench/welcome-mark.svg';
@@ -595,7 +596,7 @@ function App() {
                       />
                     )}
                   </aside>
-                  <section className="wb-conversation">
+                  <section className="wb-conversation wb-history-conversation">
                     {preview ? (
                       <>
                         <div className="wb-history-heading">
@@ -635,6 +636,11 @@ function App() {
                               Continuing creates a new fork from this selection
                               and preserves the source.
                             </p>
+                          )}
+                        {preview.loaded &&
+                          !b.previewLoading &&
+                          (preview.ready || preview.entries.length > 0) && (
+                            <HistorySummary entries={preview.entries} />
                           )}
                         <Transcript
                           key={`${preview.info.file}:${preview.entryId}`}
