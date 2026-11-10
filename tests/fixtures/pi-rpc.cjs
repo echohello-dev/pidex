@@ -275,6 +275,15 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       reply();
       streaming = true;
       event('agent_start');
+      if (command.message === 'Start interrupted tool fixture') {
+        event('tool_execution_start', {
+          toolCallId: 'interrupted-build', toolName: 'bash', args: { command: 'build-project' },
+        });
+        event('tool_execution_update', {
+          toolCallId: 'interrupted-build', partialResult: { content: [{ type: 'text', text: 'Building project...' }] },
+        });
+        break;
+      }
       event('message_start', { message: { role: 'assistant' } });
       event('message_update', {
         assistantMessageEvent: {

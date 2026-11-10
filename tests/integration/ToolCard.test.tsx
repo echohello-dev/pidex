@@ -154,4 +154,16 @@ describe('<TranscriptRow> tool card', () => {
     expect(container.textContent).toContain('Running');
     expect(container.textContent).toContain('Waiting for output');
   });
+
+  it('shows interrupted calls with partial output and no success claim', () => {
+    const entry = { ...toolEntry, interrupted: true, output: 'Partial progress' };
+    const { container, getByText } = render(
+      <TranscriptRow entry={entry} expanded={new Map([[entry.key, true]])} />,
+    );
+    expect(getByText('Interrupted')).toBeTruthy();
+    expect(container.querySelector('summary')?.textContent).not.toContain('Done');
+    expect(container.textContent).toContain('check before retrying');
+    expect(container.querySelectorAll('.wb-tool-section pre')[1]?.textContent).toBe('Partial progress');
+    expect(container.querySelector('summary img')?.getAttribute('src')).not.toContain('/check.svg');
+  });
 });

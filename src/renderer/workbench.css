@@ -706,6 +706,10 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   font-size: 12px;
   color: var(--copy);
 }
+.wb-tool-notice {
+  margin: 0;
+  padding: 0 12px 10px;
+}
 .wb-tool-section h3 {
   margin: 0;
   padding: 8px 12px 0;

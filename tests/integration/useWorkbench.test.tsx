@@ -64,6 +64,64 @@ afterEach(() => {
 });
 
 describe('workbench root switching', () => {
+  it('settles unfinished tool cards when their runtime exits', async () => {
+    const fixture = apiFixture();
+    const openSession = vi
+      .fn<PidexApi['openSession']>()
+      .mockResolvedValue({ sessionId: 'runtime' });
+    const sessionCommands = vi
+      .fn<PidexApi['sessionCommands']>()
+      .mockResolvedValue({ commands: [] });
+    Object.assign(fixture, { openSession, sessionCommands });
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    act(() =>
+      result.current.showSession({
+        cwd: '/code/api',
+        id: 'archive',
+        file: '/sessions/archive.jsonl',
+        title: 'Build',
+        model: '',
+        timestamp: '',
+        messageCount: 0,
+      }),
+    );
+    await waitFor(() => expect(result.current.tabs).toHaveLength(1));
+    const onEvent = fixture.onSessionEvent.mock.calls[0][0];
+    const onExit = fixture.onSessionExit.mock.calls[0][0];
+    act(() => {
+      onEvent({
+        sessionId: 'runtime',
+        event: {
+          type: 'tool_execution_start',
+          toolCallId: 'build',
+          toolName: 'bash',
+          args: { command: 'build' },
+        },
+      });
+      onEvent({
+        sessionId: 'runtime',
+        event: {
+          type: 'tool_execution_update',
+          toolCallId: 'build',
+          partialResult: { content: [{ type: 'text', text: 'Partial build' }] },
+        },
+      });
+      onExit({ sessionId: 'other-runtime' });
+    });
+    expect(result.current.tabs[0].entries[0]).toMatchObject({ running: true });
+    act(() => onExit({ sessionId: 'runtime' }));
+    expect(result.current.tabs[0]).toMatchObject({
+      running: false,
+      exited: true,
+    });
+    expect(result.current.tabs[0].entries[0]).toMatchObject({
+      running: false,
+      interrupted: true,
+      output: 'Partial build',
+    });
+  });
+
   it('rejects late catalog, file, model and defaults results from a previous root', async () => {
     const fixture = apiFixture();
     const oldCatalog = deferred<WorkspaceCatalog>();

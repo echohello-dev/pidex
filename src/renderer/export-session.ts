@@ -1,4 +1,4 @@
-import type { Entry } from './timeline';
+import { toolStatus, type Entry } from './timeline';
 
 export type SessionExportInput = {
   title: string;
@@ -17,11 +17,6 @@ function fenced(text: string): string {
   }
   const fence = '`'.repeat(Math.max(3, longest + 1));
   return `${fence}\n${text.replace(/\n$/, '')}\n${fence}`;
-}
-
-function toolStatus(entry: Extract<Entry, { kind: 'tool' }>): string {
-  if (entry.running) return 'Running';
-  return entry.ok ? 'Done' : 'Failed';
 }
 
 function toolHeading(entry: Extract<Entry, { kind: 'tool' }>): string {
@@ -60,11 +55,14 @@ function summarySection(entries: Entry[]): string {
     `- ${messages} ${messages === 1 ? 'message' : 'messages'}: ${users} from you, ${assistants} from Pi.`,
   ];
   if (tools.length > 0) {
-    const done = tools.filter((e) => !e.running && e.ok).length;
-    const failed = tools.filter((e) => !e.running && !e.ok).length;
-    const running = tools.filter((e) => e.running).length;
+    const done = tools.filter((e) => toolStatus(e) === 'Done').length;
+    const failed = tools.filter((e) => toolStatus(e) === 'Failed').length;
+    const running = tools.filter((e) => toolStatus(e) === 'Running').length;
+    const interrupted = tools.filter(
+      (e) => toolStatus(e) === 'Interrupted',
+    ).length;
     lines.push(
-      `- ${tools.length} ${tools.length === 1 ? 'tool call' : 'tool calls'}: ${done} done, ${failed} failed, ${running} running.`,
+      `- ${tools.length} ${tools.length === 1 ? 'tool call' : 'tool calls'}: ${done} done, ${failed} failed, ${running} running${interrupted ? `, ${interrupted} interrupted` : ''}.`,
       `- Tools used: ${[...new Set(tools.map((e) => e.tool))].join(', ')}.`,
     );
   }

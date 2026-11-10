@@ -399,6 +399,24 @@ describe('Figma workbench in Electron', () => {
     expect(errors).toEqual([]);
   });
 
+  it('settles a stopped tool as interrupted and preserves partial output', async () => {
+    await win.getByRole('button', { name: 'New session', exact: true }).click();
+    await win.getByLabel('Message pi').fill('Start interrupted tool fixture');
+    await win.getByRole('button', { name: 'Send', exact: true }).click();
+    const card = win.locator('.wb-tool').filter({ hasText: 'build-project' });
+    await card.locator('summary').getByText('Running', { exact: true }).waitFor();
+    await win.getByRole('button', { name: 'Stop', exact: true }).click();
+    await card.locator('summary').getByText('Interrupted', { exact: true }).waitFor();
+    await card.locator('summary').click();
+    await card.getByText('Building project...', { exact: true }).waitFor();
+    await card.getByText(/check before retrying/).waitFor();
+    expect(await card.locator('summary').textContent()).not.toContain('Done');
+    const screenshot = path.join(shots, '10-interrupted-tool.png');
+    await win.screenshot({ path: screenshot });
+    await fs.mkdir(path.join(ROOT, '.tmp/proof'), { recursive: true });
+    await fs.copyFile(screenshot, path.join(ROOT, '.tmp/proof/interrupted-tool.png'));
+  });
+
   it('keeps the desktop layouts usable at the minimum window size', async () => {
     await win.getByRole('button', { name: 'New session', exact: true }).click();
     await win.setViewportSize({ width: 900, height: 600 });
