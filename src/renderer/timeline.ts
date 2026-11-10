@@ -15,6 +15,7 @@ type Entry =
       output: string;
       running: boolean;
       ok: boolean;
+      interrupted?: boolean;
     };
 
 type AgentContent = {
@@ -142,6 +143,7 @@ function entriesFromMessages(messages: unknown[]): Entry[] {
             output: '',
             running: false,
             ok: true,
+            interrupted: true,
           };
           tools.set(p.id, tool);
           entries.push(tool);
@@ -154,6 +156,7 @@ function entriesFromMessages(messages: unknown[]): Entry[] {
       if (tool) {
         tool.output = resultText(m.content);
         tool.ok = m.isError !== true;
+        tool.interrupted = false;
       }
     }
   }
@@ -181,6 +184,11 @@ function applyEvent(
       break;
     case 'agent_end':
       running = false;
+      for (let i = 0; i < next.length; i++) {
+        const entry = next[i];
+        if (entry.kind === 'tool' && entry.running)
+          next[i] = { ...entry, running: false, interrupted: true };
+      }
       break;
     case 'message_start': {
       const message = event.message as AgentMessage | undefined;
@@ -249,6 +257,7 @@ function applyEvent(
           output: resultText(result?.content),
           running: false,
           ok: event.isError !== true,
+          interrupted: false,
         } as Entry;
       }
       break;
@@ -257,5 +266,11 @@ function applyEvent(
   return { entries: next, running };
 }
 
-export { entriesFromMessages, applyEvent };
+function toolStatus(entry: Extract<Entry, { kind: 'tool' }>): string {
+  if (entry.running) return 'Running';
+  if (entry.interrupted) return 'Interrupted';
+  return entry.ok ? 'Done' : 'Failed';
+}
+
+export { entriesFromMessages, applyEvent, toolStatus };
 export type { Entry, ToolLine };

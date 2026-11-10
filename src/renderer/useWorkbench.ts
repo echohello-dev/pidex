@@ -166,7 +166,12 @@ export function useWorkbench() {
       setTabs((prev) =>
         prev.map((tab) =>
           tab.runtimeId === sessionId
-            ? { ...tab, running: false, exited: true }
+            ? {
+                ...tab,
+                entries: applyEvent(tab.entries, { type: 'agent_end' }).entries,
+                running: false,
+                exited: true,
+              }
             : tab,
         ),
       );

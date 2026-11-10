@@ -114,6 +114,20 @@ describe('entriesFromMessages', () => {
     }
   });
 
+  it('marks archive calls interrupted until a matching result is recorded', () => {
+    const call = {
+      role: 'assistant',
+      content: [{ type: 'toolCall', id: 'incomplete', name: 'bash', arguments: { command: 'build' } }],
+    };
+    expect(entriesFromMessages([call])[0]).toMatchObject({
+      running: false, interrupted: true,
+    });
+    // An empty result still establishes completion.
+    expect(entriesFromMessages([call, {
+      role: 'toolResult', toolCallId: 'incomplete', content: [],
+    }])[0]).toMatchObject({ running: false, interrupted: false, ok: true });
+  });
+
   it('keeps full edit input with old and new text', () => {
     const messages = [
       {
@@ -246,6 +260,26 @@ describe('applyEvent', () => {
   it('agent_end clears running', () => {
     const { running } = applyEvent(empty, { type: 'agent_end' });
     expect(running).toBe(false);
+  });
+
+  it('agent_end interrupts only unfinished calls and retains partial output', () => {
+    const tool: Extract<Entry, { kind: 'tool' }> = {
+      key: 'pending', kind: 'tool', toolId: 'pending', tool: 'bash',
+      args: 'build', input: 'build', output: 'Building...', running: true, ok: true,
+    };
+    const done = { ...tool, key: 'done', toolId: 'done', running: false };
+    const failed = { ...done, key: 'failed', toolId: 'failed', ok: false };
+    const { entries } = applyEvent([tool, done, failed], { type: 'agent_end' });
+    expect(entries[0]).toMatchObject({ running: false, interrupted: true, output: 'Building...' });
+    expect(entries[1]).toBe(done);
+    expect(entries[2]).toBe(failed);
+    expect(tool.running).toBe(true);
+    expect(applyEvent(entries, { type: 'agent_end' }).entries).toEqual(entries);
+    const completed = applyEvent(entries, {
+      type: 'tool_execution_end', toolCallId: 'pending',
+      result: { content: [{ type: 'text', text: 'Build complete' }] },
+    }).entries;
+    expect(completed[0]).toMatchObject({ interrupted: false, running: false, ok: true, output: 'Build complete' });
   });
 
   it('message_start (assistant) pushes a streaming assistant entry', () => {

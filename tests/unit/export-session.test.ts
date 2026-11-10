@@ -111,6 +111,16 @@ describe('sessionExportMarkdown', () => {
     expect(running).toContain('## bash / npm test (Running)');
   });
 
+  it('counts interrupted tools separately and retains their partial output', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'Interrupted build', cwd: '/repo/app', model: '', exportedAt,
+      entries: [bashDone, { ...bashDone, key: 'interrupted', interrupted: true, output: 'Building...' }],
+    });
+    expect(markdown).toContain('2 tool calls: 1 done, 0 failed, 0 running, 1 interrupted.');
+    expect(markdown).toContain('## bash / npm test (Interrupted)');
+    expect(markdown).toContain('Building...');
+  });
+
   it('keeps an empty input and output readable', () => {
     const markdown = sessionExportMarkdown({
       title: 'T',

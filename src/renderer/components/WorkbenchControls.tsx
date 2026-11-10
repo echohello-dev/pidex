@@ -8,7 +8,7 @@ import {
 import { BracketButton } from './BracketButton';
 import { FigureFrame } from './FigureFrame';
 import { Markdown } from './Markdown';
-import type { Entry } from '../timeline';
+import { toolStatus, type Entry } from '../timeline';
 import type { ModelInfo, SlashCommand } from '../api';
 
 const icons = import.meta.glob<string>('../assets/workbench/*.svg', {
@@ -446,7 +446,7 @@ export const TranscriptRow = memo(function TranscriptRow({
                 ? 'activity-terminal'
                 : entry.tool === 'read'
                   ? 'file'
-                  : entry.ok
+                  : entry.ok && !entry.interrupted
                     ? 'check'
                     : 'file'
             }
@@ -455,10 +455,14 @@ export const TranscriptRow = memo(function TranscriptRow({
             {entry.tool}
             {entry.args ? ` / ${entry.args}` : ''}
           </span>
-          <small>
-            {entry.running ? 'Running' : entry.ok ? 'Done' : 'Failed'}
-          </small>
+          <small>{toolStatus(entry)}</small>
         </summary>
+        {entry.interrupted && (
+          <p className="wb-tool-notice wb-muted">
+            No completion result was recorded. The tool may have made changes;
+            check before retrying.
+          </p>
+        )}
         {entry.oldText !== undefined || entry.newText !== undefined ? (
           <ToolDiffSection
             text={entry.input || 'No input.'}
