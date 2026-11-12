@@ -727,12 +727,23 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 .wb-tool-section h3 {
   margin: 0;
-  padding: 8px 12px 0;
+  flex: 1;
+}
+.wb-tool-section h3 button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
+  cursor: pointer;
 }
 .wb-tool-section-head {
   display: flex;

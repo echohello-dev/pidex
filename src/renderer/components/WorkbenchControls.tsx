@@ -1,5 +1,6 @@
 import {
   memo,
+  useId,
   useRef,
   useState,
   type KeyboardEvent,
@@ -330,16 +331,69 @@ function useCopy(text: string) {
   return { copied, copy };
 }
 
+function ToolSection({
+  title,
+  text,
+  stateKey,
+  expanded,
+  children,
+}: {
+  title: string;
+  text: string;
+  stateKey: string;
+  expanded: Map<string, boolean>;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(
+    () => expanded.get(stateKey) ?? title === 'Output',
+  );
+  const { copied, copy } = useCopy(text);
+  return (
+    <div className="wb-tool-section">
+      <div className="wb-tool-section-head">
+        <h3>
+          <button
+            type="button"
+            aria-label={`${title} details`}
+            aria-expanded={open}
+            aria-controls={id}
+            onClick={() => {
+              expanded.set(stateKey, !open);
+              setOpen(!open);
+            }}
+          >
+            <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+            {title}
+          </button>
+        </h3>
+        <button
+          type="button"
+          className="wb-tool-copy"
+          aria-label={`Copy ${title.toLowerCase()}`}
+          onClick={() => void copy()}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div id={id} hidden={!open}>{open && children}</div>
+    </div>
+  );
+}
+
 function ToolDiffSection({
   text,
   oldText,
   newText,
+  stateKey,
+  expanded,
 }: {
   text: string;
   oldText: string;
   newText: string;
+  stateKey: string;
+  expanded: Map<string, boolean>;
 }) {
-  const { copied, copy } = useCopy(text);
   const [showAll, setShowAll] = useState(false);
   const rows = diffLines(oldText, newText);
   const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
@@ -355,18 +409,7 @@ function ToolDiffSection({
     if (visible.length === 0 && rows.length > 0) visible = [rows[0]];
   }
   return (
-    <div className="wb-tool-section">
-      <div className="wb-tool-section-head">
-        <h3>Input</h3>
-        <button
-          type="button"
-          className="wb-tool-copy"
-          aria-label="Copy input"
-          onClick={() => void copy()}
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
+    <ToolSection title="Input" text={text} stateKey={stateKey} expanded={expanded}>
       <div className="wb-tool-diff">
         {visible.map((row, index) => (
           <div
@@ -388,29 +431,22 @@ function ToolDiffSection({
           {showAll ? 'Show less' : 'Show more'}
         </button>
       )}
-    </div>
+    </ToolSection>
   );
 }
 
-function ToolTextSection({ title, text }: { title: string; text: string }) {
+function ToolTextSection({ title, text, stateKey, expanded }: {
+  title: string;
+  text: string;
+  stateKey: string;
+  expanded: Map<string, boolean>;
+}) {
   const [showAll, setShowAll] = useState(false);
-  const { copied, copy } = useCopy(text);
   const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
   const visible =
     isLong && !showAll ? text.slice(0, TOOL_TEXT_PREVIEW_LIMIT) : text;
   return (
-    <div className="wb-tool-section">
-      <div className="wb-tool-section-head">
-        <h3>{title}</h3>
-        <button
-          type="button"
-          className="wb-tool-copy"
-          aria-label={`Copy ${title.toLowerCase()}`}
-          onClick={() => void copy()}
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
+    <ToolSection title={title} text={text} stateKey={stateKey} expanded={expanded}>
       <pre>{visible}</pre>
       {isLong && (
         <button
@@ -421,7 +457,7 @@ function ToolTextSection({ title, text }: { title: string; text: string }) {
           {showAll ? 'Show less' : 'Show more'}
         </button>
       )}
-    </div>
+    </ToolSection>
   );
 }
 
@@ -468,12 +504,21 @@ export const TranscriptRow = memo(function TranscriptRow({
             text={entry.input || 'No input.'}
             oldText={entry.oldText ?? ''}
             newText={entry.newText ?? ''}
+            stateKey={`${entry.key}:input`}
+            expanded={expanded}
           />
         ) : (
-          <ToolTextSection title="Input" text={entry.input || 'No input.'} />
+          <ToolTextSection
+            title="Input"
+            text={entry.input || 'No input.'}
+            stateKey={`${entry.key}:input`}
+            expanded={expanded}
+          />
         )}
         <ToolTextSection
           title="Output"
+          stateKey={`${entry.key}:output`}
+          expanded={expanded}
           text={
             entry.output ||
             (entry.running ? 'Waiting for output…' : 'No output.')
