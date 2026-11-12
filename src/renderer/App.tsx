@@ -1,6 +1,7 @@
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { SessionTree, EntryTree } from './components/SessionTree';
 import { HistorySummary } from './components/HistorySummary';
+import { HistoryExport } from './components/HistoryExport';
 import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
 import welcomeMark from './assets/workbench/welcome-mark.svg';
@@ -20,10 +21,6 @@ import {
 } from './components/WorkbenchViews';
 import { Transcript } from './components/Transcript';
 import { CommandPalette } from './components/CommandPalette';
-import {
-  sessionExportFilename,
-  sessionExportMarkdown,
-} from './export-session';
 import { timeAgo, useWorkbench } from './useWorkbench';
 
 function App() {
@@ -111,25 +108,15 @@ function App() {
   const branch = details.branch || ws?.branch || 'local';
   const context = `${ws?.name ?? 'pidex'} / ${branch} / ${view === 'history' ? `${sessions.length} sessions` : view === 'changes' ? `${details.changes.length} changes` : view === 'settings' ? 'workspace defaults' : 'local workspace'}`;
   const live = b.tabs;
-  const exportSession = () => {
-    if (!preview) return;
-    const exportedAt = new Date();
-    const text = sessionExportMarkdown({
-      title: preview.info.title,
-      cwd: preview.info.cwd,
-      model: preview.info.model,
-      exportedAt,
-      entries: preview.entries,
-    });
-    const url = URL.createObjectURL(
-      new Blob([text], { type: 'text/markdown' }),
-    );
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = sessionExportFilename(preview.info.title, exportedAt);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const historyExport = preview?.loaded && !b.previewLoading &&
+    (preview.ready || preview.entries.length > 0)
+    ? {
+        title: preview.info.title,
+        cwd: preview.info.cwd,
+        model: preview.info.model,
+        entries: preview.entries,
+      }
+    : null;
 
   return (
     <div
@@ -330,9 +317,10 @@ function App() {
                     Restore defaults
                   </BracketButton>
                 ) : view === 'history' ? (
-                  <BracketButton disabled={!preview} onClick={exportSession}>
-                    Export
-                  </BracketButton>
+                  <HistoryExport
+                    key={`${preview?.info.file}:${preview?.entryId}:${!!historyExport}`}
+                    input={historyExport}
+                  />
                 ) : (
                   <BracketButton
                     onClick={() =>

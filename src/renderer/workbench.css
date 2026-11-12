@@ -327,6 +327,21 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.wb-view-header > .wb-history-export-actions {
+  flex: 0 1 auto;
+  max-width: 360px;
+}
+.wb-history-export-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.wb-view-header .wb-history-export-actions p {
+  margin-top: 4px;
+  white-space: normal;
+  font-size: 11px;
+  line-height: 14px;
+}
 .wb-view-header p {
   font-size: 12px;
   line-height: 18px;
