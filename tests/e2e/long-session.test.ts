@@ -204,6 +204,53 @@ describe('long session in Electron', () => {
     ).toBeGreaterThan(500);
   });
 
+  it('inspects tool sections independently and retains choices after row recycling', async () => {
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await scroll(false);
+    const card = page.locator('.wb-tool').first();
+    await card.locator('summary').click();
+    const input = card.getByRole('button', { name: 'Input details' });
+    const output = card.getByRole('button', { name: 'Output details' });
+    expect(await input.getAttribute('aria-expanded')).toBe('false');
+    expect(await output.getAttribute('aria-expanded')).toBe('true');
+    expect(await card.getByText('git diff --stat # iteration 0', { exact: true }).count()).toBe(0);
+    await card.locator('pre').getByText(/1 file changed/).waitFor();
+    await card.scrollIntoViewIfNeeded();
+    const proof = path.join(root, '.tmp/proof');
+    await fs.mkdir(proof, { recursive: true });
+    await page.screenshot({ path: path.join(proof, 'tool-output-first.png') });
+    await page.screenshot({ path: path.join(shotDir, 'tool-output-first.png') });
+
+    await input.focus();
+    await input.press('Enter');
+    await card.getByText('git diff --stat # iteration 0', { exact: true }).waitFor();
+    await output.focus();
+    await output.press('Space');
+    expect(await output.getAttribute('aria-expanded')).toBe('false');
+    await card.getByRole('button', { name: 'Copy input' }).click();
+    await card.getByRole('button', { name: 'Copy input' }).getByText('Copied', { exact: true }).waitFor();
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('git diff --stat # iteration 0');
+
+    // Remove focus from the row so the virtualizer can actually recycle it.
+    await page.locator('.wb-transcript').focus();
+    await scroll(true);
+    await page.locator('.wb-transcript').getByText('Iteration 1499', { exact: true }).waitFor();
+    await expect.poll(() => page.getByText('git diff --stat # iteration 0', { exact: true }).count()).toBe(0);
+    await scroll(false);
+    await page.locator('.wb-transcript').getByText('Iteration 0', { exact: true }).waitFor();
+    expect(await input.getAttribute('aria-expanded')).toBe('true');
+    expect(await output.getAttribute('aria-expanded')).toBe('false');
+    await card.getByText('git diff --stat # iteration 0', { exact: true }).waitFor();
+    expect(await card.locator('pre').count()).toBe(1);
+    await card.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(proof, 'tool-input-restored.png') });
+    await page.screenshot({ path: path.join(shotDir, 'tool-input-restored.png') });
+    await output.click();
+    await card.locator('summary').click();
+    await scroll(false);
+    expect(errors).toEqual([]);
+  });
+
   it('preserves selection, expansion and measured layout while browsing history', async () => {
     await page.getByRole('button', { name: /^Sessions/ }).click();
     await page

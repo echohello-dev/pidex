@@ -20,13 +20,14 @@ describe('<TranscriptRow> tool card', () => {
 
   it('shows input and output as separate labelled sections when expanded', () => {
     const expanded = new Map<string, boolean>([[toolEntry.key, true]]);
-    const { container } = render(
+    const { container, getByRole } = render(
       <TranscriptRow entry={toolEntry} expanded={expanded} />,
     );
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
     const headings = [...container.querySelectorAll('.wb-tool-section h3')].map(
-      (h) => h.textContent,
+      (h) => h.querySelector('button')?.getAttribute('aria-label'),
     );
-    expect(headings).toEqual(['Input', 'Output']);
+    expect(headings).toEqual(['Input details', 'Output details']);
     expect(container.textContent).toContain('const before = 1;');
     expect(container.textContent).toContain('const after = 2;');
     expect(container.textContent).toContain('Edited /repo/src/app.ts');
@@ -78,9 +79,10 @@ describe('<TranscriptRow> tool card', () => {
       newText: 'const keep = 0;\nconst after = 2;',
     };
     const expanded = new Map<string, boolean>([[editEntry.key, true]]);
-    const { container } = render(
+    const { container, getByRole } = render(
       <TranscriptRow entry={editEntry} expanded={expanded} />,
     );
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
     const del = container.querySelector('.wb-tool-diff-line--del');
     const add = container.querySelector('.wb-tool-diff-line--add');
     const context = container.querySelector('.wb-tool-diff-line--context');
@@ -103,9 +105,10 @@ describe('<TranscriptRow> tool card', () => {
       output: 'Wrote /repo/new.ts',
     };
     const expanded = new Map<string, boolean>([[writeEntry.key, true]]);
-    const { container } = render(
+    const { container, getByRole } = render(
       <TranscriptRow entry={writeEntry} expanded={expanded} />,
     );
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
     const added = [...container.querySelectorAll('.wb-tool-diff-line--add')];
     expect(added).toHaveLength(2);
     expect(added[0]?.textContent).toContain('export const a = 1;');
@@ -163,7 +166,66 @@ describe('<TranscriptRow> tool card', () => {
     expect(getByText('Interrupted')).toBeTruthy();
     expect(container.querySelector('summary')?.textContent).not.toContain('Done');
     expect(container.textContent).toContain('check before retrying');
-    expect(container.querySelectorAll('.wb-tool-section pre')[1]?.textContent).toBe('Partial progress');
+    expect(container.querySelector('.wb-tool-section pre')?.textContent).toBe('Partial progress');
     expect(container.querySelector('summary img')?.getAttribute('src')).not.toContain('/check.svg');
+  });
+
+  it('opens output first and toggles input and output independently', () => {
+    const { getByRole, queryByText } = render(
+      <TranscriptRow entry={toolEntry} expanded={new Map([[toolEntry.key, true]])} />,
+    );
+    const input = getByRole('button', { name: 'Input details' });
+    const output = getByRole('button', { name: 'Output details' });
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(output.getAttribute('aria-expanded')).toBe('true');
+    const inputBody = document.getElementById(input.getAttribute('aria-controls')!)!;
+    expect(inputBody.hidden).toBe(true);
+    fireEvent.click(input);
+    expect(inputBody.hidden).toBe(false);
+    expect(inputBody.textContent).toBe(toolEntry.input);
+    fireEvent.click(output);
+    expect(queryByText(toolEntry.output)).toBeNull();
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(document.getElementById(output.getAttribute('aria-controls')!)?.hidden).toBe(true);
+  });
+
+  it('keeps closed output hidden during streaming and reveals the latest result', () => {
+    const expanded = new Map([[toolEntry.key, true]]);
+    const running = { ...toolEntry, running: true, output: '' };
+    const { getByRole, queryByText, rerender } = render(
+      <TranscriptRow entry={running} expanded={expanded} />,
+    );
+    expect(queryByText('Waiting for output…')).toBeTruthy();
+    fireEvent.click(getByRole('button', { name: 'Output details' }));
+    rerender(<TranscriptRow entry={{ ...running, output: 'Partial output' }} expanded={expanded} />);
+    expect(queryByText('Partial output')).toBeNull();
+    rerender(<TranscriptRow entry={toolEntry} expanded={expanded} />);
+    expect(queryByText(toolEntry.output)).toBeNull();
+    fireEvent.click(getByRole('button', { name: 'Output details' }));
+    expect(queryByText(toolEntry.output)).toBeTruthy();
+  });
+
+  it('restores section choices after remounting without changing other cards', () => {
+    const expanded = new Map([[toolEntry.key, true]]);
+    const first = render(<TranscriptRow entry={toolEntry} expanded={expanded} />);
+    fireEvent.click(first.getByRole('button', { name: 'Input details' }));
+    fireEvent.click(first.getByRole('button', { name: 'Output details' }));
+    first.unmount();
+    const restored = render(<TranscriptRow entry={toolEntry} expanded={expanded} />);
+    expect(restored.getByRole('button', { name: 'Input details' }).getAttribute('aria-expanded')).toBe('true');
+    expect(restored.getByRole('button', { name: 'Output details' }).getAttribute('aria-expanded')).toBe('false');
+    restored.unmount();
+    const other = render(<TranscriptRow entry={{ ...toolEntry, key: 'other' }} expanded={new Map([...expanded, ['other', true]])} />);
+    expect(other.getByRole('button', { name: 'Input details' }).getAttribute('aria-expanded')).toBe('false');
+    expect(other.getByRole('button', { name: 'Output details' }).getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('shows empty input and output explanations when their sections are open', () => {
+    const { getByRole, getByText } = render(
+      <TranscriptRow entry={{ ...toolEntry, input: '', output: '' }} expanded={new Map([[toolEntry.key, true]])} />,
+    );
+    expect(getByText('No output.')).toBeTruthy();
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
+    expect(getByText('No input.')).toBeTruthy();
   });
 });
