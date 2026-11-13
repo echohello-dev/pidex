@@ -1,0 +1,117 @@
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { _electron as electron, type ElectronApplication, type Page } from 'playwright-core';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+const ROOT = path.resolve(__dirname, '../..');
+let app: ElectronApplication;
+let page: Page;
+let fixture: string;
+let project: string;
+let clean: string;
+const errors: string[] = [];
+const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+const status = () => page.getByRole('region', { name: 'Workspace Git status' });
+async function capture(name: string) {
+  for (const directory of ['.tmp/proof', 'test-results/workspace-status']) {
+    await fs.mkdir(path.join(ROOT, directory), { recursive: true });
+    await page.screenshot({ path: path.join(ROOT, directory, name) });
+  }
+}
+async function select(name: string) {
+  await page.getByLabel('Workspace group').selectOption({ label: name });
+  await page.getByRole('heading', { name: 'Start a session', exact: true }).waitFor();
+}
+
+describe('workspace status in Electron', () => {
+  beforeAll(async () => {
+    fixture = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'pidex-status-')));
+    project = path.join(fixture, 'project');
+    clean = path.join(fixture, 'clean');
+    const plain = path.join(fixture, 'plain');
+    const userData = path.join(fixture, 'user-data');
+    await Promise.all([project, clean, plain, userData].map((dir) => fs.mkdir(dir)));
+    await fs.mkdir(path.join(fixture, 'sessions'));
+    for (const cwd of [project, clean]) {
+      git(cwd, 'init', '-b', 'main');
+      await fs.writeFile(path.join(cwd, 'app.ts'), 'export const value = 1;\n');
+      git(cwd, 'add', '.');
+      git(cwd, '-c', 'user.name=Test', '-c', 'user.email=test@example.test', '-c', 'commit.gpgsign=false', 'commit', '-m', 'fixture');
+    }
+    git(project, 'switch', '-c', 'feature/workspace-status');
+    await fs.writeFile(path.join(project, 'app.ts'), 'export const value = 2;\n');
+    git(project, 'add', 'app.ts');
+    await fs.writeFile(path.join(project, 'app.ts'), 'export const value = 3;\n');
+    await fs.writeFile(path.join(project, 'notes.txt'), 'Review before starting Pi.\n');
+    await fs.writeFile(path.join(userData, 'workspaces.json'), JSON.stringify([project, clean, plain, path.join(fixture, 'missing')]));
+    app = await electron.launch({
+      executablePath: require('electron'), args: ['.'], cwd: ROOT,
+      env: {
+        ...process.env, NODE_ENV: 'development', PIDEX_E2E_CWD: project,
+        PIDEX_E2E_RENDERER_URL: inject('rendererUrl'), PIDEX_E2E_USER_DATA: userData,
+        PIDEX_SESSIONS_ROOT: path.join(fixture, 'sessions'),
+        PIDEX_PI: path.join(ROOT, 'tests/fixtures/pi-rpc.cjs'),
+      },
+    });
+    page = await app.firstWindow();
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('heading', { name: 'Start a session', exact: true }).waitFor();
+    await select('project');
+  });
+  afterAll(async () => {
+    await app?.close();
+    if (fixture) await fs.rm(fixture, { recursive: true, force: true });
+  });
+
+  it('shows mixed Git changes before starting Pi and opens Changes without losing the task draft', async () => {
+    await expect.poll(() => status().textContent()).toContain('2 changed files');
+    expect(await status().textContent()).toContain('feature/workspace-status · 1 staged · 1 unstaged · 1 untracked');
+    await page.getByLabel('Message pi').fill('Review the existing changes before editing.');
+    await page.evaluate(() => document.fonts.ready);
+    await capture('workspace-status.png');
+    await page.setViewportSize({ width: 760, height: 900 });
+    await status().scrollIntoViewIfNeeded();
+    const bounds = await status().boundingBox();
+    const button = await status().getByRole('button').boundingBox();
+    if (!bounds || !button) throw new Error('Workspace status is not visible.');
+    expect(button.x + button.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+    await capture('workspace-status-narrow.png');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await status().getByRole('button', { name: 'Review workspace changes' }).click();
+    await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Review the existing changes before editing.');
+    await page.getByLabel('Commit message').waitFor();
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Review the existing changes before editing.');
+    expect(await page.locator('.wb-sidebar .wb-session-item').filter({ hasText: 'this window' }).count()).toBe(0);
+  });
+
+  it('refreshes changed counts on focus and keeps clean and detached roots distinct', async () => {
+    await fs.unlink(path.join(project, 'notes.txt'));
+    git(project, 'add', 'app.ts');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().textContent()).toContain('1 changed file');
+    expect(await status().textContent()).toContain('1 staged · 0 unstaged · 0 untracked');
+    await select('clean');
+    await expect.poll(() => status().textContent()).toContain('No changes in this root');
+    expect(await status().textContent()).toContain('main · 0 staged · 0 unstaged · 0 untracked');
+    git(clean, 'checkout', '--detach');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().textContent()).toContain('Detached HEAD');
+    expect(await status().textContent()).not.toContain('feature/workspace-status');
+  });
+
+  it('does not describe non-Git folders or missing roots as clean', async () => {
+    await select('plain');
+    await expect.poll(() => status().textContent()).toContain('Git changes are unavailable for this folder.');
+    expect(await status().getByRole('button').isDisabled()).toBe(true);
+    await select('missing');
+    await expect.poll(() => status().textContent()).toContain('Restore this folder to inspect Git changes.');
+    expect(await status().getByRole('button').isDisabled()).toBe(true);
+    expect(await status().textContent()).not.toContain('No changes in this root');
+    expect(errors).toEqual([]);
+  });
+});

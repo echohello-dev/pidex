@@ -389,6 +389,32 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   gap: 16px;
   min-height: 80px;
 }
+.wb-workspace-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.wb-workspace-status h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.wb-workspace-status > div {
+  flex: 1 1 300px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wb-workspace-status > button {
+  max-width: 100%;
+  white-space: normal;
+}
+.wb-workspace-status p {
+  margin: 4px 0 0;
+}
 .wb-start-title > svg {
   flex-shrink: 0;
 }

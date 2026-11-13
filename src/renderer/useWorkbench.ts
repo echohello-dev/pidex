@@ -42,6 +42,10 @@ export const DEFAULTS: Defaults = {
   thinking: 'medium',
 };
 const EMPTY_DETAILS: WorkspaceDetails = { branch: '', changes: [], files: [] };
+const UNAVAILABLE_DETAILS: WorkspaceDetails = {
+  ...EMPTY_DETAILS,
+  gitError: 'Workspace inspection is unavailable. Return to this root to try again.',
+};
 
 export function timeAgo(iso: string): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return 'local';
@@ -73,6 +77,7 @@ export function useWorkbench() {
   const generation = useRef(0);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [details, setDetails] = useState(EMPTY_DETAILS);
+  const [detailsRoot, setDetailsRoot] = useState('');
   const [view, setView] = useState<View>('new');
   const [tabs, setTabs] = useState<SessionTab[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -186,6 +191,7 @@ export function useWorkbench() {
   useEffect(() => {
     let cancelled = false;
     setDetails(EMPTY_DETAILS);
+    setDetailsRoot('');
     setSessions([]);
     setPreviewLoading(false);
     setModels([]);
@@ -222,10 +228,17 @@ export function useWorkbench() {
     api
       .inspectWorkspace(ws.cwd)
       .then((r) => {
-        if (!cancelled) setDetails(unwrap(r));
+        if (!cancelled) {
+          setDetails(unwrap(r));
+          setDetailsRoot(ws.dirName);
+        }
       })
       .catch((error) => {
-        if (!cancelled) report(error);
+        if (!cancelled) {
+          setDetails(UNAVAILABLE_DETAILS);
+          setDetailsRoot(ws.dirName);
+          report(error);
+        }
       });
     api
       .models(ws.cwd)
@@ -262,9 +275,19 @@ export function useWorkbench() {
     if (currentCwd.current === ws.cwd && token === generation.current)
       setSessions(list);
     if (ws.availability !== 'available') return;
-    const result = await api.inspectWorkspace(ws.cwd);
-    if (currentCwd.current === ws.cwd && token === generation.current)
-      setDetails(unwrap(result));
+    try {
+      const result = await api.inspectWorkspace(ws.cwd);
+      if (currentCwd.current === ws.cwd && token === generation.current) {
+        setDetails(unwrap(result));
+        setDetailsRoot(ws.dirName);
+      }
+    } catch (error) {
+      if (currentCwd.current === ws.cwd && token === generation.current) {
+        setDetails(UNAVAILABLE_DETAILS);
+        setDetailsRoot(ws.dirName);
+      }
+      throw error;
+    }
   }, [api, ws]);
   useEffect(() => {
     if (!ws) return;
@@ -700,12 +723,15 @@ export function useWorkbench() {
     ws,
     sessions,
     details,
+    detailsRoot,
     setDetails: (next: WorkspaceDetails) => {
       if (
         currentCwd.current === ws?.cwd &&
         generation.current === renderGeneration
-      )
+      ) {
         setDetails(next);
+        setDetailsRoot(ws?.dirName ?? '');
+      }
     },
     view,
     navigate,

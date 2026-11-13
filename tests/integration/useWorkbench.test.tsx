@@ -64,6 +64,31 @@ afterEach(() => {
 });
 
 describe('workbench root switching', () => {
+  it('keeps inspection pending until the selected root responds and exposes inspection failures', async () => {
+    const fixture = apiFixture();
+    const pending = deferred<Awaited<ReturnType<PidexApi['inspectWorkspace']>>>();
+    fixture.inspectWorkspace.mockImplementation((cwd) => cwd === '/code/web'
+      ? pending.promise
+      : Promise.resolve({ data: { branch: 'main', files: [], changes: [] } }));
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.detailsRoot).toBe('api'));
+    act(() => result.current.selectWorkspace(catalog.roots[1]));
+    expect(result.current.detailsRoot).not.toBe('web');
+    await act(async () => pending.resolve({ error: 'Inspection failed' }));
+    expect(result.current.detailsRoot).toBe('web');
+    expect(result.current.details.gitError).toContain('inspection is unavailable');
+    fixture.inspectWorkspace.mockResolvedValue({ data: { branch: 'web', files: [], changes: [] } });
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.details.gitError).toBeUndefined();
+    expect(result.current.detailsRoot).toBe('web');
+    fixture.inspectWorkspace.mockRejectedValue(new Error('IPC failed'));
+    await act(async () => {
+      await expect(result.current.refresh()).rejects.toThrow('IPC failed');
+    });
+    expect(result.current.details.gitError).toContain('inspection is unavailable');
+    expect(result.current.detailsRoot).toBe('web');
+  });
+
   it('prepares selected history across groups, keeps both drafts and restores the source selection', async () => {
     const fixture = apiFixture();
     fixture.workspaceCatalog.mockResolvedValue({
@@ -243,6 +268,7 @@ describe('workbench root switching', () => {
     const { result } = renderHook(useWorkbench);
     await waitFor(() => expect(result.current.ws?.name).toBe('api'));
     fixture.workspaceCatalog.mockImplementationOnce(() => oldCatalog.promise);
+    expect(result.current.detailsRoot).toBe('');
     act(() => {
       window.dispatchEvent(new Event('focus'));
     });
@@ -269,6 +295,7 @@ describe('workbench root switching', () => {
     expect(result.current.ws?.name).toBe('web');
     expect(result.current.groups[0].name).toBe('Commerce');
     expect(result.current.details.files).toEqual(['web-only.ts']);
+    expect(result.current.detailsRoot).toBe('web');
     expect(result.current.models.map((m) => m.id)).toEqual(['web-model']);
     expect(result.current.defaults.thinking).toBe('low');
   });

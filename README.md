@@ -51,6 +51,8 @@ These are captures of real Electron interactions with a temporary Git workspace 
 - Switch roots while sessions run in the background; retain per-root drafts, views and model defaults.
 - Use quick switch for roots, sessions, files, and commands.
 
+The new-session view shows the selected root's branch and changed-file counts before you send a task. A partially staged file counts once overall and appears in both staged and unstaged totals. Use **Review workspace changes** to open Changes and keep your task draft. Counts follow the existing refresh on focus, navigation and every 15 seconds; unavailable folders and failed inspections never appear clean.
+
 Expanded tool cards show output first. Open Input or close Output independently, and copy either section while it is closed. These choices stay with each card while scrolling through the transcript; reopening the transcript resets them.
 
 Session history shows source/fork relationships and an entry tree with selected and archive-tip markers. Select a branch tip or an earlier entry to preview its parent chain. Resume at the archive tip continues in place; **Resume in new fork** continues a historical selection in a separate archive and preserves the source. **Fork from here** uses the selected entry. Pi 1.5.0 RPC does not expose arbitrary-entry navigation, so forks extract a native branch archive before launching Pi so even runtime startup writes preserve the source. Continuation requires an intact Pi v3 archive within the 16 MiB browsing limit. See [ADR 0013](docs/adr/0013-session-branch-selection.md) for runtime semantics and limits.
