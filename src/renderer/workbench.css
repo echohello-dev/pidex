@@ -934,7 +934,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
-.wb-history-heading .wb-meta {
+.wb-history-heading > div > .wb-meta {
   margin-top: 8px;
 }
 .wb-history-workspace-status {
@@ -1728,7 +1728,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   border-bottom: 1px solid #ffffff12;
   color: #b9c7bd;
 }
-.wb-history-heading .wb-meta {
+.wb-history-heading > div > .wb-meta {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
