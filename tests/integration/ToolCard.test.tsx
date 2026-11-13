@@ -71,6 +71,81 @@ describe('<TranscriptRow> tool card', () => {
     expect(container.textContent).not.toContain('end-marker');
   });
 
+  it('inspects a failed output ending, expands the full result and copies it exactly', async () => {
+    const output = `build-start\n${'Compiling module…\n'.repeat(200)}ERROR: build failed\n`;
+    const entry = { ...toolEntry, tool: 'bash', input: 'bun run build', output, ok: false };
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText }, configurable: true,
+    });
+    const { container, getByRole, getByText, queryByRole } = render(
+      <TranscriptRow entry={entry} expanded={new Map([[entry.key, true]])} />,
+    );
+    const result = () => container.querySelector('pre')!;
+    expect(getByText('Failed')).toBeTruthy();
+    expect(result().textContent).toBe(output.slice(0, TOOL_TEXT_PREVIEW_LIMIT));
+    expect(getByText(`Showing first 2,000 of ${output.length.toLocaleString('en-AU')} characters.`)).toBeTruthy();
+    fireEvent.click(getByRole('button', { name: 'Show end' }));
+    expect(result().textContent).toBe(output.slice(-TOOL_TEXT_PREVIEW_LIMIT));
+    expect(result().textContent).toContain('ERROR: build failed');
+    expect(getByText(`Showing last 2,000 of ${output.length.toLocaleString('en-AU')} characters.`)).toBeTruthy();
+    fireEvent.click(getByRole('button', { name: 'Copy output' }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(output));
+    fireEvent.click(getByRole('button', { name: 'Show more' }));
+    expect(result().textContent).toBe(output);
+    expect(queryByRole('button', { name: 'Show beginning' })).toBeNull();
+    fireEvent.click(getByRole('button', { name: 'Show less' }));
+    expect(result().textContent).toBe(output.slice(-TOOL_TEXT_PREVIEW_LIMIT));
+    fireEvent.click(getByRole('button', { name: 'Show beginning' }));
+    expect(result().textContent).toBe(output.slice(0, TOOL_TEXT_PREVIEW_LIMIT));
+    expect(result().scrollTop).toBe(0);
+  });
+
+  it('follows appended output in the end preview and keeps that choice through row recycling', () => {
+    const expanded = new Map([[toolEntry.key, true]]);
+    const entry = { ...toolEntry, running: true, output: 'progress\n'.repeat(400) };
+    const view = render(<TranscriptRow entry={entry} expanded={expanded} />);
+    fireEvent.click(view.getByRole('button', { name: 'Show end' }));
+    const next = { ...entry, output: `${entry.output}Latest progress\n` };
+    view.rerender(<TranscriptRow entry={next} expanded={expanded} />);
+    expect(view.container.querySelector('pre')?.textContent).toBe(next.output.slice(-TOOL_TEXT_PREVIEW_LIMIT));
+    fireEvent.click(view.getByRole('button', { name: 'Output details' }));
+    const done = { ...next, running: false, output: `${next.output}Finished\n` };
+    view.rerender(<TranscriptRow entry={done} expanded={expanded} />);
+    expect(view.container.querySelector('pre')).toBeNull();
+    view.unmount();
+    const restored = render(<TranscriptRow entry={done} expanded={expanded} />);
+    fireEvent.click(restored.getByRole('button', { name: 'Output details' }));
+    expect(restored.container.querySelector('pre')?.textContent).toBe(done.output.slice(-TOOL_TEXT_PREVIEW_LIMIT));
+    restored.unmount();
+    const other = render(<TranscriptRow entry={{ ...done, key: 'other' }} expanded={new Map([...expanded, ['other', true]])} />);
+    expect(other.container.querySelector('pre')?.textContent).toBe(done.output.slice(0, TOOL_TEXT_PREVIEW_LIMIT));
+  });
+
+  it.each([TOOL_TEXT_PREVIEW_LIMIT - 1, TOOL_TEXT_PREVIEW_LIMIT])('shows %i output characters in full without preview controls', (length) => {
+    const output = 'x'.repeat(length);
+    const { container, queryByRole } = render(
+      <TranscriptRow entry={{ ...toolEntry, output }} expanded={new Map([[toolEntry.key, true]])} />,
+    );
+    expect(container.querySelector('pre')?.textContent).toBe(output);
+    expect(queryByRole('button', { name: 'Show end' })).toBeNull();
+    expect(queryByRole('button', { name: 'Show more' })).toBeNull();
+  });
+
+  it('keeps long input at the beginning when output uses an end preview', () => {
+    const input = `input-start-${'i'.repeat(3000)}-input-end`;
+    const output = `output-start-${'o'.repeat(3000)}-output-end`;
+    const { container, getByRole, getAllByRole } = render(
+      <TranscriptRow entry={{ ...toolEntry, input, output }} expanded={new Map([[toolEntry.key, true]])} />,
+    );
+    fireEvent.click(getByRole('button', { name: 'Show end' }));
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
+    expect([...container.querySelectorAll('pre')].map((pre) => pre.textContent)).toEqual([
+      input.slice(0, TOOL_TEXT_PREVIEW_LIMIT), output.slice(-TOOL_TEXT_PREVIEW_LIMIT),
+    ]);
+    expect(getAllByRole('button', { name: 'Show beginning' })).toHaveLength(1);
+  });
+
   it('renders edit input as a diff with added, removed, and context lines', () => {
     const editEntry: Extract<Entry, { kind: 'tool' }> = {
       ...toolEntry,

@@ -7,6 +7,7 @@ import path from 'node:path';
 const root = path.resolve(__dirname, '../..');
 const oldText = `const settings = {${'enabled: false, '.repeat(400)}}; // old-end`;
 const newText = `const settings = {${'enabled: true, '.repeat(400)}}; // new-end`;
+const failedOutput = `Starting build\n${'Compiling workspace modules…\n'.repeat(160)}ERROR: settings.js failed validation\nBuild exited with code 1\n`;
 const shots = path.join(root, 'test-results/tool-preview');
 let app: ElectronApplication;
 let page: Page;
@@ -95,21 +96,24 @@ describe('bounded tool previews in Electron', () => {
       fs.mkdir(path.join(root, '.tmp/proof'), { recursive: true }),
       fs.mkdir(shots, { recursive: true }),
     ]);
-    for (const tool of ['write', 'edit']) {
+    for (const tool of ['write', 'edit', 'bash']) {
       const records = [
         { type: 'session', version: 3, id: tool, cwd: project, timestamp: new Date().toISOString() },
         { type: 'message', id: 'task', parentId: null, message: {
           role: 'user', content: [{ type: 'text', text: `Inspect long ${tool} input` }],
         } },
         { type: 'message', id: 'call', parentId: 'task', message: {
-          role: 'assistant', content: [{ type: 'toolCall', id: tool, name: tool, arguments: {
-            path: 'settings.js',
-            ...(tool === 'write' ? { content: newText } : { oldText, newText }),
-          } }],
+          role: 'assistant', content: [{ type: 'toolCall', id: tool, name: tool, arguments:
+            tool === 'bash' ? { command: 'bun run build' } : {
+              path: 'settings.js',
+              ...(tool === 'write' ? { content: newText } : { oldText, newText }),
+            },
+          }],
         } },
         { type: 'message', id: 'result', parentId: 'call', message: {
           role: 'toolResult', toolCallId: tool, toolName: tool,
-          content: [{ type: 'text', text: 'Updated settings.js' }],
+          isError: tool === 'bash',
+          content: [{ type: 'text', text: tool === 'bash' ? failedOutput : 'Updated settings.js' }],
         } },
       ];
       await fs.writeFile(path.join(archives, `${tool}.jsonl`), records.map((r) => JSON.stringify(r)).join('\n'));
@@ -176,6 +180,47 @@ describe('bounded tool previews in Electron', () => {
     await captureFooter(`${tool}-footer-restored`);
     await card.locator('summary').click();
     await captureFooter(`${tool}-footer-collapsed`);
+    expect(errors).toEqual([]);
+  });
+
+  it('inspects the end of failed output with bounded text, exact copying and keyboard controls', async () => {
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Inspect long bash input/ }).click();
+    const card = page.locator('.wb-tool');
+    await card.locator('summary').click();
+    await card.locator('summary').getByText('Failed', { exact: true }).waitFor();
+    const output = card.locator('.wb-tool-section').filter({ has: page.getByRole('button', { name: 'Output details' }) });
+    const text = output.locator('pre');
+    expect(await text.textContent()).toBe(failedOutput.slice(0, 2000));
+    await output.getByRole('button', { name: 'Show end', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    expect(await text.textContent()).toBe(failedOutput.slice(-2000));
+    await expect.poll(() => text.evaluate((node) => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+    await output.getByRole('button', { name: 'Copy output' }).click();
+    await card.getByText('Copied', { exact: true }).waitFor();
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(failedOutput);
+    const capture = async (name: string) => {
+      await output.getByRole('button', { name: 'Show beginning' }).scrollIntoViewIfNeeded();
+      const screenshot = await page.screenshot({ scale: 'css' });
+      await Promise.all([
+        fs.writeFile(path.join(root, '.tmp/proof', name), screenshot),
+        fs.writeFile(path.join(shots, name), screenshot),
+      ]);
+    };
+    await capture('failed-output-end.png');
+    await output.getByRole('button', { name: 'Show more' }).click();
+    expect(await text.textContent()).toBe(failedOutput);
+    await output.getByRole('button', { name: 'Show less' }).click();
+    expect(await text.textContent()).toBe(failedOutput.slice(-2000));
+    await card.getByRole('button', { name: 'Output details' }).click();
+    await card.getByRole('button', { name: 'Output details' }).click();
+    await expect.poll(() => text.evaluate((node) => node.scrollHeight - node.clientHeight - node.scrollTop)).toBeLessThanOrEqual(1);
+    await resizeWindow(900, 600);
+    await capture('failed-output-end-narrow.png');
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    await output.getByRole('button', { name: 'Show beginning' }).click();
+    expect(await text.textContent()).toBe(failedOutput.slice(0, 2000));
+    expect(await text.evaluate((node) => node.scrollTop)).toBe(0);
     expect(errors).toEqual([]);
   });
 });
