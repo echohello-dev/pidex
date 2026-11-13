@@ -613,13 +613,14 @@ function App() {
                                 : ''}
                             </p>
                           </div>
-                          <BracketButton
-                            primary
-                            onClick={() => b.navigate('changes')}
-                          >
-                            Review changes
-                          </BracketButton>
                         </div>
+                        <WorkspaceStatus
+                          context="history"
+                          workspace={ws}
+                          details={details}
+                          ready={b.detailsRoot === ws.dirName}
+                          onReview={() => b.navigate('changes')}
+                        />
                         {preview.tree?.warning && (
                           <p className="wb-meta" role="status">
                             {preview.tree.warning}

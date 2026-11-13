@@ -391,6 +391,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 .wb-workspace-status {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;

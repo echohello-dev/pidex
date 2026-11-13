@@ -6,11 +6,13 @@ export function WorkspaceStatus({
   details,
   ready,
   onReview,
+  context = 'new',
 }: {
   workspace: WorkspaceInfo;
   details: WorkspaceDetails;
   ready: boolean;
   onReview: () => void;
+  context?: 'new' | 'history';
 }) {
   const unavailable = workspace.availability !== 'available';
   const changes = details.changes;
@@ -32,7 +34,12 @@ export function WorkspaceStatus({
   return (
     <section className="wb-workspace-status" aria-label="Workspace Git status">
       <div>
-        <h3>Workspace changes</h3>
+        <h3>{context === 'history' ? 'Current workspace changes' : 'Workspace changes'}</h3>
+        {context === 'history' && (
+          <p className="wb-meta">
+            Saved history does not restore files or switch Git branches.
+          </p>
+        )}
         <p role="status">{message}</p>
         {inspected && (
           <p className="wb-meta">
