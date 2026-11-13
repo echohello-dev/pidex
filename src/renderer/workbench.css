@@ -920,7 +920,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 .wb-history-heading {
   display: flex;
-  align-items: center;
+  align-items: start;
   gap: 16px;
 }
 .wb-history-heading > div {
@@ -950,11 +950,22 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   padding: 8px 10px;
 }
 .wb-history-workspace-status summary .wb-meta {
-  display: block;
+  display: flex;
+  min-width: 0;
+  margin-top: 4px;
+}
+.wb-history-workspace-status summary .wb-meta > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-top: 4px;
+}
+.wb-history-status-branch {
+  flex: 1;
+  min-width: 0;
+}
+.wb-history-workspace-status summary .wb-meta > span:last-child {
+  flex-shrink: 0;
+  max-width: 100%;
 }
 .wb-history-workspace-status .wb-workspace-status {
   border: 0;
@@ -1879,5 +1890,27 @@ html[data-reduced-motion='true'] .wb-shell *::after {
     padding-top: 12px;
     padding-bottom: 12px;
     gap: 8px;
+  }
+  .wb-history-heading h2 {
+    font-size: 20px;
+    line-height: 24px;
+  }
+  .wb-history-heading > div > .wb-meta {
+    margin-top: 4px;
+  }
+  .wb-history-workspace-status summary {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .wb-history-conversation > .wb-branch-notice {
+    padding: 6px 10px;
+  }
+  .wb-history-conversation .wb-composer {
+    padding: 12px;
+    min-height: 128px;
+  }
+  .wb-history-conversation .wb-composer textarea {
+    height: 40px;
+    min-height: 40px;
   }
 }

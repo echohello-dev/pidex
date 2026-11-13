@@ -15,8 +15,8 @@ afterEach(cleanup);
 
 describe('workspace Git status', () => {
   it('distinguishes current files from saved conversation history', () => {
-    render(<WorkspaceStatus context="history" workspace={workspace} details={details} ready onReview={vi.fn()} />);
-    expect(screen.getByText('feature/status · No changes in this root')).toBeVisible();
+    const { container } = render(<WorkspaceStatus context="history" workspace={workspace} details={details} ready onReview={vi.fn()} />);
+    expect(container.querySelector('summary')).toHaveTextContent('feature/status · No changes in this root');
     expect(screen.getByRole('button', { name: 'Review workspace changes', hidden: true })).not.toBeVisible();
     fireEvent.click(screen.getByText('Current workspace changes'));
     expect(screen.getByText('Saved history does not restore files or switch Git branches.')).toBeVisible();
