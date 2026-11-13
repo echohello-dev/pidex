@@ -396,17 +396,20 @@ function ToolDiffSection({
 }) {
   const [showAll, setShowAll] = useState(false);
   const rows = diffLines(oldText, newText);
-  const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
+  const isLong =
+    rows.reduce((length, row) => length + row.text.length + 1, 0) >
+    TOOL_TEXT_PREVIEW_LIMIT;
   let visible = rows;
   if (isLong && !showAll) {
     visible = [];
-    let used = 0;
+    let remaining = TOOL_TEXT_PREVIEW_LIMIT;
     for (const row of rows) {
-      used += row.text.length + 1;
-      if (used > TOOL_TEXT_PREVIEW_LIMIT) break;
-      visible.push(row);
+      if (remaining <= 0) break;
+      // Include the diff marker in the budget and clip even a single long row.
+      const clipped = row.text.slice(0, remaining - 1);
+      visible.push({ ...row, text: clipped });
+      remaining -= clipped.length + 1;
     }
-    if (visible.length === 0 && rows.length > 0) visible = [rows[0]];
   }
   return (
     <ToolSection title="Input" text={text} stateKey={stateKey} expanded={expanded}>
@@ -422,6 +425,11 @@ function ToolDiffSection({
         ))}
         {visible.length === 0 && <div className="wb-tool-diff-line">No changes.</div>}
       </div>
+      {isLong && !showAll && (
+        <p className="wb-tool-notice wb-muted">
+          Input preview shortened. Show more or copy the full input.
+        </p>
+      )}
       {isLong && (
         <button
           type="button"

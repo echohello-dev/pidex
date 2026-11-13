@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
-import { TranscriptRow } from '../../src/renderer/components/WorkbenchControls';
+import { TOOL_TEXT_PREVIEW_LIMIT, TranscriptRow } from '../../src/renderer/components/WorkbenchControls';
 import type { Entry } from '../../src/renderer/timeline';
 
 const toolEntry: Extract<Entry, { kind: 'tool' }> = {
@@ -113,6 +113,68 @@ describe('<TranscriptRow> tool card', () => {
     expect(added).toHaveLength(2);
     expect(added[0]?.textContent).toContain('export const a = 1;');
     expect(container.querySelector('.wb-tool-diff-line--del')).toBeNull();
+  });
+
+  it.each(['edit', 'write'])('bounds a single long %s line and preserves full inspection and copying', async (tool) => {
+    const oldText = tool === 'edit' ? `before-${'x'.repeat(5000)}-old-end` : '';
+    const newText = `after-${'y'.repeat(5000)}-new-end`;
+    const input = tool === 'edit'
+      ? `${toolEntry.args}\n\nOld:\n${oldText}\n\nNew:\n${newText}`
+      : `${toolEntry.args}\n\n${newText}`;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const entry = { ...toolEntry, tool, input, oldText, newText };
+    const { container, getByRole, queryByText } = render(
+      <TranscriptRow entry={entry} expanded={new Map([[entry.key, true]])} />,
+    );
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
+    const diff = container.querySelector('.wb-tool-diff')!;
+    expect(diff.textContent?.length).toBe(TOOL_TEXT_PREVIEW_LIMIT);
+    expect(diff.textContent).not.toContain('-new-end');
+    expect(diff.textContent).not.toContain('-old-end');
+    expect(queryByText('Input preview shortened. Show more or copy the full input.')).toBeTruthy();
+
+    fireEvent.click(getByRole('button', { name: 'Copy input' }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(input));
+    fireEvent.click(getByRole('button', { name: 'Show more' }));
+    expect(diff.textContent).toContain(newText);
+    if (oldText) expect(diff.textContent).toContain(oldText);
+    expect(queryByText('Input preview shortened. Show more or copy the full input.')).toBeNull();
+    fireEvent.click(getByRole('button', { name: 'Show less' }));
+    expect(diff.textContent?.length).toBe(TOOL_TEXT_PREVIEW_LIMIT);
+  });
+
+  it('bounds multiple diff rows including the final partial row', () => {
+    const lines = Array.from({ length: 4 }, (_, index) => `${index}-${'x'.repeat(700)}`);
+    const entry = { ...toolEntry, oldText: '', newText: lines.join('\n') };
+    const { container, getByRole } = render(
+      <TranscriptRow entry={entry} expanded={new Map([[entry.key, true]])} />,
+    );
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
+    const diff = container.querySelector('.wb-tool-diff')!;
+    expect(diff.textContent?.length).toBe(TOOL_TEXT_PREVIEW_LIMIT);
+    const rows = diff.querySelectorAll('.wb-tool-diff-line');
+    expect(rows).toHaveLength(3);
+    expect(rows[0].textContent).toBe(`+${lines[0]}`);
+    expect(rows[2].textContent).toMatch(/^\+2-x+$/);
+    expect(rows[2].textContent?.length).toBeLessThan(lines[2].length);
+    fireEvent.click(getByRole('button', { name: 'Show more' }));
+    expect(diff.querySelectorAll('.wb-tool-diff-line')).toHaveLength(4);
+    expect(diff.textContent).toContain(lines[3]);
+  });
+
+  it.each([TOOL_TEXT_PREVIEW_LIMIT - 1, TOOL_TEXT_PREVIEW_LIMIT])('does not shorten a %i-character diff because of input path or labels', (length) => {
+    const newText = 'x'.repeat(length - 1);
+    const entry = { ...toolEntry, input: `${toolEntry.args}\n\n${newText}`, oldText: '', newText };
+    const { container, getByRole, queryByRole } = render(
+      <TranscriptRow entry={entry} expanded={new Map([[entry.key, true]])} />,
+    );
+    fireEvent.click(getByRole('button', { name: 'Input details' }));
+    expect(container.querySelector('.wb-tool-diff')?.textContent).toBe(`+${newText}`);
+    expect(queryByRole('button', { name: 'Show more' })).toBeNull();
   });
 
   it('copies the exact plain input text from a diff card', async () => {
