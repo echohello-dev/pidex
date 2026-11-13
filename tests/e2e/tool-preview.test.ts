@@ -96,10 +96,13 @@ describe('bounded tool previews in Electron', () => {
     await card.locator('summary').scrollIntoViewIfNeeded();
     // Expansion changes the virtual row height. Wait for measurement before
     // capturing so the history footer has moved below the resized card.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
     await expect.poll(async () => {
-      const cardBounds = await card.boundingBox();
+      const outputBounds = await card.getByRole('button', { name: 'Output details' }).boundingBox();
       const footerBounds = await page.getByRole('button', { name: 'Fork from here', exact: true }).boundingBox();
-      return !!cardBounds && !!footerBounds && footerBounds.y >= cardBounds.y + cardBounds.height - 1;
+      return !!outputBounds && !!footerBounds && footerBounds.y >= outputBounds.y + outputBounds.height;
     }).toBe(true);
     const screenshot = `${tool}-bounded-preview.png`;
     await page.screenshot({ path: path.join(root, '.tmp/proof', screenshot) });
