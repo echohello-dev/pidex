@@ -3,6 +3,7 @@ import { SessionTree, EntryTree } from './components/SessionTree';
 import { HistorySummary } from './components/HistorySummary';
 import { HistoryExport } from './components/HistoryExport';
 import { HistoryHandoff } from './components/HistoryHandoff';
+import { WorkspaceStatus } from './components/WorkspaceStatus';
 import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
 import welcomeMark from './assets/workbench/welcome-mark.svg';
@@ -388,6 +389,12 @@ function App() {
                       </label>
                       <span className="wb-meta">{ws.cwd}</span>
                     </div>
+                    <WorkspaceStatus
+                      workspace={ws}
+                      details={details}
+                      ready={b.detailsRoot === ws.dirName}
+                      onReview={() => b.navigate('changes')}
+                    />
                     {composer()}
                     <div className="wb-starters">
                       <button
