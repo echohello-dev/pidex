@@ -59,6 +59,8 @@ Session history shows source/fork relationships and an entry tree with selected 
 
 Saved history includes a collapsible summary of the selected path, with the latest request and reply, message counts and tool outcomes. Unfinished tool calls carry a reminder to review the workspace before retrying. Selecting another branch or an earlier entry updates the summary.
 
+History also shows the root's current Git branch and changed-file counts before you resume or fork. Open **Current workspace changes**, then use **Review workspace changes** to inspect the current diff. Return to Sessions with the selected history entry and continuation draft preserved. Saved history does not restore files or switch Git branches.
+
 Use **Copy context** in History to put the selected path's Markdown handoff on the clipboard, or **Export** to save it as a file. Both include the original root, model, messages, thinking and tool input/output. Open the destination root and paste the context into a new session there. This transfers context; saved history and Resume stay with the original root.
 
 To prepare that handoff directly, select a history branch or entry and open **Continue in another root**. Choose a registered destination and **Prepare draft** to add the selected history to its new-session composer. Existing draft text is kept. Review and send it when ready. Files and session archives stay in their original root; this starts a separate session in the destination.

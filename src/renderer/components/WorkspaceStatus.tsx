@@ -6,11 +6,13 @@ export function WorkspaceStatus({
   details,
   ready,
   onReview,
+  context = 'new',
 }: {
   workspace: WorkspaceInfo;
   details: WorkspaceDetails;
   ready: boolean;
   onReview: () => void;
+  context?: 'new' | 'history';
 }) {
   const unavailable = workspace.availability !== 'available';
   const changes = details.changes;
@@ -29,10 +31,15 @@ export function WorkspaceStatus({
           : 'No changes in this root';
   const inspected = !unavailable && ready && !details.gitError;
 
-  return (
-    <section className="wb-workspace-status" aria-label="Workspace Git status">
+  const content = (
+    <>
       <div>
-        <h3>Workspace changes</h3>
+        {context === 'new' && <h3>Workspace changes</h3>}
+        {context === 'history' && (
+          <p className="wb-meta">
+            Saved history does not restore files or switch Git branches.
+          </p>
+        )}
         <p role="status">{message}</p>
         {inspected && (
           <p className="wb-meta">
@@ -43,6 +50,23 @@ export function WorkspaceStatus({
       <BracketButton disabled={!inspected} onClick={onReview}>
         Review workspace changes
       </BracketButton>
-    </section>
+    </>
   );
+  if (context === 'history') {
+    return (
+      <section className="wb-history-workspace-status" aria-label="Workspace Git status">
+        <details>
+          <summary>
+            Current workspace changes
+            <span className="wb-meta" title={inspected ? `${details.branch || 'Detached HEAD'} · ${message}` : message}>
+              {inspected && <span className="wb-history-status-branch">{details.branch || 'Detached HEAD'}</span>}
+              <span>{inspected && ' · '}{message}</span>
+            </span>
+          </summary>
+          <div className="wb-workspace-status">{content}</div>
+        </details>
+      </section>
+    );
+  }
+  return <section className="wb-workspace-status" aria-label="Workspace Git status">{content}</section>;
 }

@@ -14,6 +14,15 @@ const change: GitChange = {
 afterEach(cleanup);
 
 describe('workspace Git status', () => {
+  it('distinguishes current files from saved conversation history', () => {
+    const { container } = render(<WorkspaceStatus context="history" workspace={workspace} details={details} ready onReview={vi.fn()} />);
+    expect(container.querySelector('summary')).toHaveTextContent('feature/status · No changes in this root');
+    expect(screen.getByRole('button', { name: 'Review workspace changes', hidden: true })).not.toBeVisible();
+    fireEvent.click(screen.getByText('Current workspace changes'));
+    expect(screen.getByText('Saved history does not restore files or switch Git branches.')).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('No changes in this root');
+  });
+
   it('counts a partially staged file once overall and in both change groups', () => {
     const onReview = vi.fn();
     render(<WorkspaceStatus workspace={workspace} ready details={{

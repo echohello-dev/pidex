@@ -11,14 +11,25 @@ let page: Page;
 let fixture: string;
 let project: string;
 let clean: string;
+let source: string;
+let rpcLog: string;
 const errors: string[] = [];
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' });
 const status = () => page.getByRole('region', { name: 'Workspace Git status' });
 async function capture(name: string) {
   for (const directory of ['.tmp/proof', 'test-results/workspace-status']) {
     await fs.mkdir(path.join(ROOT, directory), { recursive: true });
-    await page.screenshot({ path: path.join(ROOT, directory, name) });
+    await page.screenshot({ scale: 'css', path: path.join(ROOT, directory, name) });
   }
+}
+async function resizeWindow(width: number, height: number) {
+  const window = await app.browserWindow(page);
+  await window.evaluate((window, size) => window.setContentSize(size.width, size.height), { width, height });
+  const [actualWidth, actualHeight] = await window.evaluate((window) => window.getContentSize());
+  await page.waitForFunction(
+    ({ width, height }) => innerWidth === width && innerHeight === height,
+    { width: actualWidth, height: actualHeight },
+  );
 }
 async function select(name: string) {
   await page.getByLabel('Workspace group').selectOption({ label: name });
@@ -33,7 +44,19 @@ describe('workspace status in Electron', () => {
     const plain = path.join(fixture, 'plain');
     const userData = path.join(fixture, 'user-data');
     await Promise.all([project, clean, plain, userData].map((dir) => fs.mkdir(dir)));
-    await fs.mkdir(path.join(fixture, 'sessions'));
+    const archives = path.join(fixture, 'sessions/workspace');
+    await fs.mkdir(archives, { recursive: true });
+    source = path.join(archives, 'source.jsonl');
+    rpcLog = path.join(fixture, 'rpc.jsonl');
+    const message = (id: string, parentId: string | null, role: string, text: string) => ({
+      type: 'message', id, parentId, message: { role, content: [{ type: 'text', text }] },
+    });
+    await fs.writeFile(source, [
+      { type: 'session', version: 3, id: 'source', cwd: project, timestamp: new Date().toISOString() },
+      message('task', null, 'user', 'Review saved parser work'),
+      message('old-tip', 'task', 'assistant', 'The streaming approach needs review.'),
+      message('new-tip', 'task', 'assistant', 'The buffered approach is ready.'),
+    ].map((record) => JSON.stringify(record)).join('\n') + '\n');
     for (const cwd of [project, clean]) {
       git(cwd, 'init', '-b', 'main');
       await fs.writeFile(path.join(cwd, 'app.ts'), 'export const value = 1;\n');
@@ -53,11 +76,12 @@ describe('workspace status in Electron', () => {
         PIDEX_E2E_RENDERER_URL: inject('rendererUrl'), PIDEX_E2E_USER_DATA: userData,
         PIDEX_SESSIONS_ROOT: path.join(fixture, 'sessions'),
         PIDEX_PI: path.join(ROOT, 'tests/fixtures/pi-rpc.cjs'),
+        PIDEX_RPC_LOG: rpcLog,
       },
     });
     page = await app.firstWindow();
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await resizeWindow(1280, 900);
     await page.getByRole('heading', { name: 'Start a session', exact: true }).waitFor();
     await select('project');
   });
@@ -72,14 +96,14 @@ describe('workspace status in Electron', () => {
     await page.getByLabel('Message pi').fill('Review the existing changes before editing.');
     await page.evaluate(() => document.fonts.ready);
     await capture('workspace-status.png');
-    await page.setViewportSize({ width: 760, height: 900 });
+    await resizeWindow(900, 700);
     await status().scrollIntoViewIfNeeded();
     const bounds = await status().boundingBox();
     const button = await status().getByRole('button').boundingBox();
     if (!bounds || !button) throw new Error('Workspace status is not visible.');
     expect(button.x + button.width).toBeLessThanOrEqual(bounds.x + bounds.width);
     await capture('workspace-status-narrow.png');
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await resizeWindow(1280, 900);
     await status().getByRole('button', { name: 'Review workspace changes' }).click();
     await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
     expect(await page.getByLabel('Message pi').inputValue()).toBe('Review the existing changes before editing.');
@@ -87,6 +111,54 @@ describe('workspace status in Electron', () => {
     await page.getByRole('button', { name: 'New session', exact: true }).click();
     expect(await page.getByLabel('Message pi').inputValue()).toBe('Review the existing changes before editing.');
     expect(await page.locator('.wb-sidebar .wb-session-item').filter({ hasText: 'this window' }).count()).toBe(0);
+  });
+
+  it('reviews current changes from saved history without losing the selected entry or continuation draft', async () => {
+    const original = await fs.readFile(source, 'utf8');
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Review saved parser work/ }).click();
+    await page.getByLabel('Branch tip').selectOption('old-tip');
+    await page.locator('.wb-transcript').getByText('The streaming approach needs review.').waitFor();
+    await expect.poll(() => status().textContent()).toContain('2 changed files');
+    expect(await status().textContent()).toContain('feature/workspace-status · 1 staged · 1 unstaged · 1 untracked');
+    await page.getByLabel('Message pi').fill('Check the current files before continuing this branch.');
+
+    await resizeWindow(1280, 900);
+    await page.evaluate(() => document.fonts.ready);
+    await capture('history-workspace-status.png');
+    await status().locator('summary').click();
+    await status().getByText('Saved history does not restore files or switch Git branches.').waitFor();
+    await capture('history-workspace-status-expanded.png');
+    await status().getByRole('button', { name: 'Review workspace changes' }).click();
+    await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
+    await page.getByLabel('Commit message').waitFor();
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    expect(await page.getByLabel('Branch tip').inputValue()).toBe('old-tip');
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Check the current files before continuing this branch.');
+    expect(await page.getByRole('button', { name: 'Resume in new fork', exact: true }).isEnabled()).toBe(true);
+    expect(await page.locator('.wb-transcript').textContent()).not.toContain('The buffered approach is ready.');
+
+    await fs.writeFile(path.join(project, 'notes.txt'), 'A newer edit outside the saved conversation.\n');
+    git(project, 'add', 'notes.txt');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().textContent()).toContain('2 staged · 1 unstaged · 0 untracked');
+    await status().locator('summary').click();
+    await capture('history-workspace-status-refreshed.png');
+    await status().locator('summary').click();
+    await resizeWindow(900, 600);
+    expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    await capture('history-workspace-status-narrow.png');
+    await resizeWindow(1280, 900);
+    git(project, 'reset', '--', 'notes.txt');
+    expect(await fs.readFile(source, 'utf8')).toBe(original);
+    const commands = (await fs.readFile(rpcLog, 'utf8').catch(() => ''))
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    expect(commands.every((command) => command.type === 'get_available_models')).toBe(true);
+    expect(await page.locator('.wb-sidebar .wb-session-item').filter({ hasText: 'this window' }).count()).toBe(0);
+    expect(errors).toEqual([]);
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
   });
 
   it('refreshes changed counts on focus and keeps clean and detached roots distinct', async () => {
