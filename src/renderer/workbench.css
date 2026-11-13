@@ -792,6 +792,15 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-tool-toggle {
   margin: 0 12px 12px;
 }
+.wb-tool-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+.wb-tool-preview-actions .wb-tool-toggle {
+  margin: 0;
+}
 .wb-tool-section + .wb-tool-section {
   border-top: 1px solid var(--line-soft);
 }

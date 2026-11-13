@@ -450,20 +450,57 @@ function ToolTextSection({ title, text, stateKey, expanded }: {
   expanded: Map<string, boolean>;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [showEnd, setShowEnd] = useState(
+    () => expanded.get(`${stateKey}:end`) ?? false,
+  );
+  const textRef = useRef<HTMLPreElement>(null);
   const isLong = text.length > TOOL_TEXT_PREVIEW_LIMIT;
+  const atEnd = title === 'Output' && showEnd;
   const visible =
-    isLong && !showAll ? text.slice(0, TOOL_TEXT_PREVIEW_LIMIT) : text;
+    isLong && !showAll
+      ? atEnd
+        ? text.slice(-TOOL_TEXT_PREVIEW_LIMIT)
+        : text.slice(0, TOOL_TEXT_PREVIEW_LIMIT)
+      : text;
   return (
     <ToolSection title={title} text={text} stateKey={stateKey} expanded={expanded}>
-      <pre>{visible}</pre>
+      <pre
+        ref={(node) => {
+          textRef.current = node;
+          // End previews follow appended output and reopen at the final line.
+          if (node && atEnd) node.scrollTop = node.scrollHeight;
+        }}
+      >
+        {visible}
+      </pre>
+      {title === 'Output' && isLong && !showAll && (
+        <p className="wb-tool-notice wb-muted">
+          Showing {atEnd ? 'last' : 'first'} {TOOL_TEXT_PREVIEW_LIMIT.toLocaleString('en-AU')} of {text.length.toLocaleString('en-AU')} characters.
+        </p>
+      )}
       {isLong && (
-        <button
-          type="button"
-          className="wb-tool-toggle"
-          onClick={() => setShowAll((value) => !value)}
-        >
-          {showAll ? 'Show less' : 'Show more'}
-        </button>
+        <div className="wb-tool-preview-actions">
+          {title === 'Output' && !showAll && (
+            <button
+              type="button"
+              className="wb-tool-toggle"
+              onClick={() => {
+                expanded.set(`${stateKey}:end`, !showEnd);
+                setShowEnd(!showEnd);
+                if (showEnd && textRef.current) textRef.current.scrollTop = 0;
+              }}
+            >
+              {atEnd ? 'Show beginning' : 'Show end'}
+            </button>
+          )}
+          <button
+            type="button"
+            className="wb-tool-toggle"
+            onClick={() => setShowAll((value) => !value)}
+          >
+            {showAll ? 'Show less' : 'Show more'}
+          </button>
+        </div>
       )}
     </ToolSection>
   );

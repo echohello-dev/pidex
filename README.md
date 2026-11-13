@@ -55,6 +55,8 @@ The new-session view shows the selected root's branch and changed-file counts be
 
 Expanded tool cards show output first. Open Input or close Output independently, and copy either section while it is closed. These choices stay with each card while scrolling through the transcript; reopening the transcript resets them.
 
+Long tool output previews the first 2,000 characters. Use **Show end** to inspect the last 2,000 characters, including final errors, without expanding the whole result. The end preview follows new output while Pi works. **Show beginning** returns to the start, **Show more** opens the full text, and Copy keeps the complete output in every mode.
+
 Session history shows source/fork relationships and an entry tree with selected and archive-tip markers. Select a branch tip or an earlier entry to preview its parent chain. Resume at the archive tip continues in place; **Resume in new fork** continues a historical selection in a separate archive and preserves the source. **Fork from here** uses the selected entry. Pi 1.5.0 RPC does not expose arbitrary-entry navigation, so forks extract a native branch archive before launching Pi so even runtime startup writes preserve the source. Continuation requires an intact Pi v3 archive within the 16 MiB browsing limit. See [ADR 0013](docs/adr/0013-session-branch-selection.md) for runtime semantics and limits.
 
 Saved history includes a collapsible summary of the selected path, with the latest request and reply, message counts and tool outcomes. Unfinished tool calls carry a reminder to review the workspace before retrying. Selecting another branch or an earlier entry updates the summary.
