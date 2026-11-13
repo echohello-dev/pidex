@@ -122,12 +122,14 @@ describe('workspace status in Electron', () => {
     await page.locator('.wb-transcript').getByText('The streaming approach needs review.').waitFor();
     await expect.poll(() => status().textContent()).toContain('2 changed files');
     expect(await status().textContent()).toContain('feature/workspace-status · 1 staged · 1 unstaged · 1 untracked');
-    await status().getByText('Saved history does not restore files or switch Git branches.').waitFor();
     await page.getByLabel('Message pi').fill('Check the current files before continuing this branch.');
 
     await resizeWindow(1280, 900);
     await page.evaluate(() => document.fonts.ready);
     await capture('history-workspace-status.png');
+    await status().locator('summary').click();
+    await status().getByText('Saved history does not restore files or switch Git branches.').waitFor();
+    await capture('history-workspace-status-expanded.png');
     await status().getByRole('button', { name: 'Review workspace changes' }).click();
     await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
     await page.getByLabel('Commit message').waitFor();
@@ -141,7 +143,14 @@ describe('workspace status in Electron', () => {
     git(project, 'add', 'notes.txt');
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect.poll(() => status().textContent()).toContain('2 staged · 1 unstaged · 0 untracked');
+    await status().locator('summary').click();
     await capture('history-workspace-status-refreshed.png');
+    await status().locator('summary').click();
+    await resizeWindow(900, 600);
+    expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    await capture('history-workspace-status-narrow.png');
+    await resizeWindow(1280, 900);
     git(project, 'reset', '--', 'notes.txt');
     expect(await fs.readFile(source, 'utf8')).toBe(original);
     const commands = (await fs.readFile(rpcLog, 'utf8').catch(() => ''))

@@ -937,6 +937,30 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-history-heading .wb-meta {
   margin-top: 8px;
 }
+.wb-history-workspace-status {
+  flex: 0 1 280px;
+  min-width: 0;
+  max-width: 50%;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.wb-history-workspace-status summary {
+  cursor: pointer;
+  padding: 8px 10px;
+}
+.wb-history-workspace-status summary .wb-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.wb-history-workspace-status .wb-workspace-status {
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px;
+}
 .wb-fork-actions {
   display: flex;
   gap: 16px;
