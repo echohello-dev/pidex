@@ -59,13 +59,15 @@ Saved history includes a collapsible summary of the selected path, with the late
 
 Use **Copy context** in History to put the selected path's Markdown handoff on the clipboard, or **Export** to save it as a file. Both include the original root, model, messages, thinking and tool input/output. Open the destination root and paste the context into a new session there. This transfers context; saved history and Resume stay with the original root.
 
+To prepare that handoff directly, select a history branch or entry and open **Continue in another root**. Choose a registered destination and **Prepare draft** to add the selected history to its new-session composer. Existing draft text is kept. Review and send it when ready. Files and session archives stay in their original root; this starts a separate session in the destination.
+
 Use **Create workspace** or **Edit workspace** in the sidebar to name a group and select its roots. **Add root** chooses an existing folder. Each session runs in one root; the composer shows its path. Switching roots leaves open sessions running and makes them available under **Open sessions**. Files, Changes, History and defaults remain scoped to the selected root. A missing folder retains readable history, but cannot start or resume Pi until its original path is available. Adding another folder does not relocate a session. Group membership does not change Pi's tool permissions or load sibling roots into its context.
 
 Existing `workspaces.json` and `session-defaults.json` records migrate to `workspace-registry.json` in Electron userData. Original files and `.bak` copies remain intact. Workspace groups and selection persist; live processes and drafts do not restart after app quit. A package folder shares its Git worktree's index: pidex refuses its commit when staged changes exist outside that folder. Open the repository top level to review the whole index.
 
 Active sessions and history use a virtualized transcript. A local development benchmark with 4,500 mixed entries opened in about 1.4 seconds, down from 8.3 seconds, and mounted fewer than 100 transcript DOM nodes instead of 39,000. Timings vary by machine and load; see [ADR 0011](docs/adr/0011-virtualized-transcript.md) for the method and limits.
 
-Automatic repository/worktree grouping, group-wide history and folder-to-folder context transfer remain on the [issue tracker](https://github.com/echohello-dev/pidex/issues).
+Automatic repository/worktree grouping, group-wide history and further recovery improvements remain on the [issue tracker](https://github.com/echohello-dev/pidex/issues).
 
 ## Install
 

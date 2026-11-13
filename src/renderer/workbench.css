@@ -1039,14 +1039,26 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   border-bottom: 1px solid var(--line-soft);
   overflow-wrap: anywhere;
 }
-.wb-history-summary {
+.wb-history-recovery {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.wb-history-recovery:has(> details[open]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.wb-history-summary,
+.wb-history-handoff {
+  min-width: 0;
   flex-shrink: 0;
   margin: 0;
   border: 1px solid var(--line-soft);
   border-radius: 4px;
   font-size: 12px;
 }
-.wb-history-summary > summary {
+:is(.wb-history-summary, .wb-history-handoff) > summary {
   cursor: pointer;
   padding: 6px 10px;
   white-space: nowrap;
@@ -1077,6 +1089,20 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 .wb-history-summary-body p {
   margin: 8px 0 0;
+}
+.wb-history-handoff label {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+.wb-history-handoff select {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  background: var(--panel);
+  color: var(--copy);
+  border: 1px solid var(--line-soft);
+  font: inherit;
 }
 .wb-code-preview {
   min-height: 0;

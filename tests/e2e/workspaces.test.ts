@@ -377,6 +377,70 @@ describe('grouped roots in Electron', () => {
     ).toBe(0);
   });
 
+  it('prepares ancestor context in another root without starting Pi and sends only after review', async () => {
+    const original = await fs.readFile(archive, 'utf8');
+    await page.setViewportSize({ width: 1280, height: 840 });
+    await root(web);
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    await page.getByLabel('Message pi').fill('Keep the destination plan');
+    await root(api);
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /History for api/ }).click();
+    await page.locator('.wb-transcript').getByText('Stored answer for api', { exact: true }).waitFor();
+    await page.getByRole('treeitem', { name: /user: History for api/ }).click();
+    await page.locator('.wb-transcript').getByText('History for api', { exact: true }).waitFor();
+    await page.getByLabel('Message pi').fill('Keep the source continuation');
+    const runtimeActions = async () => (await records()).filter((r) => r.type === 'get_state' || r.type === 'prompt');
+    const before = await runtimeActions();
+    await page.locator('.wb-history-handoff summary').focus();
+    await page.keyboard.press('Enter');
+    const catalog = await page.evaluate(() => window.pidex.workspaceCatalog());
+    const destinationId = catalog.roots.find((r) => r.cwd === web)!.dirName;
+    const unavailable = page.getByLabel('Destination root').locator('option').filter({ hasText: missing });
+    expect(await unavailable.evaluate((option) => (option as HTMLOptionElement).disabled)).toBe(true);
+    await page.getByLabel('Destination root').selectOption(destinationId);
+    const proof = path.join(ROOT, '.tmp/proof');
+    const shots = path.join(ROOT, 'test-results/history-handoff');
+    await fs.mkdir(proof, { recursive: true });
+    await fs.mkdir(shots, { recursive: true });
+    const capture = async (name: string) => {
+      await page.screenshot({ path: path.join(proof, name) });
+      await fs.copyFile(path.join(proof, name), path.join(shots, name));
+    };
+    await capture('select-destination.png');
+    await page.getByRole('button', { name: 'Prepare draft', exact: true }).click();
+    await page.getByRole('heading', { name: 'Start a session', exact: true }).waitFor();
+    const draft = await page.getByLabel('Message pi').inputValue();
+    expect(draft).toMatch(/^Keep the destination plan\n\n---\n\n# History for api/);
+    expect(draft).toContain('## You\n\nHistory for api');
+    expect(draft).not.toContain('Stored answer for api');
+    expect(await page.locator('.wb-execution-root').textContent()).toContain(web);
+    expect(await runtimeActions()).toEqual(before);
+    expect(await fs.readFile(archive, 'utf8')).toBe(original);
+    const composer = await page.getByLabel('Message pi').boundingBox();
+    if (!composer) throw new Error('Destination composer is not visible.');
+    await page.mouse.move(composer.x + composer.width - 3, composer.y + composer.height - 3);
+    await page.mouse.down();
+    await page.mouse.move(composer.x + composer.width - 3, composer.y + composer.height + 120, { steps: 12 });
+    await page.mouse.up();
+    await capture('prepared-destination-draft.png');
+    // Review is real editing, with no automatic send.
+    await page.getByLabel('Message pi').fill(`${draft}\n\nCheck this root first.`);
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    const prompt = (await records()).filter((r) => r.type === 'prompt').at(-1);
+    expect(prompt.cwd).toBe(web);
+    expect(prompt.message).toBe(`${draft}\n\nCheck this root first.`);
+    expect(prompt.sessionFile).not.toBe(archive);
+    expect(await fs.readFile(archive, 'utf8')).toBe(original);
+    await root(api);
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep the source continuation');
+    expect(await page.getByRole('treeitem', { name: /user: History for api/ }).getAttribute('aria-selected')).toBe('true');
+    expect(errors).toEqual([]);
+    await page.setViewportSize({ width: 1100, height: 700 });
+  });
+
   it('does not carry a commit draft into another root when both restore Changes', async () => {
     await root(web);
     await page.getByRole('button', { name: /^Changes/ }).click();
