@@ -1,6 +1,7 @@
 import type { SessionTree } from '../main/session-tree';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyEvent, entriesFromMessages, type Entry } from './timeline';
+import { sessionExportMarkdown } from './export-session';
 import type {
   Defaults,
   ModelInfo,
@@ -523,6 +524,36 @@ export function useWorkbench() {
     else if (!preview && sessions[0]) void showPreview(sessions[0]);
   }, [view, sessions, preview, previewLoading, showPreview]);
 
+  const prepareHandoff = (rootId: string) => {
+    const destination = workspaces.find((root) => root.dirName === rootId);
+    if (
+      view !== 'history' ||
+      !preview?.loaded ||
+      previewLoading ||
+      !preview.entries.length ||
+      !destination ||
+      destination.availability !== 'available' ||
+      destination.dirName === selected ||
+      destination.cwd === preview.info.cwd
+    )
+      return;
+    const context = sessionExportMarkdown({
+      title: preview.info.title,
+      cwd: preview.info.cwd,
+      model: preview.info.model,
+      entries: preview.entries,
+      exportedAt: new Date(),
+    });
+    const key = `new:${destination.cwd}`;
+    setDrafts((prev) => ({
+      ...prev,
+      [key]: prev[key] ? `${prev[key]}\n\n---\n\n${context}` : context,
+    }));
+    selectWorkspace(destination);
+    setActiveId(null);
+    navigate('new');
+  };
+
   const send = (raw?: string) =>
     run(async () => {
       const text = (raw ?? draft).trim();
@@ -719,6 +750,7 @@ export function useWorkbench() {
     showSession,
     closeSession,
     forkSession,
+    prepareHandoff,
     useSkill,
   };
 }

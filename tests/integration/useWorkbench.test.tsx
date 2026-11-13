@@ -64,6 +64,96 @@ afterEach(() => {
 });
 
 describe('workbench root switching', () => {
+  it('prepares selected history across groups, keeps both drafts and restores the source selection', async () => {
+    const fixture = apiFixture();
+    fixture.workspaceCatalog.mockResolvedValue({
+      ...catalog,
+      groups: [
+        { id: 'backend', name: 'Backend', rootIds: ['api'] },
+        { id: 'frontend', name: 'Frontend', rootIds: ['web'] },
+      ],
+      selected: { groupId: 'backend', rootId: 'api' },
+    });
+    fixture.sessionTree.mockResolvedValue({ data: { leafId: 'latest', canContinue: true, nodes: [] } });
+    fixture.previewSession.mockResolvedValue({ data: [
+      { role: 'user', content: [{ type: 'text', text: 'Selected earlier request' }] },
+    ] });
+    const openSession = vi.fn();
+    const sendPrompt = vi.fn();
+    Object.assign(fixture, { openSession, sendPrompt });
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    act(() => result.current.onDraft('Unsent source task'));
+    act(() => result.current.selectWorkspace(catalog.roots[1]));
+    act(() => result.current.onDraft('Keep this destination task'));
+    act(() => result.current.selectWorkspace(catalog.roots[0]));
+    await act(async () => {
+      result.current.navigate('history');
+      await result.current.showPreview({
+        cwd: '/code/api', id: 'source', file: '/sessions/source.jsonl',
+        title: 'Source context', model: 'original-model', timestamp: '', messageCount: 1,
+      }, 'earlier');
+    });
+    act(() => result.current.onDraft('Unsent history continuation'));
+    act(() => result.current.prepareHandoff('web'));
+    expect(result.current.view).toBe('new');
+    expect(result.current.ws?.cwd).toBe('/code/web');
+    expect(result.current.groupId).toBe('frontend');
+    expect(result.current.active).toBeNull();
+    expect(result.current.draft).toMatch(/^Keep this destination task\n\n---\n\n# Source context/);
+    expect(result.current.draft).toContain('Selected earlier request');
+    expect(result.current.draft).toContain('It ran in `/code/api`.');
+    expect(openSession).not.toHaveBeenCalled();
+    expect(sendPrompt).not.toHaveBeenCalled();
+    act(() => result.current.selectWorkspace(catalog.roots[0]));
+    expect(result.current.view).toBe('history');
+    expect(result.current.preview?.entryId).toBe('earlier');
+    expect(result.current.draft).toBe('Unsent history continuation');
+    act(() => result.current.navigate('new'));
+    expect(result.current.draft).toBe('Unsent source task');
+    expect(fixture.previewSession).toHaveBeenCalledExactlyOnceWith('/sessions/source.jsonl', 'earlier');
+  });
+
+  it('does not prepare missing, same-root, empty or loading history handoffs', async () => {
+    const fixture = apiFixture();
+    fixture.sessionTree.mockResolvedValue({ data: { leafId: 'latest', canContinue: true, nodes: [] } });
+    const messages = deferred<Awaited<ReturnType<PidexApi['previewSession']>>>();
+    fixture.previewSession.mockReturnValue(messages.promise);
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    let preview!: Promise<void>;
+    act(() => {
+      result.current.navigate('history');
+      preview = result.current.showPreview({
+        cwd: '/code/api', id: 'source', file: '/sessions/source.jsonl',
+        title: 'Source context', model: '', timestamp: '', messageCount: 1,
+      });
+    });
+    act(() => result.current.prepareHandoff('web'));
+    expect(result.current.view).toBe('history');
+    await act(async () => {
+      messages.resolve({ data: [{ role: 'user', content: [{ type: 'text', text: 'Saved request' }] }] });
+      await preview;
+    });
+    fixture.workspaceCatalog.mockResolvedValue({
+      ...catalog,
+      roots: [catalog.roots[0], { ...catalog.roots[1], availability: 'missing' }],
+    });
+    await act(async () => { await result.current.refresh(); });
+    for (const rootId of ['api', 'web', 'unknown']) {
+      act(() => result.current.prepareHandoff(rootId));
+      expect(result.current.ws?.cwd).toBe('/code/api');
+      expect(result.current.draft).toBe('');
+    }
+    fixture.workspaceCatalog.mockResolvedValue(catalog);
+    await act(async () => { await result.current.refresh(); });
+    fixture.previewSession.mockResolvedValue({ data: [] });
+    await act(async () => { await result.current.showPreview(result.current.preview!.info); });
+    act(() => result.current.prepareHandoff('web'));
+    expect(result.current.view).toBe('history');
+    expect(result.current.ws?.cwd).toBe('/code/api');
+  });
+
   it('settles unfinished tool cards when their runtime exits', async () => {
     const fixture = apiFixture();
     const openSession = vi

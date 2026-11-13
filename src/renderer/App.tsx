@@ -2,6 +2,7 @@ import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { SessionTree, EntryTree } from './components/SessionTree';
 import { HistorySummary } from './components/HistorySummary';
 import { HistoryExport } from './components/HistoryExport';
+import { HistoryHandoff } from './components/HistoryHandoff';
 import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
 import welcomeMark from './assets/workbench/welcome-mark.svg';
@@ -628,7 +629,17 @@ function App() {
                         {preview.loaded &&
                           !b.previewLoading &&
                           (preview.ready || preview.entries.length > 0) && (
-                            <HistorySummary entries={preview.entries} />
+                            <div className="wb-history-recovery">
+                              <HistorySummary entries={preview.entries} />
+                              {preview.entries.length > 0 && (
+                                <HistoryHandoff
+                                  key={`handoff:${preview.info.file}:${preview.entryId}`}
+                                  roots={b.workspaces}
+                                  sourceRootId={b.selected}
+                                  onPrepare={b.prepareHandoff}
+                                />
+                              )}
+                            </div>
                           )}
                         <Transcript
                           key={`${preview.info.file}:${preview.entryId}`}
