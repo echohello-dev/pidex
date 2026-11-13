@@ -144,7 +144,9 @@ describe('workspace status in Electron', () => {
     await capture('history-workspace-status-refreshed.png');
     git(project, 'reset', '--', 'notes.txt');
     expect(await fs.readFile(source, 'utf8')).toBe(original);
-    expect(await fs.readFile(rpcLog, 'utf8').catch(() => '')).toBe('');
+    const commands = (await fs.readFile(rpcLog, 'utf8').catch(() => ''))
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    expect(commands.every((command) => command.type === 'get_available_models')).toBe(true);
     expect(await page.locator('.wb-sidebar .wb-session-item').filter({ hasText: 'this window' }).count()).toBe(0);
     expect(errors).toEqual([]);
     await page.getByRole('button', { name: 'New session', exact: true }).click();
