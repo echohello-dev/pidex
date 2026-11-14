@@ -26,6 +26,7 @@ export type GitChange = {
 };
 export type WorkspaceDetails = {
   branch: string;
+  headCommit?: { hash: string; subject: string; committedAt: string };
   changes: GitChange[];
   files: string[];
   gitError?: string;
@@ -170,7 +171,7 @@ async function listFiles(
 export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
   const { files, filesTruncated } = await listFiles(cwd);
   try {
-    const [branch, working, staged, untracked] = await Promise.all([
+    const [branch, working, staged, untracked, commit] = await Promise.all([
       git(cwd, ['branch', '--show-current']),
       git(cwd, [
         'diff',
@@ -196,9 +197,19 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
         '.',
       ]),
       git(cwd, ['ls-files', '--others', '--exclude-standard', '-z']),
+      // HEAD belongs to this worktree, even when cwd is a package folder.
+      // An unborn or unreadable HEAD must not hide otherwise valid changes.
+      git(cwd, ['log', '-1', '--no-show-signature', '--format=%H%x00%cI%x00%s', 'HEAD', '--'])
+        .catch(() => ''),
     ]);
+    const [hash, committedAt, subject] = commit.split('\0');
     return {
       branch: branch.trim(),
+      headCommit: commit ? {
+        hash,
+        committedAt,
+        subject: subject.trim() || '(no subject)',
+      } : undefined,
       files,
       filesTruncated,
       changes: [

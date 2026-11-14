@@ -416,6 +416,13 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-workspace-status p {
   margin: 4px 0 0;
 }
+.wb-workspace-commit-subject {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 12px;
+}
 .wb-start-title > svg {
   flex-shrink: 0;
 }
