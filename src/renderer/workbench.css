@@ -416,6 +416,12 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-workspace-status p {
   margin: 4px 0 0;
 }
+.wb-workspace-upstream {
+  overflow-wrap: anywhere;
+}
+.wb-workspace-upstream-note {
+  display: block;
+}
 .wb-workspace-commit-subject {
   display: -webkit-box;
   -webkit-box-orient: vertical;

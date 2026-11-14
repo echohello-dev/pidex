@@ -29,6 +29,39 @@ afterEach(async () => {
 });
 
 describe('workspace inspection and preview', () => {
+  it('compares local upstream refs from nested roots and refreshes ahead, behind and diverged counts without fetching', async () => {
+    const root = await fixture();
+    const nested = path.join(root, 'package');
+    await fs.mkdir(nested);
+    await git(root, ['init', '-b', 'main']);
+    await git(root, ['config', 'user.name', 'Test']);
+    await git(root, ['config', 'user.email', 'test@example.test']);
+    await git(root, ['config', 'commit.gpgsign', 'false']);
+    await git(root, ['commit', '--allow-empty', '-m', 'Shared base']);
+    await git(root, ['remote', 'add', 'origin', path.join(root, 'nonexistent-remote')]);
+    await git(root, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    await git(root, ['branch', '--set-upstream-to=origin/main']);
+    const tracked = (ahead: number, behind: number) => ({ state: 'tracked', name: 'origin/main', ahead, behind });
+    expect((await inspectWorkspace(nested)).upstream).toEqual(tracked(0, 0));
+    await git(root, ['commit', '--allow-empty', '-m', 'Local tip']);
+    expect((await inspectWorkspace(nested)).upstream).toEqual(tracked(1, 0));
+    await git(root, ['checkout', '-b', 'remote-tip', 'origin/main']);
+    await git(root, ['commit', '--allow-empty', '-m', 'Remote tip']);
+    await git(root, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    await git(root, ['checkout', 'main']);
+    expect((await inspectWorkspace(nested)).upstream).toEqual(tracked(1, 1));
+    await git(root, ['reset', '--hard', 'HEAD~1']);
+    expect((await inspectWorkspace(nested)).upstream).toEqual(tracked(0, 1));
+    await git(root, ['update-ref', '-d', 'refs/remotes/origin/main']);
+    await fs.writeFile(path.join(nested, 'new.ts'), 'pending change');
+    const gone = await inspectWorkspace(nested);
+    expect(gone.upstream).toEqual({ state: 'unavailable', name: 'origin/main' });
+    expect(gone.gitError).toBeUndefined();
+    expect(gone.changes[0]?.path).toBe('new.ts');
+    await git(root, ['branch', '--unset-upstream']);
+    expect((await inspectWorkspace(nested)).upstream).toEqual({ state: 'none' });
+  });
+
   it('reads repository HEAD from nested roots and refreshes after a commit outside the root', async () => {
     const root = await fixture();
     const nested = path.join(root, 'package');
@@ -67,11 +100,15 @@ describe('workspace inspection and preview', () => {
     await git(root, ['commit', '--allow-empty', '-m', 'Shared base']);
     await git(root, ['worktree', 'add', '-b', 'feature/linked', linked]);
     await git(linked, ['commit', '--allow-empty', '-m', 'Linked tip']);
+    await git(linked, ['branch', '--set-upstream-to=main']);
+    expect((await inspectWorkspace(root)).upstream).toEqual({ state: 'none' });
+    expect((await inspectWorkspace(linked)).upstream).toEqual({ state: 'tracked', name: 'main', ahead: 1, behind: 0 });
     expect((await inspectWorkspace(root)).headCommit?.subject).toBe('Shared base');
     expect((await inspectWorkspace(linked)).headCommit?.subject).toBe('Linked tip');
     await git(linked, ['checkout', '--detach', 'HEAD~1']);
     const detached = await inspectWorkspace(linked);
     expect(detached.branch).toBe('');
+    expect(detached.upstream).toBeUndefined();
     expect(detached.headCommit?.subject).toBe('Shared base');
   });
 
@@ -83,6 +120,7 @@ describe('workspace inspection and preview', () => {
     expect(result.branch).toBe('main');
     expect(result.gitError).toBeUndefined();
     expect(result.headCommit).toBeUndefined();
+    expect(result.upstream).toEqual({ state: 'none' });
     expect(result.changes[0]?.path).toBe('new.ts');
   });
 

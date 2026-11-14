@@ -211,6 +211,55 @@ describe('workspace status in Electron', () => {
     expect(errors).toEqual([]);
   });
 
+  it('refreshes local upstream comparison, preserves history space and clears stale tracking on root switches', async () => {
+    await select('project');
+    git(project, 'remote', 'add', 'origin', path.join(fixture, 'no-remote'));
+    git(project, 'update-ref', 'refs/remotes/origin/feature/workspace-status', 'HEAD');
+    git(project, 'branch', '--set-upstream-to=origin/feature/workspace-status');
+    // An independent commit object models a fetched remote tip without a network request.
+    const remoteTip = git(project, '-c', 'user.name=Test', '-c', 'user.email=test@example.test',
+      'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'Cached upstream tip').toString().trim();
+    git(project, 'update-ref', 'refs/remotes/origin/feature/workspace-status', remoteTip);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Upstream comparison').textContent()).toContain('0 ahead · 1 behind');
+    await status().getByText('Local refs only. No fetch performed.').waitFor();
+    await capture('workspace-upstream.png');
+    await resizeWindow(900, 600);
+    await status().getByLabel('Upstream comparison').scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    await capture('workspace-upstream-narrow.png');
+    await resizeWindow(1280, 900);
+
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Review saved parser work/ }).click();
+    await status().locator('summary').click();
+    await status().getByLabel('Upstream comparison').waitFor();
+    expect(await status().getByLabel('Upstream comparison').textContent()).toContain('0 ahead · 1 behind');
+    await status().getByLabel('Upstream comparison').scrollIntoViewIfNeeded();
+    await capture('history-upstream.png');
+    await resizeWindow(900, 600);
+    await status().getByLabel('Upstream comparison').scrollIntoViewIfNeeded();
+    expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    const composerBottom = await page.locator('.wb-composer').evaluate((el) => el.getBoundingClientRect().bottom);
+    const footerTop = await page.locator('.wb-statusbar').evaluate((el) => el.getBoundingClientRect().top);
+    expect(composerBottom).toBeLessThanOrEqual(footerTop);
+    await capture('history-upstream-narrow.png');
+    git(project, 'update-ref', '-d', 'refs/remotes/origin/feature/workspace-status');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Upstream comparison').textContent()).toContain('Upstream origin/feature/workspace-status unavailable.');
+    expect(await status().getByRole('button', { name: 'Review workspace changes' }).isEnabled()).toBe(true);
+    await resizeWindow(1280, 900);
+    await select('clean');
+    await expect.poll(() => status().getByLabel('Upstream comparison').textContent()).toContain('detached HEAD');
+    expect(await status().textContent()).not.toContain('origin/feature/workspace-status');
+    git(clean, 'switch', 'main');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Upstream comparison').textContent()).toBe('No upstream configured.');
+    expect(errors).toEqual([]);
+  });
+
   it('does not describe non-Git folders or missing roots as clean', async () => {
     await select('plain');
     await expect.poll(() => status().textContent()).toContain('Git changes are unavailable for this folder.');

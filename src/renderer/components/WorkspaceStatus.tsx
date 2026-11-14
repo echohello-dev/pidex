@@ -47,6 +47,18 @@ export function WorkspaceStatus({
             <p className="wb-meta">
               {details.branch || 'Detached HEAD'} · {staged} staged · {unstaged} unstaged · {untracked} untracked
             </p>
+            <p className="wb-meta wb-workspace-upstream" aria-label="Upstream comparison">
+              {!details.branch
+                ? 'Upstream comparison unavailable for detached HEAD.'
+                : details.upstream?.state === 'none'
+                  ? 'No upstream configured.'
+                  : details.upstream?.state === 'tracked'
+                    ? `Upstream ${details.upstream.name} · ${details.upstream.ahead} ahead · ${details.upstream.behind} behind`
+                    : `Upstream ${details.upstream?.state === 'unavailable' && details.upstream.name ? details.upstream.name : 'comparison'} unavailable.`}
+              {details.branch && details.upstream?.state !== 'none' && (
+                <span className="wb-workspace-upstream-note">Local refs only. No fetch performed.</span>
+              )}
+            </p>
             {commit ? (
               <div className="wb-workspace-commit" aria-label="Current repository commit">
                 <p className="wb-meta">
