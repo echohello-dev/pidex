@@ -64,6 +64,39 @@ afterEach(() => {
 });
 
 describe('workbench root switching', () => {
+  it('previews a chosen saved conversation without launching Pi or consuming the new-session draft', async () => {
+    const fixture = apiFixture();
+    const source = {
+      cwd: '/code/api', id: 'source', file: '/sessions/source.jsonl',
+      title: 'Saved parser work', model: '', timestamp: '', messageCount: 1,
+    };
+    fixture.sessionTree.mockResolvedValue({ data: { leafId: 'saved', canContinue: true, nodes: [] } });
+    fixture.previewSession.mockResolvedValue({ data: [
+      { role: 'user', content: [{ type: 'text', text: 'Saved parser work' }] },
+    ] });
+    const openSession = vi.fn();
+    const sendPrompt = vi.fn();
+    Object.assign(fixture, { openSession, sendPrompt });
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    act(() => result.current.onDraft('Keep my separate task'));
+    await act(async () => {
+      result.current.navigate('history');
+      await result.current.showPreview(source);
+    });
+    expect(result.current.view).toBe('history');
+    expect(result.current.preview?.info.file).toBe(source.file);
+    expect(result.current.preview?.entryId).toBe('saved');
+    expect(result.current.draft).toBe('');
+    act(() => result.current.onDraft('Unsent continuation'));
+    act(() => result.current.navigate('new'));
+    expect(result.current.draft).toBe('Keep my separate task');
+    act(() => result.current.navigate('history'));
+    expect(result.current.draft).toBe('Unsent continuation');
+    expect(openSession).not.toHaveBeenCalled();
+    expect(sendPrompt).not.toHaveBeenCalled();
+  });
+
   it('keeps inspection pending until the selected root responds and exposes inspection failures', async () => {
     const fixture = apiFixture();
     const pending = deferred<Awaited<ReturnType<PidexApi['inspectWorkspace']>>>();

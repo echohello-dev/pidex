@@ -643,8 +643,26 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-continue {
   border: 1px solid var(--line-soft);
 }
-.wb-continue > p {
-  padding: 16px;
+.wb-session-choice,
+.wb-new-conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.wb-session-choice h3,
+.wb-new-conversation h3,
+.wb-session-choice p,
+.wb-new-conversation > p {
+  margin: 0;
+}
+.wb-session-choice .wb-section-heading {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.wb-session-choice .wb-section-heading > button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .wb-active-layout {
   display: grid;

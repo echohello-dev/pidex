@@ -4,6 +4,7 @@ import { HistorySummary } from './components/HistorySummary';
 import { HistoryExport } from './components/HistoryExport';
 import { HistoryHandoff } from './components/HistoryHandoff';
 import { WorkspaceStatus } from './components/WorkspaceStatus';
+import { SessionStartChoice } from './components/SessionStartChoice';
 import { useEffect, useState } from 'react';
 import { PidexMark } from './components/PidexMark';
 import welcomeMark from './assets/workbench/welcome-mark.svg';
@@ -402,7 +403,23 @@ function App() {
                       ready={b.detailsRoot === ws.dirName}
                       onReview={() => b.navigate('changes')}
                     />
-                    {composer()}
+                    <SessionStartChoice
+                      sessions={sessions}
+                      busy={b.busy}
+                      onPreview={(session) => {
+                        b.navigate('history');
+                        void b.showPreview(session);
+                      }}
+                      onBrowse={() => b.navigate('history')}
+                    />
+                    <div className="wb-new-conversation">
+                      <h3 className="wb-eyebrow">Start a new conversation</h3>
+                      <p className="wb-meta">
+                        Send starts a separate session in this root. Use a saved
+                        preview to resume or fork existing work.
+                      </p>
+                      {composer()}
+                    </div>
                     <div className="wb-starters">
                       <button
                         type="button"
@@ -436,36 +453,6 @@ function App() {
                         </span>
                         <small>Understand this project.</small>
                       </button>
-                    </div>
-                    <div className="wb-section-heading">
-                      <span className="wb-eyebrow">Continue a session</span>
-                      <button
-                        type="button"
-                        onClick={() => b.navigate('history')}
-                      >
-                        View all / ⌘⇧H
-                      </button>
-                    </div>
-                    <div className="wb-continue">
-                      {sessions.slice(0, 2).map((s) => (
-                        <button
-                          type="button"
-                          key={s.id}
-                          className="wb-session-item"
-                          onClick={() => b.showSession(s)}
-                          disabled={b.busy}
-                        >
-                          <span>{s.title}</span>
-                          <small>
-                            Saved / {branch} / {timeAgo(s.timestamp)}
-                          </small>
-                        </button>
-                      ))}
-                      {!sessions.length && (
-                        <p className="wb-meta">
-                          No saved sessions yet. Start with a task above.
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
