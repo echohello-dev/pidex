@@ -805,6 +805,18 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-tool-toggle {
   margin: 0 12px 12px;
 }
+.wb-tool-copy:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.wb-tool-copy-feedback {
+  margin: 0;
+  padding: 0 12px 8px;
+  color: var(--muted);
+}
+.wb-tool-copy-feedback[role='alert'] {
+  color: var(--error);
+}
 .wb-tool-preview-actions {
   display: flex;
   flex-wrap: wrap;
