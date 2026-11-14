@@ -98,6 +98,11 @@ describe('session branches in Electron', () => {
       }) + '\n',
     );
     switched = path.join(archives, 'switched.jsonl');
+    await fs.writeFile(path.join(archives, 'legacy.jsonl'), [
+      { type: 'session', version: 2, id: 'legacy', cwd: project, timestamp: '2026-11-01T01:00:00Z' },
+      message('legacy-task', null, 'user', 'Recover legacy context'),
+      message('legacy-answer', 'legacy-task', 'assistant', 'A readable older archive.'),
+    ].map((record) => JSON.stringify(record)).join('\n') + '\n');
     await fs.writeFile(
       path.join(archives, 'recovery.jsonl'),
       [
@@ -237,6 +242,10 @@ describe('session branches in Electron', () => {
     expect(latest).toContain('The latest branch uses a buffered parser.');
     expect(latest).toContain('## Continue elsewhere');
     expect(latest).toContain('It ran in `');
+    expect(latest).toContain('- Pi session `source`.');
+    expect(latest).toContain(`- Source archive \`${source}\`.`);
+    expect(latest).toContain('- Selected entry `new-tip` (archive tip).');
+    expect(latest).toContain('select entry `new-tip`, and choose Resume.');
     expect(latest).not.toContain('Streaming branch is ready.');
     await page.getByLabel('Branch tip').selectOption('old-tip');
     await page.locator('.wb-transcript').getByText('Streaming branch is ready.').waitFor();
@@ -246,6 +255,9 @@ describe('session branches in Electron', () => {
     const branch = await app.evaluate(({ clipboard }) => clipboard.readText());
     expect(branch).toContain('Streaming branch is ready.');
     expect(branch).not.toContain('buffered parser');
+    expect(branch).toContain('- Selected entry `old-tip`.');
+    expect(branch).toContain('- Archive tip at export `new-tip`.');
+    expect(branch).toContain('select entry `old-tip`, and choose Resume in new fork.');
     await page.getByRole('treeitem', { name: /assistant: The original branch/ }).click();
     await page.locator('.wb-transcript').getByText('The original branch uses a streaming parser.').waitFor();
     await page.getByRole('button', { name: 'Copy context', exact: true }).click();
@@ -254,13 +266,49 @@ describe('session branches in Electron', () => {
     expect(ancestor).toContain('The original branch uses a streaming parser.');
     expect(ancestor).not.toContain('Keep the streaming approach');
     expect(ancestor).not.toContain('Streaming branch is ready.');
+    expect(ancestor).toContain('- Selected entry `old-answer`.');
+    expect(ancestor).toContain('- Archive tip at export `new-tip`.');
+    expect(ancestor).toContain('select entry `old-answer`, and choose Resume in new fork.');
     await fs.mkdir(path.join(ROOT, '.tmp/proof'), { recursive: true });
+    const exportedFile = path.join(ROOT, '.tmp/proof/selected-history.md');
+    await app.evaluate(({ BrowserWindow }, output) => {
+      BrowserWindow.getAllWindows()[0].webContents.session.once('will-download', (_event, item) => {
+        item.setSavePath(output);
+      });
+    }, exportedFile);
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    await expect.poll(() => fs.readFile(exportedFile, 'utf8')).toContain('- Selected entry `old-answer`.');
+    const exported = await fs.readFile(exportedFile, 'utf8');
+    // Copy and download differ only in the time at which the snapshot was made.
+    expect(exported.replace(/^Exported from pidex at .*$/m, '')).toBe(ancestor.replace(/^Exported from pidex at .*$/m, ''));
+    await fs.copyFile(exportedFile, path.join(summaryShots, 'selected-history.md'));
     await page.screenshot({ path: path.join(ROOT, '.tmp/proof/copied-history-context.png') });
     expect(await fs.readFile(source, 'utf8')).toBe(original);
     expect((await readLog()).filter((c) => c.type === 'get_state' || c.type === 'prompt')).toEqual([]);
     await page.getByRole('tree', { name: 'Session archives', exact: true }).getByRole('treeitem', { name: /Explore parser branches/ }).click();
     await page.locator('.wb-transcript').getByText('The latest branch uses a buffered parser.').waitFor();
     await page.setViewportSize({ width: 1100, height: 700 });
+  });
+
+  it('copies readable legacy history with source identifiers and no unsafe resume instruction', async () => {
+    const legacy = path.join(path.dirname(source), 'legacy.jsonl');
+    const original = await fs.readFile(legacy, 'utf8');
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Recover legacy context/ }).click();
+    await page.locator('.wb-transcript').getByText('A readable older archive.').waitFor();
+    await page.getByRole('button', { name: 'Copy context', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Context copied.' }).waitFor();
+    const context = await app.evaluate(({ clipboard }) => clipboard.readText());
+    expect(context).toContain('- Pi session `legacy`.');
+    expect(context).toContain('- Selected entry `legacy-answer` (archive tip).');
+    expect(context).toContain('Pidex could not validate it for continuation');
+    expect(context).not.toContain('and choose Resume');
+    expect(await fs.readFile(legacy, 'utf8')).toBe(original);
+    expect((await readLog()).filter((c) => c.type === 'get_state' || c.type === 'prompt')).toEqual([]);
+    await fs.writeFile(path.join(summaryShots, 'legacy-history-context.md'), context);
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Explore parser branches/ }).click();
+    await page.locator('.wb-transcript').getByText('The latest branch uses a buffered parser.').waitFor();
   });
 
   it('previews selected branch and ancestor, forks exact selection and preserves both source branches', async () => {

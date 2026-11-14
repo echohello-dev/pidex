@@ -415,6 +415,11 @@ describe('grouped roots in Electron', () => {
     expect(draft).toMatch(/^Keep the destination plan\n\n---\n\n# History for api/);
     expect(draft).toContain('## You\n\nHistory for api');
     expect(draft).not.toContain('Stored answer for api');
+    expect(draft).toContain('- Pi session `api`.');
+    expect(draft).toContain(`- Source archive \`${archive}\`.`);
+    expect(draft).toContain('- Selected entry `u`.');
+    expect(draft).toContain('- Archive tip at export `a`.');
+    expect(draft).toContain('select entry `u`, and choose Resume in new fork.');
     expect(await page.locator('.wb-execution-root').textContent()).toContain(web);
     expect(await runtimeActions()).toEqual(before);
     expect(await fs.readFile(archive, 'utf8')).toBe(original);
@@ -425,6 +430,22 @@ describe('grouped roots in Electron', () => {
     await page.mouse.move(composer.x + composer.width - 3, composer.y + composer.height + 120, { steps: 12 });
     await page.mouse.up();
     await capture('prepared-destination-draft.png');
+    await fs.writeFile(path.join(shots, 'prepared-history-context.md'), draft);
+    // Capture the real composer showing the new identifiers at native window size.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.clearDeviceMetricsOverride');
+    const nativeWindow = await app.browserWindow(page);
+    await nativeWindow.evaluate((window) => window.setContentSize(1280, 840));
+    const size = await nativeWindow.evaluate((window) => window.getContentSize());
+    await page.waitForFunction(([width, height]) => innerWidth === width && innerHeight === height, size);
+    await page.getByLabel('Message pi').scrollIntoViewIfNeeded();
+    await page.getByLabel('Message pi').evaluate((textarea) => {
+      const input = textarea as HTMLTextAreaElement;
+      const line = input.value.slice(0, input.value.indexOf('## Saved selection')).split('\n').length - 1;
+      input.scrollTop = line * parseFloat(getComputedStyle(input).lineHeight);
+    });
+    await capture('history-context-identifiers.png');
+    await cdp.detach();
     // Review is real editing, with no automatic send.
     await page.getByLabel('Message pi').fill(`${draft}\n\nCheck this root first.`);
     await page.getByRole('button', { name: 'Send', exact: true }).click();
