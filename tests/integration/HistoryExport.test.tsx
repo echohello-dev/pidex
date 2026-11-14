@@ -5,6 +5,10 @@ import { sessionExportMarkdown, type SessionExportInput } from '../../src/render
 
 const input: Omit<SessionExportInput, 'exportedAt'> = {
   title: 'Recover the parser', cwd: '/code/api', model: 'test-model',
+  source: {
+    sessionId: 'parser', archivePath: '/sessions/parser.jsonl',
+    entryId: 'earlier', archiveTipId: 'latest', canContinue: true,
+  },
   entries: [
     { key: 'u', kind: 'user', text: 'Fix the parser' },
     { key: 'a', kind: 'assistant', text: 'Use a buffered parser', thinking: 'Check boundaries', streaming: false },
@@ -43,6 +47,8 @@ describe('<HistoryExport>', () => {
     const { getByRole } = render(<HistoryExport input={input} />);
     fireEvent.click(getByRole('button', { name: 'Copy context' }));
     expect(writeText).toHaveBeenCalledWith(sessionExportMarkdown({ ...input, exportedAt }));
+    expect(writeText.mock.calls[0][0]).toContain('- Selected entry `earlier`.');
+    expect(writeText.mock.calls[0][0]).toContain('and choose Resume in new fork.');
     await waitFor(() => expect(getByRole('status').textContent).toContain('Paste it into a new session'));
     fireEvent.click(getByRole('button', { name: 'Copy context' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
@@ -90,8 +96,8 @@ describe('<HistoryExport>', () => {
     expect(getByRole('button', { name: 'Export' })).toBeEnabled();
   });
 
-  it('downloads the selected history as a Markdown file', () => {
-    vi.useFakeTimers();
+  it('downloads the selected history and exact source identifiers as a Markdown file', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     const create = vi.fn().mockReturnValue('blob:history');
     const revoke = vi.fn();
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: create });
@@ -104,6 +110,17 @@ describe('<HistoryExport>', () => {
     fireEvent.click(getByRole('button', { name: 'Export' }));
     expect(click).toHaveBeenCalledOnce();
     expect(create.mock.calls[0][0].type).toBe('text/markdown');
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(create.mock.calls[0][0]);
+    });
+    expect(text).toContain('- Pi session `parser`.');
+    expect(text).toContain('- Source archive `/sessions/parser.jsonl`.');
+    expect(text).toContain('- Selected entry `earlier`.');
+    expect(text).toContain('- Archive tip at export `latest`.');
+    expect(text).toContain('and choose Resume in new fork.');
     vi.advanceTimersByTime(1000);
     expect(revoke).toHaveBeenCalledWith('blob:history');
   });

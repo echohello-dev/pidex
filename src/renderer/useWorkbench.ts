@@ -566,6 +566,13 @@ export function useWorkbench() {
       model: preview.info.model,
       entries: preview.entries,
       exportedAt: new Date(),
+      source: {
+        sessionId: preview.info.id,
+        archivePath: preview.info.file,
+        entryId: preview.entryId ?? null,
+        archiveTipId: preview.tree?.leafId ?? null,
+        canContinue: !!preview.tree?.canContinue,
+      },
     });
     const key = `new:${destination.cwd}`;
     setDrafts((prev) => ({

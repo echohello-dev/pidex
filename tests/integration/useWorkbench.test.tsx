@@ -128,6 +128,11 @@ describe('workbench root switching', () => {
     expect(result.current.draft).toMatch(/^Keep this destination task\n\n---\n\n# Source context/);
     expect(result.current.draft).toContain('Selected earlier request');
     expect(result.current.draft).toContain('It ran in `/code/api`.');
+    expect(result.current.draft).toContain('- Pi session `source`.');
+    expect(result.current.draft).toContain('- Source archive `/sessions/source.jsonl`.');
+    expect(result.current.draft).toContain('- Selected entry `earlier`.');
+    expect(result.current.draft).toContain('- Archive tip at export `latest`.');
+    expect(result.current.draft).toContain('and choose Resume in new fork.');
     expect(openSession).not.toHaveBeenCalled();
     expect(sendPrompt).not.toHaveBeenCalled();
     act(() => result.current.selectWorkspace(catalog.roots[0]));

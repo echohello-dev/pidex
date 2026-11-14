@@ -117,6 +117,13 @@ function App() {
         cwd: preview.info.cwd,
         model: preview.info.model,
         entries: preview.entries,
+        source: {
+          sessionId: preview.info.id,
+          archivePath: preview.info.file,
+          entryId: preview.entryId ?? null,
+          archiveTipId: preview.tree?.leafId ?? null,
+          canContinue: !!preview.tree?.canContinue,
+        },
       }
     : null;
 

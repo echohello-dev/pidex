@@ -19,7 +19,71 @@ const bashDone: Extract<Entry, { kind: 'tool' }> = {
   ok: true,
 };
 
+const source = {
+  sessionId: 'parser-session', archivePath: '/sessions/parser.jsonl',
+  entryId: 'selected-entry', archiveTipId: 'selected-entry', canContinue: true,
+};
+
 describe('sessionExportMarkdown', () => {
+  it('identifies the exact saved archive tip and explains that the snapshot can advance', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'Parser', cwd: '/repo', model: '', exportedAt, source,
+      entries: [{ key: 'u', kind: 'user', text: 'Fix the parser' }],
+    });
+    expect(markdown).toContain('- Pi session `parser-session`.');
+    expect(markdown).toContain('- Source archive `/sessions/parser.jsonl`.');
+    expect(markdown).toContain('- Selected entry `selected-entry` (archive tip).');
+    expect(markdown).toContain('- Archive tip at export `selected-entry`.');
+    expect(markdown).toContain('select entry `selected-entry`, and choose Resume.');
+    expect(markdown).toContain('If the archive has advanced');
+    expect(markdown).toContain('The archive may change before you return.');
+  });
+
+  it('distinguishes a selected ancestor or alternate branch from the archive tip', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'Parser', cwd: '/repo', model: '', exportedAt,
+      source: { ...source, entryId: 'earlier-entry' },
+      entries: [{ key: 'u', kind: 'user', text: 'Fix the parser' }],
+    });
+    expect(markdown).toContain('- Selected entry `earlier-entry`.');
+    expect(markdown).toContain('- Archive tip at export `selected-entry`.');
+    expect(markdown).toContain('select entry `earlier-entry`, and choose Resume in new fork.');
+    expect(markdown).not.toContain('`earlier-entry` (archive tip)');
+  });
+
+  it('preserves readable history identifiers without promising unsafe continuation', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'Legacy parser', cwd: '/repo', model: '', exportedAt,
+      source: { ...source, canContinue: false },
+      entries: [{ key: 'u', kind: 'user', text: 'Fix the parser' }],
+    });
+    expect(markdown).toContain('## Saved selection');
+    expect(markdown).toContain('Pidex could not validate it for continuation');
+    expect(markdown).toContain('Use this file as context in a new session');
+    expect(markdown).not.toContain('and choose Resume');
+  });
+
+  it('records an empty archive without inventing an entry or offering continuation', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'Empty', cwd: '/repo', model: '', exportedAt, entries: [],
+      source: { ...source, entryId: null, archiveTipId: null },
+    });
+    expect(markdown).toContain('- Pi session `parser-session`.');
+    expect(markdown).toContain('no selected conversation entry');
+    expect(markdown).toContain('no conversation tip');
+    expect(markdown).not.toContain('Continue elsewhere');
+  });
+
+  it('keeps backticks and line breaks in archive identifiers inside readable inline code', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'Parser', cwd: '', model: '', exportedAt, entries: [],
+      source: { ...source, archivePath: '/sessions/a`b\n# pretend-heading.jsonl', sessionId: '`parser`' },
+    });
+    expect(markdown).toContain('- Source archive ``/sessions/a`b # pretend-heading.jsonl``.');
+    expect(markdown).toContain('- Pi session `` `parser` ``.');
+    expect(markdown).not.toContain('\n# pretend-heading');
+  });
+
   it('exports image result notices and accompanying text without inline image data', () => {
     const markdown = sessionExportMarkdown({
       title: 'Inspect an image', cwd: '/repo/app', model: '', exportedAt,
