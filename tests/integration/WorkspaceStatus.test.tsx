@@ -19,6 +19,41 @@ const change: GitChange = {
 afterEach(cleanup);
 
 describe('workspace Git status', () => {
+  it('shows local upstream counts and refreshes them without claiming to fetch', () => {
+    const { rerender } = render(<WorkspaceStatus workspace={workspace} details={{ ...details,
+      upstream: { state: 'tracked', name: 'origin/feature/status', ahead: 2, behind: 3 },
+    }} ready onReview={vi.fn()} />);
+    expect(screen.getByLabelText('Upstream comparison')).toHaveTextContent('Upstream origin/feature/status · 2 ahead · 3 behind');
+    expect(screen.getByText('Local refs only. No fetch performed.')).toBeVisible();
+    rerender(<WorkspaceStatus workspace={workspace} details={{ ...details,
+      upstream: { state: 'tracked', name: 'origin/main', ahead: 0, behind: 0 },
+    }} ready onReview={vi.fn()} />);
+    expect(screen.getByLabelText('Upstream comparison')).toHaveTextContent('Upstream origin/main · 0 ahead · 0 behind');
+    expect(screen.queryByText(/origin\/feature/)).not.toBeInTheDocument();
+  });
+
+  it('shows upstream comparison only inside expanded saved-history status', () => {
+    render(<WorkspaceStatus context="history" workspace={workspace} details={{ ...details,
+      upstream: { state: 'tracked', name: 'origin/main', ahead: 1, behind: 2 },
+    }} ready onReview={vi.fn()} />);
+    expect(screen.getByLabelText('Upstream comparison')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Current workspace changes'));
+    expect(screen.getByLabelText('Upstream comparison')).toBeVisible();
+    expect(screen.getByLabelText('Upstream comparison')).toHaveTextContent('1 ahead · 2 behind');
+  });
+
+  it.each([
+    { branch: 'main', upstream: { state: 'none' as const }, message: 'No upstream configured.' },
+    { branch: '', upstream: undefined, message: 'Upstream comparison unavailable for detached HEAD.' },
+    { branch: 'main', upstream: { state: 'unavailable' as const, name: 'origin/gone' }, message: 'Upstream origin/gone unavailable.' },
+    { branch: 'main', upstream: { state: 'unavailable' as const }, message: 'Upstream comparison unavailable.' },
+  ])('explains $message and preserves change review', ({ branch, upstream, message }) => {
+    render(<WorkspaceStatus workspace={workspace} details={{ ...details, branch, upstream, changes: [change] }} ready onReview={vi.fn()} />);
+    expect(screen.getByLabelText('Upstream comparison')).toHaveTextContent(message);
+    expect(screen.getByRole('status')).toHaveTextContent('1 changed file');
+    expect(screen.getByRole('button')).toBeEnabled();
+  });
+
   it('shows current repository hash, literal subject and committed date, then refreshes them', () => {
     const { container, rerender } = render(<WorkspaceStatus workspace={workspace} details={{ ...details, headCommit }} ready onReview={vi.fn()} />);
     expect(screen.getByLabelText('Current repository commit')).toHaveTextContent('Repository HEAD · 12345678');
@@ -83,11 +118,12 @@ describe('workspace Git status', () => {
     { ready: true, availability: 'unavailable' as const, gitError: undefined, message: 'Restore this folder to inspect Git changes.' },
     { ready: true, availability: 'available' as const, gitError: 'Git changes are unavailable for this folder.', message: 'Git changes are unavailable for this folder.' },
   ])('does not claim a clean root when $message', ({ ready, availability, gitError, message }) => {
-    render(<WorkspaceStatus workspace={{ ...workspace, availability }} details={{ ...details, gitError, headCommit }} ready={ready} onReview={vi.fn()} />);
+    render(<WorkspaceStatus workspace={{ ...workspace, availability }} details={{ ...details, gitError, headCommit, upstream: { state: 'tracked', name: 'origin/main', ahead: 1, behind: 2 } }} ready={ready} onReview={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent(message);
     expect(screen.getByRole('button')).toBeDisabled();
     expect(screen.queryByText('No changes in this root')).not.toBeInTheDocument();
     expect(screen.queryByText(/old-branch|feature\/status/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Current repository commit')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Upstream comparison')).not.toBeInTheDocument();
   });
 });

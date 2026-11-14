@@ -24,8 +24,13 @@ export type GitChange = {
   staged: boolean;
   untracked: boolean;
 };
+export type GitUpstream =
+  | { state: 'none' }
+  | { state: 'unavailable'; name?: string }
+  | { state: 'tracked'; name: string; ahead: number; behind: number };
 export type WorkspaceDetails = {
   branch: string;
+  upstream?: GitUpstream;
   headCommit?: { hash: string; subject: string; committedAt: string };
   changes: GitChange[];
   files: string[];
@@ -168,6 +173,26 @@ async function listFiles(
   return { files, filesTruncated };
 }
 
+async function inspectUpstream(cwd: string, branch: string): Promise<GitUpstream | undefined> {
+  if (!branch) return undefined;
+  let name: string | undefined;
+  try {
+    const refs = await git(cwd, [
+      'for-each-ref', '--format=%(upstream:short)%00%(upstream)', `refs/heads/${branch}`,
+    ]);
+    const [shortName, ref] = refs.trim().split('\0');
+    if (!ref) return { state: 'none' };
+    name = shortName;
+    // Compare full refs, including local-branch upstreams, without network access.
+    const counts = await git(cwd, ['rev-list', '--left-right', '--count', `HEAD...${ref}`, '--']);
+    const match = /^(\d+)\s+(\d+)$/.exec(counts.trim());
+    if (!match) return { state: 'unavailable', name };
+    return { state: 'tracked', name, ahead: Number(match[1]), behind: Number(match[2]) };
+  } catch {
+    return { state: 'unavailable', name };
+  }
+}
+
 export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
   const { files, filesTruncated } = await listFiles(cwd);
   try {
@@ -205,6 +230,7 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
     const [hash, committedAt, subject] = commit.split('\0');
     return {
       branch: branch.trim(),
+      upstream: await inspectUpstream(cwd, branch.trim()),
       headCommit: commit ? {
         hash,
         committedAt,
