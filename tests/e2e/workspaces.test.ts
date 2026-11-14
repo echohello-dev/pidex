@@ -432,11 +432,10 @@ describe('grouped roots in Electron', () => {
     await capture('prepared-destination-draft.png');
     await fs.writeFile(path.join(shots, 'prepared-history-context.md'), draft);
     // Capture the real composer showing the new identifiers at native window size.
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Emulation.clearDeviceMetricsOverride');
     const nativeWindow = await app.browserWindow(page);
     await nativeWindow.evaluate((window) => window.setContentSize(1280, 840));
     const size = await nativeWindow.evaluate((window) => window.getContentSize());
+    await page.setViewportSize({ width: size[0], height: size[1] });
     await page.waitForFunction(([width, height]) => innerWidth === width && innerHeight === height, size);
     await page.getByLabel('Message pi').scrollIntoViewIfNeeded();
     await page.getByLabel('Message pi').evaluate((textarea) => {
@@ -445,7 +444,6 @@ describe('grouped roots in Electron', () => {
       input.scrollTop = line * parseFloat(getComputedStyle(input).lineHeight);
     });
     await capture('history-context-identifiers.png');
-    await cdp.detach();
     // Review is real editing, with no automatic send.
     await page.getByLabel('Message pi').fill(`${draft}\n\nCheck this root first.`);
     await page.getByRole('button', { name: 'Send', exact: true }).click();

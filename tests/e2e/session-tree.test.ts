@@ -38,7 +38,7 @@ const readLog = async () =>
 
 describe('session branches in Electron', () => {
   beforeAll(async () => {
-    fixture = await fs.mkdtemp(path.join(os.tmpdir(), 'pidex-branches-'));
+    fixture = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'pidex-branches-')));
     const project = path.join(fixture, 'project');
     const archives = path.join(fixture, 'sessions/workspace');
     await Promise.all([
