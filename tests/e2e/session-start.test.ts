@@ -30,6 +30,11 @@ async function capture(name: string) {
     await page.screenshot({ scale: 'css', path: path.join(ROOT, directory, name) });
   }
 }
+async function sessionRecords() {
+  const log = await fs.readFile(rpcLog, 'utf8').catch(() => '');
+  return log.split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    .filter((record) => record.type !== 'get_available_models');
+}
 
 describe('session start choice in Electron', () => {
   beforeAll(async () => {
@@ -83,7 +88,7 @@ describe('session start choice in Electron', () => {
     if (fixture) await fs.rm(fixture, { recursive: true, force: true });
   });
 
-  it('previews a chosen saved conversation before starting Pi and preserves the separate task draft', async () => {
+  it('previews a chosen saved conversation before opening a runtime session and preserves the separate task draft', async () => {
     await page.getByLabel('Message pi').fill('Keep this separate task for later.');
     await choice().scrollIntoViewIfNeeded();
     const order = await page.evaluate(() => ({
@@ -109,11 +114,14 @@ describe('session start choice in Electron', () => {
     await page.getByRole('tree', { name: 'Session archives', exact: true }).getByRole('treeitem', { name: /Older saved task/ }).waitFor();
     expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep this unsent continuation too.');
     expect(await fs.readFile(source, 'utf8')).toBe(sourceBytes);
-    expect(await fs.readFile(rpcLog, 'utf8').catch(() => '')).toBe('');
+    expect(await sessionRecords()).toEqual([]);
+    expect(await page.locator('.wb-sidebar .wb-session-item').filter({ hasText: 'this window' }).count()).toBe(0);
     await newSession();
   });
 
   it('keeps both choices reachable by scrolling at the native minimum window size', async () => {
+    await newSession();
+    await page.getByLabel('Message pi').fill('Keep this separate task for later.');
     await resize(900, 600);
     await choice().scrollIntoViewIfNeeded();
     await capture('new-or-saved-session-narrow.png');
@@ -131,11 +139,13 @@ describe('session start choice in Electron', () => {
     await capture('new-task-composer-narrow.png');
     expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep this separate task for later.');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect(await fs.readFile(rpcLog, 'utf8').catch(() => '')).toBe('');
+    expect(await sessionRecords()).toEqual([]);
     await resize(1280, 1000);
   });
 
   it('scopes choices to the selected root and starts a fresh conversation only after Send', async () => {
+    await newSession();
+    await page.getByLabel('Message pi').fill('Keep this separate task for later.');
     await page.getByLabel('Workspace group').selectOption({ label: 'empty' });
     await expect.poll(() => choice().count()).toBe(0);
     expect(await page.getByLabel('Message pi').inputValue()).toBe('');
@@ -144,7 +154,7 @@ describe('session start choice in Electron', () => {
     await page.getByLabel('Workspace group').selectOption({ label: 'parser' });
     await choice().getByRole('button', { name: 'Preview Review parser recovery', exact: true }).waitFor();
     expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep this separate task for later.');
-    expect(await fs.readFile(rpcLog, 'utf8').catch(() => '')).toBe('');
+    expect(await sessionRecords()).toEqual([]);
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await page.getByRole('button', { name: 'Stop', exact: true }).waitFor();
     await expect.poll(async () => fs.readFile(rpcLog, 'utf8').catch(() => '')).toContain('"type":"prompt"');
