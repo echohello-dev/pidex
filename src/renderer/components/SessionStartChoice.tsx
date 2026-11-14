@@ -3,18 +3,16 @@ import { timeAgo } from '../useWorkbench';
 
 export function SessionStartChoice({
   sessions,
-  cwd,
   busy,
   onPreview,
   onBrowse,
 }: {
   sessions: SessionInfo[];
-  cwd: string;
   busy: boolean;
   onPreview: (session: SessionInfo) => void;
   onBrowse: () => void;
 }) {
-  const recent = sessions.filter((session) => session.cwd === cwd).slice(0, 2);
+  const recent = sessions.slice(0, 2);
   if (!recent.length) return null;
 
   return (

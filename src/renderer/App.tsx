@@ -405,7 +405,6 @@ function App() {
                     />
                     <SessionStartChoice
                       sessions={sessions}
-                      cwd={ws.cwd}
                       busy={b.busy}
                       onPreview={(session) => {
                         b.navigate('history');

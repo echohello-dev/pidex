@@ -47,10 +47,12 @@ describe('session start choice in Electron', () => {
       git('add', '.');
       git('-c', 'user.name=Test', '-c', 'user.email=test@example.test', '-c', 'commit.gpgsign=false', 'commit', '-m', 'Prepare workspace');
     }
+    const alias = path.join(fixture, 'parser-alias');
+    await fs.symlink(project, alias, 'dir');
     for (const [index, title] of ['Review parser recovery', 'Check keyboard focus', 'Older saved task'].entries()) {
       const file = path.join(archives, `${index}.jsonl`);
       const records = [
-        { type: 'session', version: 3, id: `saved-${index}`, cwd: project, timestamp: new Date(Date.now() - index * 60_000).toISOString() },
+        { type: 'session', version: 3, id: `saved-${index}`, cwd: index === 0 ? alias : project, timestamp: new Date(Date.now() - index * 60_000).toISOString() },
         { type: 'message', id: 'u', parentId: null, message: { role: 'user', content: [{ type: 'text', text: title }] } },
         { type: 'message', id: 'a', parentId: 'u', message: { role: 'assistant', content: [{ type: 'text', text: `Saved response for ${title}.` }] } },
       ];
@@ -145,6 +147,7 @@ describe('session start choice in Electron', () => {
     expect(await fs.readFile(rpcLog, 'utf8').catch(() => '')).toBe('');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await page.getByRole('button', { name: 'Stop', exact: true }).waitFor();
+    await expect.poll(async () => fs.readFile(rpcLog, 'utf8').catch(() => '')).toContain('"type":"prompt"');
     const records = (await fs.readFile(rpcLog, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
     const prompt = records.find((record) => record.type === 'prompt');
     expect(prompt).toMatchObject({ cwd: project, message: 'Keep this separate task for later.' });
