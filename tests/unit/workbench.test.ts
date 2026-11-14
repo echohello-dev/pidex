@@ -29,6 +29,63 @@ afterEach(async () => {
 });
 
 describe('workspace inspection and preview', () => {
+  it('reads repository HEAD from nested roots and refreshes after a commit outside the root', async () => {
+    const root = await fixture();
+    const nested = path.join(root, 'package');
+    await fs.mkdir(nested);
+    await git(root, ['init', '-b', 'main']);
+    await git(root, ['config', 'user.name', 'Test']);
+    await git(root, ['config', 'user.email', 'test@example.test']);
+    await git(root, ['config', 'commit.gpgsign', 'false']);
+    await fs.writeFile(path.join(nested, 'app.ts'), 'original\n');
+    await git(root, ['add', '.']);
+    await git(root, ['commit', '-m', 'Start package']);
+    const first = (await inspectWorkspace(nested)).headCommit;
+    expect(first?.subject).toBe('Start package');
+
+    await fs.writeFile(path.join(root, 'readme.txt'), 'outside the selected root\n');
+    await git(root, ['add', '.']);
+    await git(root, ['commit', '-m', 'Document café parser <status>', '-m', 'Body is not the subject.']);
+    await git(root, ['config', 'log.showSignature', 'true']);
+    const result = await inspectWorkspace(nested);
+    expect(result.headCommit).toEqual({
+      hash: (await git(root, ['rev-parse', 'HEAD'])).trim(),
+      subject: 'Document café parser <status>',
+      committedAt: (await git(root, ['log', '-1', '--format=%cI'])).trim(),
+    });
+    expect(result.headCommit?.hash).not.toBe(first?.hash);
+    expect(result.changes).toEqual([]);
+  });
+
+  it('reads the selected linked worktree and detached HEAD rather than another checkout', async () => {
+    const root = await fixture();
+    const linked = path.join(await fixture(), 'linked');
+    await git(root, ['init', '-b', 'main']);
+    await git(root, ['config', 'user.name', 'Test']);
+    await git(root, ['config', 'user.email', 'test@example.test']);
+    await git(root, ['config', 'commit.gpgsign', 'false']);
+    await git(root, ['commit', '--allow-empty', '-m', 'Shared base']);
+    await git(root, ['worktree', 'add', '-b', 'feature/linked', linked]);
+    await git(linked, ['commit', '--allow-empty', '-m', 'Linked tip']);
+    expect((await inspectWorkspace(root)).headCommit?.subject).toBe('Shared base');
+    expect((await inspectWorkspace(linked)).headCommit?.subject).toBe('Linked tip');
+    await git(linked, ['checkout', '--detach', 'HEAD~1']);
+    const detached = await inspectWorkspace(linked);
+    expect(detached.branch).toBe('');
+    expect(detached.headCommit?.subject).toBe('Shared base');
+  });
+
+  it('keeps changes available in a repository with no commits', async () => {
+    const root = await fixture();
+    await git(root, ['init', '-b', 'main']);
+    await fs.writeFile(path.join(root, 'new.ts'), 'new\n');
+    const result = await inspectWorkspace(root);
+    expect(result.branch).toBe('main');
+    expect(result.gitError).toBeUndefined();
+    expect(result.headCommit).toBeUndefined();
+    expect(result.changes[0]?.path).toBe('new.ts');
+  });
+
   it('reads actual staged, unstaged and untracked changes, including unusual filenames', async () => {
     const root = await fixture();
     await git(root, ['init', '-b', 'main']);

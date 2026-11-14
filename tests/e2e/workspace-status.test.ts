@@ -14,6 +14,7 @@ let clean: string;
 let source: string;
 let rpcLog: string;
 const errors: string[] = [];
+const projectSubject = 'Prepare streaming parser for workspace inspection and preserve the selected root while reviewing a long repository commit subject';
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' });
 const status = () => page.getByRole('region', { name: 'Workspace Git status' });
 async function capture(name: string) {
@@ -61,7 +62,7 @@ describe('workspace status in Electron', () => {
       git(cwd, 'init', '-b', 'main');
       await fs.writeFile(path.join(cwd, 'app.ts'), 'export const value = 1;\n');
       git(cwd, 'add', '.');
-      git(cwd, '-c', 'user.name=Test', '-c', 'user.email=test@example.test', '-c', 'commit.gpgsign=false', 'commit', '-m', 'fixture');
+      git(cwd, '-c', 'user.name=Test', '-c', 'user.email=test@example.test', '-c', 'commit.gpgsign=false', 'commit', '-m', cwd === project ? projectSubject : 'Initial clean workspace');
     }
     git(project, 'switch', '-c', 'feature/workspace-status');
     await fs.writeFile(path.join(project, 'app.ts'), 'export const value = 2;\n');
@@ -93,6 +94,8 @@ describe('workspace status in Electron', () => {
   it('shows mixed Git changes before starting Pi and opens Changes without losing the task draft', async () => {
     await expect.poll(() => status().textContent()).toContain('2 changed files');
     expect(await status().textContent()).toContain('feature/workspace-status · 1 staged · 1 unstaged · 1 untracked');
+    expect(await status().getByLabel('Current repository commit').textContent()).toContain(projectSubject);
+    expect(await status().locator('code').textContent()).toBe(git(project, 'rev-parse', 'HEAD').toString().trim().slice(0, 8));
     await page.getByLabel('Message pi').fill('Review the existing changes before editing.');
     await page.evaluate(() => document.fonts.ready);
     await capture('workspace-status.png');
@@ -129,7 +132,17 @@ describe('workspace status in Electron', () => {
     await capture('history-workspace-status.png');
     await status().locator('summary').click();
     await status().getByText('Saved history does not restore files or switch Git branches.').waitFor();
+    expect(await status().getByLabel('Current repository commit').isVisible()).toBe(true);
+    await status().getByLabel('Current repository commit').scrollIntoViewIfNeeded();
     await capture('history-workspace-status-expanded.png');
+    await resizeWindow(900, 600);
+    await status().getByLabel('Current repository commit').scrollIntoViewIfNeeded();
+    await capture('history-head-commit-narrow.png');
+    expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+    const composerBottom = await page.locator('.wb-composer').evaluate((el) => el.getBoundingClientRect().bottom);
+    const footerTop = await page.locator('.wb-statusbar').evaluate((el) => el.getBoundingClientRect().top);
+    expect(composerBottom).toBeLessThanOrEqual(footerTop);
+    await resizeWindow(1280, 900);
     await status().getByRole('button', { name: 'Review workspace changes' }).click();
     await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
     await page.getByLabel('Commit message').waitFor();
@@ -176,10 +189,33 @@ describe('workspace status in Electron', () => {
     expect(await status().textContent()).not.toContain('feature/workspace-status');
   });
 
+  it('refreshes repository HEAD on focus, keeps detached commits visible and clears them on root switches', async () => {
+    const subject = 'Record a new detached repository tip';
+    git(clean, '-c', 'user.name=Test', '-c', 'user.email=test@example.test', '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', subject);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Current repository commit').textContent()).toContain(subject);
+    expect(await status().locator('code').textContent()).toBe(git(clean, 'rev-parse', 'HEAD').toString().trim().slice(0, 8));
+    expect(await status().textContent()).toContain('Detached HEAD');
+    await page.getByLabel('Workspace group').selectOption({ label: 'project' });
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    await page.getByRole('heading', { name: 'Start a session', exact: true }).waitFor();
+    await expect.poll(() => status().getByLabel('Current repository commit').textContent()).toContain(projectSubject);
+    expect(await status().textContent()).not.toContain(subject);
+    await page.evaluate(() => document.fonts.ready);
+    await capture('workspace-head-commit.png');
+    await resizeWindow(900, 600);
+    await status().scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    await capture('workspace-head-commit-narrow.png');
+    await resizeWindow(1280, 900);
+    expect(errors).toEqual([]);
+  });
+
   it('does not describe non-Git folders or missing roots as clean', async () => {
     await select('plain');
     await expect.poll(() => status().textContent()).toContain('Git changes are unavailable for this folder.');
     expect(await status().getByRole('button').isDisabled()).toBe(true);
+    expect(await status().getByLabel('Current repository commit').count()).toBe(0);
     await select('missing');
     await expect.poll(() => status().textContent()).toContain('Restore this folder to inspect Git changes.');
     expect(await status().getByRole('button').isDisabled()).toBe(true);

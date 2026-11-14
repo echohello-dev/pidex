@@ -416,6 +416,13 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-workspace-status p {
   margin: 4px 0 0;
 }
+.wb-workspace-commit-subject {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 12px;
+}
 .wb-start-title > svg {
   flex-shrink: 0;
 }
@@ -929,8 +936,13 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 }
 .wb-history-heading {
   display: flex;
-  align-items: start;
+  align-items: stretch;
   gap: 16px;
+  min-height: 80px;
+  overflow: hidden;
+}
+.wb-history-conversation > .wb-transcript {
+  min-height: 48px;
 }
 .wb-history-heading > div {
   min-width: 0;
@@ -953,6 +965,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   font-size: 12px;
   border: 1px solid var(--line);
   border-radius: 4px;
+  overflow-y: auto;
 }
 .wb-history-workspace-status summary {
   cursor: pointer;

@@ -30,6 +30,7 @@ export function WorkspaceStatus({
           ? `${count} changed ${count === 1 ? 'file' : 'files'}`
           : 'No changes in this root';
   const inspected = !unavailable && ready && !details.gitError;
+  const commit = inspected ? details.headCommit : undefined;
 
   const content = (
     <>
@@ -42,9 +43,24 @@ export function WorkspaceStatus({
         )}
         <p role="status">{message}</p>
         {inspected && (
-          <p className="wb-meta">
-            {details.branch || 'Detached HEAD'} · {staged} staged · {unstaged} unstaged · {untracked} untracked
-          </p>
+          <>
+            <p className="wb-meta">
+              {details.branch || 'Detached HEAD'} · {staged} staged · {unstaged} unstaged · {untracked} untracked
+            </p>
+            {commit ? (
+              <div className="wb-workspace-commit" aria-label="Current repository commit">
+                <p className="wb-meta">
+                  Repository HEAD · <code title={commit.hash}>{commit.hash.slice(0, 8)}</code> ·{' '}
+                  <time dateTime={commit.committedAt} title={commit.committedAt}>
+                    {new Date(commit.committedAt).toLocaleDateString('en-AU', {
+                      day: 'numeric', month: 'short', year: 'numeric',
+                    })}
+                  </time>
+                </p>
+                <p className="wb-workspace-commit-subject" title={commit.subject}>{commit.subject}</p>
+              </div>
+            ) : <p className="wb-meta">No repository commit available.</p>}
+          </>
         )}
       </div>
       <BracketButton disabled={!inspected} onClick={onReview}>
