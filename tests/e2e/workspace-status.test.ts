@@ -133,7 +133,16 @@ describe('workspace status in Electron', () => {
     await status().locator('summary').click();
     await status().getByText('Saved history does not restore files or switch Git branches.').waitFor();
     expect(await status().getByLabel('Current repository commit').isVisible()).toBe(true);
+    await status().getByLabel('Current repository commit').scrollIntoViewIfNeeded();
     await capture('history-workspace-status-expanded.png');
+    await resizeWindow(900, 600);
+    await status().getByLabel('Current repository commit').scrollIntoViewIfNeeded();
+    expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+    const composerBottom = await page.locator('.wb-composer').evaluate((el) => el.getBoundingClientRect().bottom);
+    const footerTop = await page.locator('.wb-statusbar').evaluate((el) => el.getBoundingClientRect().top);
+    expect(composerBottom).toBeLessThanOrEqual(footerTop);
+    await capture('history-head-commit-narrow.png');
+    await resizeWindow(1280, 900);
     await status().getByRole('button', { name: 'Review workspace changes' }).click();
     await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
     await page.getByLabel('Commit message').waitFor();
