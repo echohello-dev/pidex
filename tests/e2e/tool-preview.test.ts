@@ -181,6 +181,10 @@ describe('bounded tool previews in Electron', () => {
     await page.keyboard.press('Enter');
     const image = card.getByRole('img', { name: 'Tool output image 1' });
     await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+    // The image and its controls may need separate frames on a short display.
+    await card.locator('summary').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(root, '.tmp/proof/tool-image-controls.png'), scale: 'css' });
+    await page.screenshot({ path: path.join(shots, 'tool-image-controls.png'), scale: 'css' });
     const capture = async (name: string) => {
       await image.scrollIntoViewIfNeeded();
       const bounds = await image.boundingBox();
@@ -220,7 +224,9 @@ describe('bounded tool previews in Electron', () => {
     await card.getByText(/Image 2 cannot be previewed/).waitFor();
     expect(await card.getByRole('button', { name: 'Show image 2' }).count()).toBe(0);
     await card.getByRole('button', { name: 'Show image 1' }).click();
-    await card.getByRole('status').filter({ hasText: 'Image 1 could not be displayed.' }).waitFor();
+    const failure = card.getByRole('status').filter({ hasText: 'Image 1 could not be displayed.' });
+    await failure.waitFor();
+    await failure.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(root, '.tmp/proof/tool-image-unavailable.png'), scale: 'css' });
     await page.screenshot({ path: path.join(shots, 'tool-image-unavailable.png'), scale: 'css' });
     expect(errors).toEqual([]);
