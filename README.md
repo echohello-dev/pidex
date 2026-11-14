@@ -45,7 +45,7 @@ These are captures of real Electron interactions with a temporary Git workspace 
 - Group existing local folders into named workspaces and discover Pi sessions by their original working directory.
 - Start, stop, steer, resume, and fork sessions; preview history before launching Pi.
 - Browse linked session archives and branch entries; preview and continue the selected path.
-- Render streamed Markdown, thinking, and expandable tool output.
+- Render streamed Markdown, thinking, and expandable tool output with on-demand image previews.
 - Browse files, review diffs, stage changes, and commit.
 - Discover workspace and global skills, switch models, and save model and reasoning defaults per workspace.
 - Switch roots while sessions run in the background; retain per-root drafts, views and model defaults.

@@ -3,7 +3,7 @@ import {
   sessionExportFilename,
   sessionExportMarkdown,
 } from '../../src/renderer/export-session';
-import type { Entry } from '../../src/renderer/timeline';
+import { entriesFromMessages, type Entry } from '../../src/renderer/timeline';
 
 const exportedAt = new Date('2026-11-08T01:02:03.000Z');
 
@@ -20,6 +20,24 @@ const bashDone: Extract<Entry, { kind: 'tool' }> = {
 };
 
 describe('sessionExportMarkdown', () => {
+  it('exports image result notices and accompanying text without inline image data', () => {
+    const markdown = sessionExportMarkdown({
+      title: 'Inspect an image', cwd: '/repo/app', model: '', exportedAt,
+      entries: entriesFromMessages([
+        { role: 'assistant', content: [{ type: 'toolCall', id: 'read', name: 'read', arguments: { path: 'view.png' } }] },
+        { role: 'toolResult', toolCallId: 'read', content: [
+          { type: 'text', text: 'The current screen' },
+          { type: 'image', mimeType: 'image/png', data: 'aW1hZ2U=' },
+        ] },
+      ]),
+    });
+    expect(markdown).toContain('The current screen');
+    expect(markdown).toContain('Image 1 (image/png). Image data is omitted from text copies and exports.');
+    expect(markdown).not.toContain('No output.');
+    expect(markdown).not.toContain('aW1hZ2U=');
+    expect(markdown).not.toContain('data:image');
+  });
+
   it('writes the full conversation with context and tool input', () => {
     const markdown = sessionExportMarkdown({
       title: 'Fix the export',

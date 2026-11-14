@@ -118,6 +118,30 @@ describe('bounded tool previews in Electron', () => {
       ];
       await fs.writeFile(path.join(archives, `${tool}.jsonl`), records.map((r) => JSON.stringify(r)).join('\n'));
     }
+    const image = await fs.readFile(path.join(root, 'docs/assets/banner.png'), 'base64');
+    for (const broken of [false, true]) {
+      const name = broken ? 'broken-image' : 'image';
+      const records = [
+        { type: 'session', version: 3, id: name, cwd: project, timestamp: new Date().toISOString() },
+        { type: 'message', id: 'task', parentId: null, message: {
+          role: 'user', content: [{ type: 'text', text: broken ? 'Inspect broken image output' : 'Inspect image output' }],
+        } },
+        { type: 'message', id: 'call', parentId: 'task', message: {
+          role: 'assistant', content: [{ type: 'toolCall', id: 'read', name: 'read', arguments: { path: 'banner.png' } }],
+        } },
+        { type: 'message', id: 'result', parentId: 'call', message: {
+          role: 'toolResult', toolCallId: 'read', toolName: 'read',
+          content: broken ? [
+            { type: 'image', mimeType: 'image/png', data: 'YnJva2Vu' },
+            { type: 'image', mimeType: 'image/svg+xml', data: 'PHN2Zz4=' },
+          ] : [
+            { type: 'text', text: 'Pidex banner preview' },
+            { type: 'image', mimeType: 'image/png', data: image },
+          ],
+        } },
+      ];
+      await fs.writeFile(path.join(archives, `${name}.jsonl`), records.map((r) => JSON.stringify(r)).join('\n'));
+    }
     app = await electron.launch({
       executablePath: require('electron'),
       args: ['.'],
@@ -143,6 +167,87 @@ describe('bounded tool previews in Electron', () => {
   afterAll(async () => {
     await app?.close();
     if (fixture) await fs.rm(fixture, { recursive: true, force: true });
+  });
+
+  it('previews saved tool images on demand at desktop and minimum window sizes', async () => {
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Inspect image output/ }).click();
+    const card = page.locator('.wb-tool');
+    await card.locator('summary').click();
+    await card.getByText('Pidex banner preview', { exact: false }).waitFor();
+    expect(await card.getByText('No output.', { exact: true }).count()).toBe(0);
+    expect(await card.getByRole('img', { name: 'Tool output image 1' }).count()).toBe(0);
+    await card.getByRole('button', { name: 'Show image 1' }).focus();
+    await page.keyboard.press('Enter');
+    const image = card.getByRole('img', { name: 'Tool output image 1' });
+    await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+    // The image and its controls may need separate frames on a short display.
+    await card.locator('summary').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(root, '.tmp/proof/tool-image-controls.png'), scale: 'css' });
+    await page.screenshot({ path: path.join(shots, 'tool-image-controls.png'), scale: 'css' });
+    const capture = async (name: string) => {
+      await image.scrollIntoViewIfNeeded();
+      const bounds = await image.boundingBox();
+      expect(bounds?.height).toBeLessThanOrEqual(320);
+      expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+      const screenshot = await page.screenshot({ scale: 'css' });
+      await Promise.all([
+        fs.writeFile(path.join(root, '.tmp/proof', name), screenshot),
+        fs.writeFile(path.join(shots, name), screenshot),
+      ]);
+    };
+    await capture('tool-image-desktop.png');
+    await resizeWindow(900, 600);
+    await capture('tool-image-narrow.png');
+    await card.getByRole('button', { name: 'Copy output' }).click();
+    await card.getByText('Output copied.', { exact: true }).waitFor();
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(
+      'Pidex banner preview\nImage 1 (image/png). Image data is omitted from text copies and exports.',
+    );
+    await page.getByRole('button', { name: 'Copy context', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: 'Context copied.' }).waitFor();
+    const exported = await app.evaluate(({ clipboard }) => clipboard.readText());
+    expect(exported).toContain('Image data is omitted from text copies and exports.');
+    expect(exported).not.toContain('data:image');
+    await card.getByRole('button', { name: 'Output details' }).click();
+    await card.getByRole('button', { name: 'Output details' }).click();
+    await card.getByRole('button', { name: 'Hide image 1' }).click();
+    expect(await image.count()).toBe(0);
+    await resizeWindow(1280, 1100);
+  });
+
+  it('explains broken and unsupported saved images while keeping the tool result readable', async () => {
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Inspect broken image output/ }).click();
+    const card = page.locator('.wb-tool');
+    await card.locator('summary').click();
+    await card.getByText(/Image 2 cannot be previewed/).waitFor();
+    expect(await card.getByRole('button', { name: 'Show image 2' }).count()).toBe(0);
+    await card.getByRole('button', { name: 'Show image 1' }).click();
+    const failure = card.getByRole('status').filter({ hasText: 'Image 1 could not be displayed.' });
+    await failure.waitFor();
+    await failure.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(root, '.tmp/proof/tool-image-unavailable.png'), scale: 'css' });
+    await page.screenshot({ path: path.join(shots, 'tool-image-unavailable.png'), scale: 'css' });
+    expect(errors).toEqual([]);
+  });
+
+  it('keeps an opened image visible when a live tool result replaces its partial snapshot', async () => {
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    await page.getByLabel('Message pi').fill('Inspect tool image fixture');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    const card = page.locator('.wb-tool');
+    await card.locator('summary').click();
+    await card.getByRole('button', { name: 'Show image 1' }).click();
+    await card.getByText('Final image preview', { exact: false }).waitFor();
+    await card.locator('summary').getByText('Done', { exact: true }).waitFor();
+    const image = card.getByRole('img', { name: 'Tool output image 1' });
+    await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+    await image.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(root, '.tmp/proof/tool-image-live.png'), scale: 'css' });
+    await page.screenshot({ path: path.join(shots, 'tool-image-live.png'), scale: 'css' });
+    expect(errors).toEqual([]);
+    await page.getByRole('button', { name: /^Sessions/ }).click();
   });
 
   it.each(['write', 'edit'])('bounds a long %s line and keeps the footer painted through native window resizing', async (tool) => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, cleanup, fireEvent } from '@testing-library/react';
 import { TOOL_TEXT_PREVIEW_LIMIT, TranscriptRow } from '../../src/renderer/components/WorkbenchControls';
-import type { Entry } from '../../src/renderer/timeline';
+import { entriesFromMessages, type Entry } from '../../src/renderer/timeline';
 
 const toolEntry: Extract<Entry, { kind: 'tool' }> = {
   key: 'tool-1',
@@ -18,6 +18,69 @@ const toolEntry: Extract<Entry, { kind: 'tool' }> = {
 describe('<TranscriptRow> tool card', () => {
   beforeEach(() => cleanup());
   afterEach(() => vi.useRealTimers());
+
+  it('loads images on demand, keeps them independent and restores disclosure after row recycling', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const [entry] = entriesFromMessages([
+      { role: 'assistant', content: [{ type: 'toolCall', id: 'image', name: 'read' }] },
+      { role: 'toolResult', toolCallId: 'image', content: [
+        { type: 'text', text: 'Screen capture' },
+        { type: 'image', mimeType: 'image/png', data: 'aW1hZ2U=' },
+        { type: 'image', mimeType: 'image/png', data: 'c2Vjb25k' },
+      ] },
+    ]);
+    const expanded = new Map([[entry.key, true]]);
+    const view = render(<TranscriptRow entry={entry} expanded={expanded} />);
+    expect(view.queryByRole('img', { name: /Tool output image/ })).toBeNull();
+    expect(view.getByRole('button', { name: 'Show image 1' })).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(view.getByRole('button', { name: 'Show image 1' }));
+    expect(view.getByRole('img', { name: 'Tool output image 1' })).toHaveAttribute('src', 'data:image/png;base64,aW1hZ2U=');
+    expect(view.queryByRole('img', { name: 'Tool output image 2' })).toBeNull();
+    fireEvent.click(view.getByRole('button', { name: 'Copy output' }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledExactlyOnceWith(
+      'Screen capture\nImage 1 (image/png). Image data is omitted from text copies and exports.\nImage 2 (image/png). Image data is omitted from text copies and exports.',
+    ));
+    fireEvent.click(view.getByRole('button', { name: 'Output details' }));
+    expect(view.container.querySelector('img[alt="Tool output image 1"]')).toBeNull();
+    fireEvent.click(view.getByRole('button', { name: 'Output details' }));
+    expect(view.getByRole('img', { name: 'Tool output image 1' })).toBeTruthy();
+    view.unmount();
+    const recycled = render(<TranscriptRow entry={entry} expanded={expanded} />);
+    expect(recycled.getByRole('img', { name: 'Tool output image 1' })).toBeTruthy();
+    fireEvent.click(recycled.getByRole('button', { name: 'Hide image 1' }));
+    expect(recycled.queryByRole('img', { name: 'Tool output image 1' })).toBeNull();
+    expect(recycled.getByText('Screen capture', { exact: false })).toBeTruthy();
+  });
+
+  it('explains a broken image and allows a replacement streamed image to load', () => {
+    const entry = {
+      ...toolEntry, output: 'Screenshot follows',
+      images: [{ number: 1, source: 'data:image/png;base64,YnJva2Vu' }],
+    };
+    const expanded = new Map([[entry.key, true]]);
+    const view = render(<TranscriptRow entry={entry} expanded={expanded} />);
+    fireEvent.click(view.getByRole('button', { name: 'Show image 1' }));
+    fireEvent.error(view.getByRole('img', { name: 'Tool output image 1' }));
+    expect(view.getByRole('status').textContent).toContain('Image 1 could not be displayed.');
+    expect(view.getByText('Screenshot follows')).toBeTruthy();
+    view.rerender(<TranscriptRow entry={{
+      ...entry, images: [{ number: 1, source: 'data:image/png;base64,cmVwbGFjZW1lbnQ=' }],
+    }} expanded={expanded} />);
+    expect(view.queryByRole('status')).toBeNull();
+    expect(view.getByRole('img', { name: 'Tool output image 1' })).toHaveAttribute('src', 'data:image/png;base64,cmVwbGFjZW1lbnQ=');
+  });
+
+  it('explains unsupported image results without mounting a preview', () => {
+    const [entry] = entriesFromMessages([
+      { role: 'assistant', content: [{ type: 'toolCall', id: 'image', name: 'read' }] },
+      { role: 'toolResult', toolCallId: 'image', content: [{ type: 'image', mimeType: 'image/svg+xml', data: 'PHN2Zz4=' }] },
+    ]);
+    const view = render(<TranscriptRow entry={entry} expanded={new Map([[entry.key, true]])} />);
+    expect(view.getByText(/Image 1 cannot be previewed/)).toBeTruthy();
+    expect(view.queryByText('No output.')).toBeNull();
+    expect(view.queryByRole('button', { name: 'Show image 1' })).toBeNull();
+  });
 
   it.each(['input', 'output'] as const)('reports a failed %s copy while collapsed and allows retrying the complete text', async (section) => {
     const writeText = vi.fn().mockRejectedValueOnce(new Error('Clipboard denied')).mockResolvedValue(undefined);

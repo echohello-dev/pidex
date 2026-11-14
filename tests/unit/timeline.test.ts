@@ -3,6 +3,61 @@ import { entriesFromMessages, applyEvent } from '../../src/renderer/timeline';
 import type { Entry } from '../../src/renderer/timeline';
 
 describe('entriesFromMessages', () => {
+  it('keeps text and numbered image notices in saved tool results without copying image bytes', () => {
+    const [entry] = entriesFromMessages([
+      { role: 'assistant', content: [{ type: 'toolCall', id: 'image', name: 'read', arguments: { path: 'screen.png' } }] },
+      { role: 'toolResult', toolCallId: 'image', content: [
+        { type: 'text', text: 'Screenshot follows' },
+        { type: 'image', mimeType: 'image/png', data: 'aW1hZ2U=' },
+        { type: 'text', text: 'Another view' },
+        { type: 'image', mimeType: 'image/jpeg', data: 'c2Vjb25k' },
+      ] },
+    ]);
+    expect(entry).toMatchObject({
+      output: 'Screenshot follows\nImage 1 (image/png). Image data is omitted from text copies and exports.\nAnother view\nImage 2 (image/jpeg). Image data is omitted from text copies and exports.',
+      images: [
+        { number: 1, source: 'data:image/png;base64,aW1hZ2U=' },
+        { number: 2, source: 'data:image/jpeg;base64,c2Vjb25k' },
+      ],
+      running: false, interrupted: false, ok: true,
+    });
+  });
+
+  it('explains unsupported and malformed images without treating them as empty output or URLs', () => {
+    const [entry] = entriesFromMessages([
+      { role: 'assistant', content: [{ type: 'toolCall', id: 'image', name: 'read' }] },
+      { role: 'toolResult', toolCallId: 'image', content: [
+        null, 'ignored', { type: 'image', mimeType: 'image/svg+xml', data: 'PHN2Zz4=' },
+        { type: 'image', mimeType: 'image/png', data: 'https://example.com/image.png' },
+        { type: 'image', mimeType: 'image/png', data: '' },
+        { type: 'image', mimeType: 'image/png' },
+        { type: 'image', mimeType: 'image/webp', data: 'd2VicA==' },
+      ] },
+    ]);
+    expect(entry).toMatchObject({
+      output: [1, 2, 3, 4].map((n) => `Image ${n} cannot be previewed (unsupported format or invalid image data).`).join('\n') +
+        '\nImage 5 (image/webp). Image data is omitted from text copies and exports.',
+      images: [{ number: 5, source: 'data:image/webp;base64,d2VicA==' }],
+    });
+  });
+
+  it('replaces image snapshots during streaming and clears them when the final result has text only', () => {
+    let entries = applyEvent([], { type: 'tool_execution_start', toolCallId: 'image', toolName: 'read' }).entries;
+    const content = [{ type: 'image', mimeType: 'image/gif', data: 'Z2lm' }];
+    entries = applyEvent(entries, { type: 'tool_execution_update', toolCallId: 'image', partialResult: { content } }).entries;
+    expect(entries[0]).toMatchObject({
+      output: 'Image 1 (image/gif). Image data is omitted from text copies and exports.',
+      images: [{ number: 1, source: 'data:image/gif;base64,Z2lm' }], running: true,
+    });
+    entries = applyEvent(entries, { type: 'tool_execution_end', toolCallId: 'image', result: { content } }).entries;
+    expect(entries[0]).toMatchObject({ images: [{ number: 1, source: 'data:image/gif;base64,Z2lm' }], running: false });
+    entries = applyEvent(entries, {
+      type: 'tool_execution_end', toolCallId: 'image', isError: true,
+      result: { content: [{ type: 'text', text: 'Image capture failed' }] },
+    }).entries;
+    expect(entries[0]).toMatchObject({ output: 'Image capture failed', images: [], ok: false });
+  });
+
   it('returns no entries for empty input', () => {
     expect(entriesFromMessages([])).toEqual([]);
   });
