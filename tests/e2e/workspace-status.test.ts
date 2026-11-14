@@ -137,11 +137,11 @@ describe('workspace status in Electron', () => {
     await capture('history-workspace-status-expanded.png');
     await resizeWindow(900, 600);
     await status().getByLabel('Current repository commit').scrollIntoViewIfNeeded();
+    await capture('history-head-commit-narrow.png');
     expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
     const composerBottom = await page.locator('.wb-composer').evaluate((el) => el.getBoundingClientRect().bottom);
     const footerTop = await page.locator('.wb-statusbar').evaluate((el) => el.getBoundingClientRect().top);
     expect(composerBottom).toBeLessThanOrEqual(footerTop);
-    await capture('history-head-commit-narrow.png');
     await resizeWindow(1280, 900);
     await status().getByRole('button', { name: 'Review workspace changes' }).click();
     await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
@@ -196,7 +196,9 @@ describe('workspace status in Electron', () => {
     await expect.poll(() => status().getByLabel('Current repository commit').textContent()).toContain(subject);
     expect(await status().locator('code').textContent()).toBe(git(clean, 'rev-parse', 'HEAD').toString().trim().slice(0, 8));
     expect(await status().textContent()).toContain('Detached HEAD');
-    await select('project');
+    await page.getByLabel('Workspace group').selectOption({ label: 'project' });
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    await page.getByRole('heading', { name: 'Start a session', exact: true }).waitFor();
     await expect.poll(() => status().getByLabel('Current repository commit').textContent()).toContain(projectSubject);
     expect(await status().textContent()).not.toContain(subject);
     await page.evaluate(() => document.fonts.ready);
