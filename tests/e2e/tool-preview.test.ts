@@ -223,4 +223,53 @@ describe('bounded tool previews in Electron', () => {
     expect(await text.evaluate((node) => node.scrollTop)).toBe(0);
     expect(errors).toEqual([]);
   });
+
+  it.each(['input', 'output'])('reports a denied %s copy while collapsed and retries using the real clipboard', async (section) => {
+    await resizeWindow(1280, 800);
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Inspect long bash input/ }).click();
+    const card = page.locator('.wb-tool');
+    if (await card.getAttribute('open') === null) await card.locator('summary').click();
+    const title = section === 'input' ? 'Input' : 'Output';
+    const toggle = card.getByRole('button', { name: `${title} details` });
+    if (await toggle.getAttribute('aria-expanded') === 'true') await toggle.click();
+    const button = card.getByRole('button', { name: `Copy ${section}` });
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.clipboard, 'writeText', {
+        configurable: true,
+        value: () => Promise.reject(new DOMException('Clipboard denied by test', 'NotAllowedError')),
+      });
+    });
+    try {
+      await button.focus();
+      await page.keyboard.press('Enter');
+      const feedback = card.getByRole('alert');
+      await feedback.waitFor();
+      expect(await feedback.textContent()).toBe(`Could not copy ${section}. Try Copy again.`);
+      expect(await toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(await button.isEnabled()).toBe(true);
+      const capture = async (name: string) => {
+        await feedback.scrollIntoViewIfNeeded();
+        expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+        const png = await page.screenshot({ scale: 'css' });
+        await Promise.all([
+          fs.writeFile(path.join(root, '.tmp/proof', name), png),
+          fs.writeFile(path.join(shots, name), png),
+        ]);
+      };
+      await capture(`tool-copy-${section}-failed.png`);
+      await resizeWindow(900, 600);
+      await capture(`tool-copy-${section}-failed-narrow.png`);
+    } finally {
+      await page.evaluate(() => { Reflect.deleteProperty(navigator.clipboard, 'writeText'); });
+    }
+    await button.click();
+    await card.getByText(`${title} copied.`, { exact: true }).waitFor();
+    expect(await card.getByRole('alert').count()).toBe(0);
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(
+      section === 'input' ? 'bun run build' : failedOutput,
+    );
+    expect(await toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(errors).toEqual([]);
+  });
 });

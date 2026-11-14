@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { act, render, cleanup, fireEvent } from '@testing-library/react';
 import { TOOL_TEXT_PREVIEW_LIMIT, TranscriptRow } from '../../src/renderer/components/WorkbenchControls';
 import type { Entry } from '../../src/renderer/timeline';
 
@@ -17,6 +17,105 @@ const toolEntry: Extract<Entry, { kind: 'tool' }> = {
 
 describe('<TranscriptRow> tool card', () => {
   beforeEach(() => cleanup());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(['input', 'output'] as const)('reports a failed %s copy while collapsed and allows retrying the complete text', async (section) => {
+    const writeText = vi.fn().mockRejectedValueOnce(new Error('Clipboard denied')).mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const entry = { ...toolEntry, oldText: 'before', newText: 'after', output: 'x'.repeat(3000) };
+    const { getByRole, queryByRole } = render(
+      <TranscriptRow entry={entry} expanded={new Map([[entry.key, true]])} />,
+    );
+    if (section === 'output') fireEvent.click(getByRole('button', { name: 'Output details' }));
+    const button = getByRole('button', { name: `Copy ${section}` });
+    fireEvent.click(button);
+    await vi.waitFor(() => expect(getByRole('alert').textContent).toBe(`Could not copy ${section}. Try Copy again.`));
+    expect(button).toHaveAccessibleDescription(`Could not copy ${section}. Try Copy again.`);
+    expect(button.closest('.wb-tool-section')?.querySelector('pre, .wb-tool-diff')).toBeNull();
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await vi.waitFor(() => expect(button.textContent).toBe('Copied'));
+    expect(queryByRole('alert')).toBeNull();
+    expect(getByRole('status').textContent).toBe(`${section === 'input' ? 'Input' : 'Output'} copied.`);
+    expect(writeText.mock.calls.map(([text]) => text)).toEqual([entry[section], entry[section]]);
+  });
+
+  it('explains a missing clipboard API and keeps input feedback independent of output', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    const { getByRole, getByText } = render(
+      <TranscriptRow entry={toolEntry} expanded={new Map([[toolEntry.key, true]])} />,
+    );
+    fireEvent.click(getByRole('button', { name: 'Copy output' }));
+    await vi.waitFor(() => expect(getByRole('alert')).toBeTruthy());
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    fireEvent.click(getByRole('button', { name: 'Copy input' }));
+    await vi.waitFor(() => expect(getByText('Input copied.')).toBeTruthy());
+    expect(getByRole('alert').textContent).toContain('Could not copy output.');
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(toolEntry.input);
+  });
+
+  it('announces pending copying and prevents repeated writes until it settles', async () => {
+    let complete!: () => void;
+    const writeText = vi.fn(() => new Promise<void>((resolve) => { complete = resolve; }));
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { getByRole } = render(
+      <TranscriptRow entry={toolEntry} expanded={new Map([[toolEntry.key, true]])} />,
+    );
+    const button = getByRole('button', { name: 'Copy output' });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(button.textContent).toBe('Copying…');
+    expect(getByRole('status').textContent).toBe('Copying output…');
+    fireEvent.click(button);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    await act(async () => complete());
+    expect(button).toBeEnabled();
+    expect(button.textContent).toBe('Copied');
+  });
+
+  it.each(['resolve', 'reject'])('ignores a superseded clipboard %s after streamed output changes', async (settlement) => {
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const writeText = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((done, fail) => { resolve = done; reject = fail; }))
+      .mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const view = render(<TranscriptRow entry={toolEntry} expanded={new Map([[toolEntry.key, true]])} />);
+    const button = view.getByRole('button', { name: 'Copy output' });
+    fireEvent.click(button);
+    view.rerender(<TranscriptRow entry={{ ...toolEntry, output: 'New streamed text' }} expanded={new Map([[toolEntry.key, true]])} />);
+    expect(button).toBeEnabled();
+    expect(button.textContent).toBe('Copy');
+    expect(view.queryByRole('status')).toBeNull();
+    fireEvent.click(button);
+    await vi.waitFor(() => expect(button.textContent).toBe('Copied'));
+    await act(async () => settlement === 'resolve' ? resolve() : reject(new Error('Old failure')));
+    expect(button.textContent).toBe('Copied');
+    expect(view.queryByRole('alert')).toBeNull();
+    expect(writeText.mock.calls.map(([text]) => text)).toEqual([toolEntry.output, 'New streamed text']);
+  });
+
+  it('clears previous feedback on text changes and cancels the previous success timeout', async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const expanded = new Map([[toolEntry.key, true]]);
+    const view = render(<TranscriptRow entry={toolEntry} expanded={expanded} />);
+    const button = view.getByRole('button', { name: 'Copy output' });
+    await act(async () => { fireEvent.click(button); });
+    expect(button.textContent).toBe('Copied');
+    act(() => vi.advanceTimersByTime(1000));
+    view.rerender(<TranscriptRow entry={{ ...toolEntry, output: 'Updated result' }} expanded={expanded} />);
+    expect(button.textContent).toBe('Copy');
+    expect(view.queryByRole('status')).toBeNull();
+    await act(async () => { fireEvent.click(button); });
+    act(() => vi.advanceTimersByTime(500));
+    expect(button.textContent).toBe('Copied');
+    act(() => vi.advanceTimersByTime(1000));
+    expect(button.textContent).toBe('Copy');
+    expect(view.queryByRole('status')).toBeNull();
+  });
 
   it('shows input and output as separate labelled sections when expanded', () => {
     const expanded = new Map<string, boolean>([[toolEntry.key, true]]);

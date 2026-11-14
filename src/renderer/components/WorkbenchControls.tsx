@@ -1,5 +1,6 @@
 import {
   memo,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -318,17 +319,37 @@ export function diffLines(oldText: string, newText: string): DiffLine[] {
 }
 
 function useCopy(text: string) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');
+  const attempt = useRef(0);
+  const pending = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    setStatus('idle');
+    pending.current = false;
+    return () => {
+      // A streamed update or recycled row invalidates outstanding feedback.
+      attempt.current++;
+      clearTimeout(timer.current);
+    };
+  }, [text]);
   const copy = async () => {
+    if (pending.current) return;
+    const current = ++attempt.current;
+    pending.current = true;
+    clearTimeout(timer.current);
+    setStatus('copying');
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      if (current !== attempt.current) return;
+      setStatus('copied');
+      timer.current = setTimeout(() => setStatus('idle'), 1500);
     } catch {
-      setCopied(false);
+      if (current === attempt.current) setStatus('failed');
+    } finally {
+      if (current === attempt.current) pending.current = false;
     }
   };
-  return { copied, copy };
+  return { status, copy };
 }
 
 function ToolSection({
@@ -348,7 +369,14 @@ function ToolSection({
   const [open, setOpen] = useState(
     () => expanded.get(stateKey) ?? title === 'Output',
   );
-  const { copied, copy } = useCopy(text);
+  const { status, copy } = useCopy(text);
+  const feedback = status === 'failed'
+    ? `Could not copy ${title.toLowerCase()}. Try Copy again.`
+    : status === 'copied'
+      ? `${title} copied.`
+      : status === 'copying'
+        ? `Copying ${title.toLowerCase()}…`
+        : '';
   return (
     <div className="wb-tool-section">
       <div className="wb-tool-section-head">
@@ -371,11 +399,18 @@ function ToolSection({
           type="button"
           className="wb-tool-copy"
           aria-label={`Copy ${title.toLowerCase()}`}
+          aria-describedby={feedback ? `${id}-copy` : undefined}
+          disabled={status === 'copying'}
           onClick={() => void copy()}
         >
-          {copied ? 'Copied' : 'Copy'}
+          {status === 'copied' ? 'Copied' : status === 'copying' ? 'Copying…' : 'Copy'}
         </button>
       </div>
+      {feedback && (
+        <p id={`${id}-copy`} className="wb-tool-copy-feedback" role={status === 'failed' ? 'alert' : 'status'}>
+          {feedback}
+        </p>
+      )}
       <div id={id} hidden={!open}>{open && children}</div>
     </div>
   );
