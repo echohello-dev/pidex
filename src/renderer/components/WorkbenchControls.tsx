@@ -10,7 +10,7 @@ import {
 import { BracketButton } from './BracketButton';
 import { FigureFrame } from './FigureFrame';
 import { Markdown } from './Markdown';
-import { toolStatus, type Entry } from '../timeline';
+import { toolStatus, type Entry, type ToolImage } from '../timeline';
 import type { ModelInfo, SlashCommand } from '../api';
 
 const icons = import.meta.glob<string>('../assets/workbench/*.svg', {
@@ -478,11 +478,51 @@ function ToolDiffSection({
   );
 }
 
-function ToolTextSection({ title, text, stateKey, expanded }: {
+function ToolImagePreview({ image, stateKey, expanded }: {
+  image: ToolImage;
+  stateKey: string;
+  expanded: Map<string, boolean>;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(() => expanded.get(stateKey) ?? false);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  return (
+    <div className="wb-tool-image">
+      <button
+        type="button"
+        className="wb-tool-toggle"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => {
+          expanded.set(stateKey, !open);
+          setOpen(!open);
+        }}
+      >
+        {open ? 'Hide' : 'Show'} image {image.number}
+      </button>
+      <div id={id} hidden={!open}>
+        {open && (failedSource === image.source ? (
+          <p className="wb-tool-notice wb-muted" role="status">
+            Image {image.number} could not be displayed. Text output is still available.
+          </p>
+        ) : (
+          <img
+            src={image.source}
+            alt={`Tool output image ${image.number}`}
+            onError={() => setFailedSource(image.source)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ToolTextSection({ title, text, stateKey, expanded, images = [] }: {
   title: string;
   text: string;
   stateKey: string;
   expanded: Map<string, boolean>;
+  images?: ToolImage[];
 }) {
   const [showAll, setShowAll] = useState(false);
   const [showEnd, setShowEnd] = useState(
@@ -537,6 +577,14 @@ function ToolTextSection({ title, text, stateKey, expanded }: {
           </button>
         </div>
       )}
+      {images.map((image) => (
+        <ToolImagePreview
+          key={image.number}
+          image={image}
+          stateKey={`${stateKey}:image:${image.number}`}
+          expanded={expanded}
+        />
+      ))}
     </ToolSection>
   );
 }
@@ -599,6 +647,7 @@ export const TranscriptRow = memo(function TranscriptRow({
           title="Output"
           stateKey={`${entry.key}:output`}
           expanded={expanded}
+          images={entry.images}
           text={
             entry.output ||
             (entry.running ? 'Waiting for output…' : 'No output.')

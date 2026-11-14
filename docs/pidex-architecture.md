@@ -85,6 +85,8 @@ Per-root views, new-session/history drafts, unsaved settings drafts, open tabs, 
 
 Markdown and tool output use native browser layout. ResizeObserver supplies actual row heights, including expanded thinking and tools. Width changes and font readiness invalidate measurements. Observer work is scheduled through animation frames to avoid resize feedback loops.
 
+Tool results retain inline PNG, JPEG, GIF and WebP images alongside text in both saved history and live events. Each image loads through a separate disclosure control and fits within the card width and 320 pixels in height. Unsupported formats and decoding failures show an explanation. Text copies, exports and handoff drafts include numbered image notices without image bytes.
+
 Active sessions initially open at the end. Appends and row growth follow the tail when the reader is near the bottom. Upward wheel or keyboard navigation and pointer interaction cancel a pending automatic scroll. History previews start at the beginning. Selected text ranges and keyboard-focused rows remain mounted while scrolling; tool/thinking expansion survives row recycling within the view.
 
 ![Long transcript in the Electron test fixture](assets/workbench-long-session.png)

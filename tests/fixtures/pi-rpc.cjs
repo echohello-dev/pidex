@@ -275,6 +275,26 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       reply();
       streaming = true;
       event('agent_start');
+      if (command.message === 'Inspect tool image fixture') {
+        const image = {
+          type: 'image', mimeType: 'image/png',
+          data: fs.readFileSync(path.join(__dirname, '../../docs/assets/banner.png'), 'base64'),
+        };
+        event('tool_execution_start', {
+          toolCallId: 'read-image', toolName: 'read', args: { path: 'banner.png' },
+        });
+        event('tool_execution_update', {
+          toolCallId: 'read-image', partialResult: { content: [{ type: 'text', text: 'Streaming image preview' }, image] },
+        });
+        timers.push(setTimeout(() => {
+          event('tool_execution_end', {
+            toolCallId: 'read-image', result: { content: [{ type: 'text', text: 'Final image preview' }, image] },
+          });
+          streaming = false;
+          event('agent_end');
+        }, 1500));
+        break;
+      }
       if (command.message === 'Start interrupted tool fixture') {
         event('tool_execution_start', {
           toolCallId: 'interrupted-build', toolName: 'bash', args: { command: 'build-project' },

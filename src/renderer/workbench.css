@@ -837,6 +837,15 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.wb-tool-image img {
+  display: block;
+  max-width: calc(100% - 24px);
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0 12px 12px;
+}
 .wb-tool-diff {
   padding: 8px 0 12px;
   max-height: 320px;

@@ -1,4 +1,5 @@
 type ToolLine = { text: string; tone?: 'add' | 'del' | 'dim' };
+type ToolImage = { number: number; source: string };
 
 type Entry =
   | { key: string; kind: 'user'; text: string }
@@ -13,6 +14,7 @@ type Entry =
       oldText?: string;
       newText?: string;
       output: string;
+      images?: ToolImage[];
       running: boolean;
       ok: boolean;
       interrupted?: boolean;
@@ -101,12 +103,29 @@ function toolDiff(
   return undefined;
 }
 
-function resultText(content: unknown): string {
-  if (!Array.isArray(content)) return '';
-  return content
-    .filter(p => p && p.type === 'text' && typeof p.text === 'string')
-    .map(p => (p as { text: string }).text)
-    .join('\n');
+function resultOutput(content: unknown): { output: string; images: ToolImage[] } {
+  const text: string[] = [];
+  const images: ToolImage[] = [];
+  let imageNumber = 0;
+  for (const part of Array.isArray(content) ? content : []) {
+    if (!part || typeof part !== 'object') continue;
+    const block = part as Record<string, unknown>;
+    if (block.type === 'text' && typeof block.text === 'string') text.push(block.text);
+    if (block.type !== 'image') continue;
+    const number = ++imageNumber;
+    // Only inline raster data may reach an img src. Never load a tool-supplied
+    // URL or active document format such as SVG.
+    if (
+      typeof block.mimeType === 'string' && /^image\/(png|jpeg|gif|webp)$/.test(block.mimeType) &&
+      typeof block.data === 'string' && /^[A-Za-z0-9+/]+={0,2}$/.test(block.data)
+    ) {
+      images.push({ number, source: `data:${block.mimeType};base64,${block.data}` });
+      text.push(`Image ${number} (${block.mimeType}). Image data is omitted from text copies and exports.`);
+    } else {
+      text.push(`Image ${number} cannot be previewed (unsupported format or invalid image data).`);
+    }
+  }
+  return { output: text.join('\n'), images };
 }
 
 function entriesFromMessages(messages: unknown[]): Entry[] {
@@ -154,7 +173,7 @@ function entriesFromMessages(messages: unknown[]): Entry[] {
     if (m.role === 'toolResult' && m.toolCallId) {
       const tool = tools.get(m.toolCallId);
       if (tool) {
-        tool.output = resultText(m.content);
+        Object.assign(tool, resultOutput(m.content));
         tool.ok = m.isError !== true;
         tool.interrupted = false;
       }
@@ -244,7 +263,7 @@ function applyEvent(
       const idx = next.findIndex(e => e.kind === 'tool' && e.toolId === event.toolCallId);
       if (idx !== -1) {
         const partial = event.partialResult as { content?: unknown } | undefined;
-        next[idx] = { ...next[idx], output: resultText(partial?.content) } as Entry;
+        next[idx] = { ...next[idx], ...resultOutput(partial?.content) } as Entry;
       }
       break;
     }
@@ -254,7 +273,7 @@ function applyEvent(
         const result = event.result as { content?: unknown } | undefined;
         next[idx] = {
           ...next[idx],
-          output: resultText(result?.content),
+          ...resultOutput(result?.content),
           running: false,
           ok: event.isError !== true,
           interrupted: false,
@@ -273,4 +292,4 @@ function toolStatus(entry: Extract<Entry, { kind: 'tool' }>): string {
 }
 
 export { entriesFromMessages, applyEvent, toolStatus };
-export type { Entry, ToolLine };
+export type { Entry, ToolLine, ToolImage };
