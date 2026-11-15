@@ -81,8 +81,7 @@ describe('workbench root switching', () => {
     await waitFor(() => expect(result.current.ws?.name).toBe('api'));
     act(() => result.current.onDraft('Keep my separate task'));
     await act(async () => {
-      result.current.navigate('history');
-      await result.current.showPreview(source);
+      await result.current.previewSavedSession(source);
     });
     expect(result.current.view).toBe('history');
     expect(result.current.preview?.info.file).toBe(source.file);
@@ -120,6 +119,39 @@ describe('workbench root switching', () => {
     });
     expect(result.current.details.gitError).toContain('inspection is unavailable');
     expect(result.current.detailsRoot).toBe('web');
+  });
+
+  it('previews saved work for a missing root and reports unreadable archives without starting Pi', async () => {
+    const fixture = apiFixture();
+    fixture.workspaceCatalog.mockResolvedValue({
+      ...catalog,
+      roots: [{ ...catalog.roots[0], availability: 'missing' }, catalog.roots[1]],
+    });
+    fixture.sessionTree.mockResolvedValue({ data: { leafId: 'saved', canContinue: true, nodes: [] } });
+    fixture.previewSession.mockResolvedValue({ data: [
+      { role: 'user', content: [{ type: 'text', text: 'Recover this saved task' }] },
+    ] });
+    const openSession = vi.fn();
+    const sendPrompt = vi.fn();
+    Object.assign(fixture, { openSession, sendPrompt });
+    const source = {
+      cwd: '/code/api', id: 'source', file: '/sessions/source.jsonl',
+      title: 'Saved task', model: '', timestamp: '', messageCount: 1,
+    };
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.availability).toBe('missing'));
+    await act(async () => { await result.current.previewSavedSession(source); });
+    expect(result.current.view).toBe('history');
+    expect(result.current.preview?.entries[0]).toMatchObject({ text: 'Recover this saved task' });
+    fixture.sessionTree.mockResolvedValue({ error: 'Archive no longer exists' });
+    await act(async () => {
+      await result.current.previewSavedSession({ ...source, file: '/sessions/removed.jsonl' });
+    });
+    expect(result.current.error).toBe('Archive no longer exists');
+    expect(result.current.preview?.ready).toBe(false);
+    expect(result.current.preview?.entries).toEqual([]);
+    expect(openSession).not.toHaveBeenCalled();
+    expect(sendPrompt).not.toHaveBeenCalled();
   });
 
   it('prepares selected history across groups, keeps both drafts and restores the source selection', async () => {
@@ -225,20 +257,11 @@ describe('workbench root switching', () => {
     const sessionCommands = vi
       .fn<PidexApi['sessionCommands']>()
       .mockResolvedValue({ commands: [] });
-    Object.assign(fixture, { openSession, sessionCommands });
+    Object.assign(fixture, { openSession, sessionCommands, sendPrompt: vi.fn().mockResolvedValue({ success: true }) });
     const { result } = renderHook(useWorkbench);
     await waitFor(() => expect(result.current.ws?.name).toBe('api'));
-    act(() =>
-      result.current.showSession({
-        cwd: '/code/api',
-        id: 'archive',
-        file: '/sessions/archive.jsonl',
-        title: 'Build',
-        model: '',
-        timestamp: '',
-        messageCount: 0,
-      }),
-    );
+    act(() => result.current.onDraft('Build'));
+    await act(async () => { await result.current.send(); });
     await waitFor(() => expect(result.current.tabs).toHaveLength(1));
     const onEvent = fixture.onSessionEvent.mock.calls[0][0];
     const onExit = fixture.onSessionExit.mock.calls[0][0];
@@ -262,13 +285,13 @@ describe('workbench root switching', () => {
       });
       onExit({ sessionId: 'other-runtime' });
     });
-    expect(result.current.tabs[0].entries[0]).toMatchObject({ running: true });
+    expect(result.current.tabs[0].entries.at(-1)).toMatchObject({ running: true });
     act(() => onExit({ sessionId: 'runtime' }));
     expect(result.current.tabs[0]).toMatchObject({
       running: false,
       exited: true,
     });
-    expect(result.current.tabs[0].entries[0]).toMatchObject({
+    expect(result.current.tabs[0].entries.at(-1)).toMatchObject({
       running: false,
       interrupted: true,
       output: 'Partial build',

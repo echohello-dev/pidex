@@ -156,7 +156,7 @@ try {
   await page
     .getByLabel('Message pi')
     .fill('Check keyboard focus in the composer.');
-  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
   await page.getByRole('button', { name: 'Stop', exact: true }).waitFor();
   await page.screenshot({ path: path.join(captures, 'workbench-loaded.png') });
   await page.getByRole('button', { name: 'Stop', exact: true }).click();

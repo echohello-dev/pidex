@@ -247,15 +247,17 @@ function App() {
                 <button
                   key={s.file}
                   type="button"
-                  className={`wb-session-item${active?.file === s.file && view === 'session' ? ' is-active' : ''}`}
-                  onClick={() => b.showSession(s)}
+                  className={`wb-session-item${preview?.info.file === s.file && view === 'history' ? ' is-active' : ''}`}
+                  aria-label={`Preview ${s.title}`}
+                  aria-current={preview?.info.file === s.file && view === 'history' ? 'page' : undefined}
+                  onClick={() => void b.previewSavedSession(s)}
                   disabled={b.busy}
                 >
                   <span>{s.title}</span>
                   <small>
                     {b.tabs.find((t) => t.file === s.file)?.running
                       ? 'Working'
-                      : 'Saved'}{' '}
+                      : 'Saved'} · Preview{' '}
                     / {timeAgo(s.timestamp)}
                   </small>
                 </button>
@@ -406,10 +408,7 @@ function App() {
                     <SessionStartChoice
                       sessions={sessions}
                       busy={b.busy}
-                      onPreview={(session) => {
-                        b.navigate('history');
-                        void b.showPreview(session);
-                      }}
+                      onPreview={(session) => void b.previewSavedSession(session)}
                       onBrowse={() => b.navigate('history')}
                     />
                     <div className="wb-new-conversation">
@@ -791,7 +790,7 @@ function App() {
           commands={active?.commands ?? []}
           onClose={() => setPalette(false)}
           onWorkspace={b.selectWorkspace}
-          onSession={b.showSession}
+          onSession={(session) => void b.previewSavedSession(session)}
           onNavigate={b.navigate}
           onFile={(file) => {
             setPaletteFiles((previous) => ({

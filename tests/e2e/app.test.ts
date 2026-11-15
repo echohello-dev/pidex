@@ -231,7 +231,7 @@ describe('Figma workbench in Electron', () => {
     await win
       .getByLabel('Message pi')
       .fill('Check keyboard focus in the composer.');
-    await win.getByRole('button', { name: 'Send', exact: true }).click();
+    await win.getByRole('button', { name: 'Resume', exact: true }).click();
     await win.getByRole('button', { name: 'Stop', exact: true }).waitFor();
     await win.screenshot({ path: path.join(shots, '02-active-session.png') });
     await win.getByRole('button', { name: 'Stop', exact: true }).click();
