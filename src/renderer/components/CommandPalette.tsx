@@ -97,7 +97,7 @@ export function CommandPalette({
       ...sessions.map((s) => ({
         id: `session:${s.file}`,
         title: s.title,
-        detail: `${s.messageCount} messages / ${s.model || 'Pi'}`,
+        detail: `Preview saved conversation / ${s.messageCount} messages / ${s.model || 'Pi'}`,
         category: 'Sessions' as const,
         run: () => onSession(s),
       })),

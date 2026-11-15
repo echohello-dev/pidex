@@ -72,6 +72,7 @@ describe('long session in Electron', () => {
   it('opens 4,500 mixed entries with a bounded DOM and revisits them quickly', async () => {
     const start = performance.now();
     await page.locator('.wb-sidebar .wb-session-item').first().click();
+    await page.getByRole('button', { name: 'Fork from here', exact: true }).click();
     await page
       .locator('.wb-transcript')
       .getByText('Iteration 1499', { exact: true })

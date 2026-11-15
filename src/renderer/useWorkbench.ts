@@ -490,12 +490,6 @@ export function useWorkbench() {
       setBusy(false);
     }
   };
-  const showSession = (info: SessionInfo) =>
-    run(async () => {
-      const token = generation.current;
-      const tab = await openSession(info);
-      if (tab && token === generation.current) setView('session');
-    });
   const forkSession = () =>
     preview?.ready &&
     preview.tree?.canContinue &&
@@ -540,6 +534,11 @@ export function useWorkbench() {
     },
     [api, report],
   );
+  const previewSavedSession = (info: SessionInfo) => {
+    if (opening.current) return;
+    navigate('history');
+    return showPreview(info);
+  };
   useEffect(() => {
     if (view !== 'history' || previewLoading) return;
     if (preview && !preview.loaded)
@@ -780,7 +779,7 @@ export function useWorkbench() {
     refresh,
     selectWorkspace,
     addWorkspace,
-    showSession,
+    previewSavedSession,
     closeSession,
     forkSession,
     prepareHandoff,

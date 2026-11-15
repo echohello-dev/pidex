@@ -143,6 +143,54 @@ describe('session start choice in Electron', () => {
     await resize(1280, 1000);
   });
 
+  it('previews sidebar shortcuts with keyboard selection and preserves drafts at the minimum window size', async () => {
+    await newSession();
+    await page.getByLabel('Message pi').fill('Keep this separate task for later.');
+    const sidebar = page.getByRole('complementary', { name: 'Workspace navigation' });
+    const selected = sidebar.getByRole('button', { name: 'Preview Check keyboard focus', exact: true });
+    await selected.focus();
+    await page.keyboard.press('Enter');
+    await page.locator('.wb-transcript').getByText('Saved response for Check keyboard focus.', { exact: true }).waitFor();
+    expect(await selected.getAttribute('aria-current')).toBe('page');
+    expect(await selected.textContent()).toContain('Preview');
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep this unsent continuation too.');
+    await capture('sidebar-saved-preview.png');
+    await resize(900, 600);
+    const older = sidebar.getByRole('button', { name: 'Preview Older saved task', exact: true });
+    await older.scrollIntoViewIfNeeded();
+    await older.click();
+    await page.locator('.wb-transcript').getByText('Saved response for Older saved task.', { exact: true }).waitFor();
+    expect(await selected.getAttribute('aria-current')).toBeNull();
+    expect(await older.getAttribute('aria-current')).toBe('page');
+    await page.getByRole('button', { name: 'Resume', exact: true }).scrollIntoViewIfNeeded();
+    await capture('sidebar-saved-preview-narrow.png');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await sessionRecords()).toEqual([]);
+    expect(await fs.readFile(source, 'utf8')).toBe(sourceBytes);
+    await newSession();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep this separate task for later.');
+    await resize(1280, 1000);
+  });
+
+  it('previews Quick switch results by keyboard without opening a runtime', async () => {
+    await page.getByRole('button', { name: 'Quick switch', exact: true }).click();
+    const palette = page.getByRole('dialog', { name: 'Quick switch' });
+    await palette.getByRole('tab', { name: /Sessions/ }).click();
+    const search = palette.getByRole('combobox');
+    await search.fill('Check keyboard focus');
+    expect(await palette.getByRole('option').count()).toBe(1);
+    expect(await palette.getByRole('option').textContent()).toContain('Preview saved conversation');
+    await capture('quick-switch-saved-preview.png');
+    await search.press('Enter');
+    await palette.waitFor({ state: 'hidden' });
+    await page.locator('.wb-transcript').getByText('Saved response for Check keyboard focus.', { exact: true }).waitFor();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep this unsent continuation too.');
+    expect(await sessionRecords()).toEqual([]);
+    expect(await fs.readFile(source, 'utf8')).toBe(sourceBytes);
+    await newSession();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep this separate task for later.');
+  });
+
   it('scopes choices to the selected root and starts a fresh conversation only after Send', async () => {
     await newSession();
     await page.getByLabel('Message pi').fill('Keep this separate task for later.');
@@ -166,6 +214,34 @@ describe('session start choice in Electron', () => {
     expect(await page.locator('.wb-transcript').textContent()).not.toContain('Saved response for');
     expect(await fs.readFile(source, 'utf8')).toBe(sourceBytes);
     await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    expect(errors).toEqual([]);
+  });
+
+  it('resumes an explicitly selected sidebar preview and focuses its live tab without another launch or prompt', async () => {
+    const sidebar = page.getByRole('complementary', { name: 'Workspace navigation' });
+    const saved = sidebar.getByRole('button', { name: 'Preview Check keyboard focus', exact: true });
+    await saved.click();
+    await page.locator('.wb-transcript').getByText('Saved response for Check keyboard focus.', { exact: true }).waitFor();
+    const before = await sessionRecords();
+    expect(before.filter((record) => record.type === 'prompt')).toHaveLength(1);
+    await page.getByLabel('Message pi').fill('Continue this saved keyboard task.');
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await page.getByRole('button', { name: 'Stop', exact: true }).waitFor();
+    await expect.poll(async () => (await sessionRecords()).filter((record) => record.type === 'prompt').length).toBe(2);
+    const resumed = await sessionRecords();
+    expect(resumed.filter((record) => record.type === 'prompt').at(-1)).toMatchObject({
+      cwd: project, message: 'Continue this saved keyboard task.',
+      sessionFile: path.join(path.dirname(source), '1.jsonl'),
+    });
+    await newSession();
+    const live = sidebar.locator('.wb-session-item').filter({ hasText: 'this window' }).filter({ hasText: 'Check keyboard focus' });
+    await live.click();
+    await page.getByRole('heading', { name: 'Check keyboard focus', exact: true }).waitFor();
+    expect(await page.getByRole('button', { name: 'Stop', exact: true }).isVisible()).toBe(true);
+    expect(await sessionRecords()).toEqual(resumed);
+    await capture('open-session-direct-focus.png');
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    expect(await fs.readFile(source, 'utf8')).toBe(sourceBytes);
     expect(errors).toEqual([]);
   });
 });

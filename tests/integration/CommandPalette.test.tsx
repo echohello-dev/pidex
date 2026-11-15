@@ -69,6 +69,7 @@ describe('command palette', () => {
     );
     fireEvent.click(screen.getByRole('tab', { name: /Sessions/ }));
     expect(screen.getAllByRole('option')).toHaveLength(2);
+    expect(screen.getAllByText(/Preview saved conversation/)).toHaveLength(2);
     rerender(<CommandPalette {...callbacks} sessions={[second]} />);
     fireEvent.click(screen.getByRole('option', { name: /Second archive/ }));
     expect(callbacks.onSession).toHaveBeenCalledExactlyOnceWith(second);

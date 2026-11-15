@@ -69,6 +69,8 @@ Use **Copy context** in History to put the selected path's Markdown handoff on t
 
 To prepare that handoff directly, select a history branch or entry and open **Continue in another root**. Choose a registered destination and **Prepare draft** to add the selected history to its new-session composer. Existing draft text is kept. Review and send it when ready. Files and session archives stay in their original root; this starts a separate session in the destination.
 
+Saved-session shortcuts in the sidebar and Quick switch open History for preview before you choose Resume or Fork from here. Previewing does not launch a session or send a prompt. Open sessions in the sidebar focus their existing live tabs directly.
+
 The new-session view offers the current root's recent saved conversations above the task composer. Choose **Preview** to read one before resuming or forking, or **View all saved sessions** to browse history. Previewing keeps an unsent new-task draft intact and waits for an explicit continuation action before starting Pi. Sending from the new-task composer starts a separate session.
 
 Use **Create workspace** or **Edit workspace** in the sidebar to name a group and select its roots. **Add root** chooses an existing folder. Each session runs in one root; the composer shows its path. Switching roots leaves open sessions running and makes them available under **Open sessions**. Files, Changes, History and defaults remain scoped to the selected root. A missing folder retains readable history, but cannot start or resume Pi until its original path is available. Adding another folder does not relocate a session. Group membership does not change Pi's tool permissions or load sibling roots into its context.
