@@ -230,9 +230,15 @@ function App() {
                   type="button"
                   className={`wb-session-item${active?.runtimeId === t.runtimeId && view === 'session' ? ' is-active' : ''}`}
                   title={t.cwd}
+                  aria-current={active?.runtimeId === t.runtimeId && view === 'session' ? 'page' : undefined}
                   onClick={() => b.activateTab(t)}
                 >
                   <span>{t.title}</span>
+                  {t.unread && (
+                    <small className="wb-session-unread" title="Open this session to read its latest activity.">
+                      Unread activity
+                    </small>
+                  )}
                   <small>
                     {t.exited ? 'Exited' : t.running ? 'Running' : 'Ready'} /
                     this window

@@ -63,6 +63,129 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('unread session activity', () => {
+  function runtimeFixture() {
+    const fixture = apiFixture();
+    return Object.assign(fixture, {
+      openSession: vi.fn<PidexApi['openSession']>().mockImplementation(async ({ cwd }) => ({
+        sessionId: cwd === '/code/api' ? 'api-runtime' : 'web-runtime',
+      })),
+      sessionCommands: vi.fn().mockResolvedValue({ commands: [] }),
+      sendPrompt: vi.fn().mockResolvedValue({ success: true }),
+    });
+  }
+
+  it('acknowledges only the opened tab when two sessions share a root', async () => {
+    const fixture = runtimeFixture();
+    fixture.openSession
+      .mockResolvedValueOnce({ sessionId: 'first' })
+      .mockResolvedValueOnce({ sessionId: 'second' });
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    await act(async () => { await result.current.send('First task'); });
+    act(() => result.current.navigate('new'));
+    await act(async () => { await result.current.send('Second task'); });
+    const onEvent = fixture.onSessionEvent.mock.calls[0][0];
+    act(() => onEvent({ sessionId: 'first', event: { type: 'agent_end' } }));
+    expect(result.current.tabs).toMatchObject([
+      { runtimeId: 'first', unread: true },
+      { runtimeId: 'second', unread: false },
+    ]);
+    act(() => result.current.navigate('changes'));
+    act(() => onEvent({ sessionId: 'second', event: { type: 'agent_end' } }));
+    expect(result.current.tabs.every((tab) => tab.unread)).toBe(true);
+    act(() => result.current.activateTab(result.current.tabs[0]));
+    expect(result.current.tabs.map((tab) => tab.unread)).toEqual([false, true]);
+  });
+
+  it('keeps another root completion unread until its transcript is opened', async () => {
+    const fixture = runtimeFixture();
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    await act(async () => { await result.current.send('Build the API'); });
+    act(() => result.current.selectWorkspace(catalog.roots[1]));
+    await act(async () => { await result.current.send('Build the web app'); });
+    const onEvent = fixture.onSessionEvent.mock.calls[0][0];
+    act(() => onEvent({ sessionId: 'api-runtime', event: { type: 'agent_end' } }));
+    expect(result.current.tabs).toMatchObject([
+      { runtimeId: 'api-runtime', running: false, unread: true },
+      { runtimeId: 'web-runtime', running: true, unread: false },
+    ]);
+    act(() => result.current.navigate('changes'));
+    act(() => result.current.navigate('new'));
+    expect(result.current.tabs[0].unread).toBe(true);
+    act(() => result.current.activateTab(result.current.tabs[0]));
+    expect(result.current.ws?.name).toBe('api');
+    expect(result.current.view).toBe('session');
+    expect(result.current.tabs[0].unread).toBe(false);
+    // A duplicate end event cannot make an acknowledged result unread again.
+    act(() => result.current.selectWorkspace(catalog.roots[1]));
+    act(() => onEvent({ sessionId: 'api-runtime', event: { type: 'agent_end' } }));
+    expect(result.current.tabs[0].unread).toBe(false);
+    // A later real turn can create a fresh unread result.
+    act(() => onEvent({ sessionId: 'api-runtime', event: { type: 'agent_start' } }));
+    act(() => onEvent({ sessionId: 'api-runtime', event: { type: 'agent_end' } }));
+    expect(result.current.tabs[0].unread).toBe(true);
+    // Returning to a root that restores the transcript also acknowledges it.
+    act(() => result.current.selectWorkspace(catalog.roots[0]));
+    expect(result.current.tabs[0].unread).toBe(false);
+  });
+
+  it.each(['completion', 'exit'])('marks a background %s in the selected root and clears it on return', async (kind) => {
+    const fixture = runtimeFixture();
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    await act(async () => { await result.current.send('Inspect this root'); });
+    act(() => result.current.navigate('changes'));
+    if (kind === 'exit') {
+      act(() => fixture.onSessionExit.mock.calls[0][0]({ sessionId: 'api-runtime' }));
+    } else {
+      act(() => fixture.onSessionEvent.mock.calls[0][0]({
+        sessionId: 'api-runtime', event: { type: 'agent_end' },
+      }));
+    }
+    expect(result.current.tabs[0]).toMatchObject({ unread: true, running: false, exited: kind === 'exit' });
+    act(() => result.current.navigate('session'));
+    expect(result.current.tabs[0].unread).toBe(false);
+  });
+
+  it.each(['completion', 'exit'])('keeps a visible %s read', async (kind) => {
+    const fixture = runtimeFixture();
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    await act(async () => { await result.current.send('Inspect this root'); });
+    if (kind === 'exit') {
+      act(() => fixture.onSessionExit.mock.calls[0][0]({ sessionId: 'api-runtime' }));
+    } else {
+      act(() => fixture.onSessionEvent.mock.calls[0][0]({
+        sessionId: 'api-runtime', event: { type: 'agent_end' },
+      }));
+    }
+    expect(result.current.tabs[0]).toMatchObject({ unread: false, running: false });
+  });
+
+  it('marks an idle background exit only once and ignores unknown sessions', async () => {
+    const fixture = runtimeFixture();
+    const { result } = renderHook(useWorkbench);
+    await waitFor(() => expect(result.current.ws?.name).toBe('api'));
+    await act(async () => { await result.current.send('Inspect this root'); });
+    const onEvent = fixture.onSessionEvent.mock.calls[0][0];
+    const onExit = fixture.onSessionExit.mock.calls[0][0];
+    act(() => onEvent({ sessionId: 'api-runtime', event: { type: 'agent_end' } }));
+    expect(result.current.tabs[0]).toMatchObject({ running: false, unread: false });
+    act(() => result.current.selectWorkspace(catalog.roots[1]));
+    act(() => onExit({ sessionId: 'unknown-runtime' }));
+    expect(result.current.tabs[0].unread).toBe(false);
+    act(() => onExit({ sessionId: 'api-runtime' }));
+    expect(result.current.tabs[0]).toMatchObject({ exited: true, unread: true });
+    act(() => result.current.activateTab(result.current.tabs[0]));
+    expect(result.current.tabs[0]).toMatchObject({ exited: true, unread: false });
+    act(() => result.current.navigate('new'));
+    act(() => onExit({ sessionId: 'api-runtime' }));
+    expect(result.current.tabs[0].unread).toBe(false);
+  });
+});
+
 describe('workbench root switching', () => {
   it('previews a chosen saved conversation without launching Pi or consuming the new-session draft', async () => {
     const fixture = apiFixture();

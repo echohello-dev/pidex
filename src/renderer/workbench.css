@@ -297,6 +297,9 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   font-size: 12px;
   line-height: 18px;
 }
+.wb-session-item small.wb-session-unread {
+  color: var(--accent);
+}
 .wb-connection {
   color: var(--copy);
   white-space: nowrap;
