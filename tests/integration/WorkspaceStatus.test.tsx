@@ -22,6 +22,8 @@ describe('workspace Git status', () => {
   it.each([
     { gitOperation: 'merge' as const, message: 'Merge in progress' },
     { gitOperation: 'rebase' as const, message: 'Rebase in progress' },
+    { gitOperation: 'cherry-pick' as const, message: 'Cherry-pick in progress' },
+    { gitOperation: 'revert' as const, message: 'Revert in progress' },
   ])('shows $message even after all root conflicts have been resolved', ({ gitOperation, message }) => {
     const onReview = vi.fn();
     const { container, rerender } = render(<WorkspaceStatus context="history" workspace={workspace} details={{

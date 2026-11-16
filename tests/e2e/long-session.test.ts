@@ -73,6 +73,11 @@ describe('long session in Electron', () => {
     const start = performance.now();
     await page.locator('.wb-sidebar .wb-session-item').first().click();
     await page.getByRole('button', { name: 'Fork from here', exact: true }).click();
+    // The same transcript is already visible in the preview. Wait for the
+    // live session before navigating away, or the pending fork can be hidden.
+    const openSession = page.locator('.wb-sidebar .wb-session-item').filter({ hasText: 'this window' }).first();
+    await openSession.waitFor();
+    await page.getByRole('button', { name: 'Send', exact: true }).waitFor();
     await page
       .locator('.wb-transcript')
       .getByText('Iteration 1499', { exact: true })
@@ -86,7 +91,7 @@ describe('long session in Electron', () => {
       .getByRole('button', { name: 'New session', exact: true })
       .click();
     const switchStart = performance.now();
-    await page.locator('.wb-sidebar .wb-session-item').first().click();
+    await openSession.click();
     await page
       .locator('.wb-transcript')
       .getByText('Iteration 1499', { exact: true })

@@ -271,6 +271,7 @@ describe('session branches in Electron', () => {
     expect(ancestor).toContain('select entry `old-answer`, and choose Resume in new fork.');
     await fs.mkdir(path.join(ROOT, '.tmp/proof'), { recursive: true });
     const exportedFile = path.join(ROOT, '.tmp/proof/selected-history.md');
+    await fs.rm(exportedFile, { force: true });
     await app.evaluate(({ BrowserWindow }, output) => {
       BrowserWindow.getAllWindows()[0].webContents.session.once('will-download', (_event, item) => {
         item.setSavePath(output);

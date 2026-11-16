@@ -41,9 +41,13 @@ export function WorkspaceStatus({
     ? 'Merge in progress'
     : operation === 'rebase'
       ? 'Rebase in progress'
-      : operation === 'unavailable'
-        ? 'Git operation status unavailable'
-        : '';
+      : operation === 'cherry-pick'
+        ? 'Cherry-pick in progress'
+        : operation === 'revert'
+          ? 'Revert in progress'
+          : operation === 'unavailable'
+            ? 'Git operation status unavailable'
+            : '';
 
   const content = (
     <>

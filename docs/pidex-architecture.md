@@ -81,7 +81,7 @@ Workspace inspection reads the file tree, Git branch/status and repository HEAD 
 
 Per-root views, new-session/history drafts, unsaved settings drafts, open tabs, transcript selection, and expanded rows are in-memory UI state. Restoring an interrupted history load retries the saved archive/entry, while completed error states require explicit retry. Settings cache only dirty drafts; clean views follow saved defaults. Changes views remount per root and late mutation results are checked against their original navigation generation. Scroll position and expansion are not persisted when a transcript is reopened.
 
-New-session and saved-history status show in-progress Git merges and rebases from the selected worktree's own Git directory, including when all conflicts in the selected root have been resolved. These operations affect the whole worktree even for nested roots. The notice is informational; Pi can still start or resume to help finish the operation. Git operations are never continued or aborted by workspace inspection.
+New-session and saved-history status show in-progress Git merges, rebases, cherry-picks and reverts from the selected worktree's own Git directory, including when all conflicts in the selected root have been resolved. Cherry-pick and revert sequences remain visible after a manual resolution commit clears the current operation marker. These operations affect the whole worktree even for nested roots. The notice is informational; Pi can still start or resume to help finish the operation. Git operations are never continued or aborted by workspace inspection.
 
 ## Transcript rendering
 
