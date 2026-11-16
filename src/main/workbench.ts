@@ -30,6 +30,7 @@ export type GitUpstream =
   | { state: 'tracked'; name: string; ahead: number; behind: number };
 export type WorkspaceDetails = {
   branch: string;
+  gitOperation?: 'merge' | 'rebase' | 'unavailable';
   upstream?: GitUpstream;
   headCommit?: { hash: string; subject: string; committedAt: string };
   changes: GitChange[];
@@ -194,10 +195,33 @@ async function inspectUpstream(cwd: string, branch: string): Promise<GitUpstream
   }
 }
 
+async function inspectGitOperation(cwd: string): Promise<WorkspaceDetails['gitOperation']> {
+  try {
+    // Linked worktrees keep operation state in their own Git directory.
+    const directory = (await git(cwd, ['rev-parse', '--absolute-git-dir'])).replace(/\r?\n$/, '');
+    const exists = (name: string) => fs.stat(path.join(directory, name)).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return false;
+        throw error;
+      },
+    );
+    const [rebaseMerge, rebaseApply, merge] = await Promise.all([
+      exists('rebase-merge'),
+      // git am also uses rebase-apply, but does not create this marker.
+      exists('rebase-apply/rebasing'),
+      exists('MERGE_HEAD'),
+    ]);
+    return rebaseMerge || rebaseApply ? 'rebase' : merge ? 'merge' : undefined;
+  } catch {
+    return 'unavailable';
+  }
+}
+
 export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
   const { files, filesTruncated } = await listFiles(cwd);
   try {
-    const [branch, working, staged, untracked, commit, conflicts] = await Promise.all([
+    const [branch, working, staged, untracked, commit, conflicts, gitOperation] = await Promise.all([
       git(cwd, ['branch', '--show-current']),
       git(cwd, [
         'diff',
@@ -231,6 +255,7 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
         'diff', '--no-ext-diff', '--no-textconv', '--name-only',
         '--diff-filter=U', '-z', '--relative', '--', '.',
       ]),
+      inspectGitOperation(cwd),
     ]);
     const [hash, committedAt, subject] = commit.split('\0');
     const conflictPaths = new Set(conflicts.split('\0').filter(Boolean));
@@ -239,6 +264,7 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
     const workingChanges = new Map(parseNumstat(working, false).map((change) => [change.path, change]));
     return {
       branch: branch.trim(),
+      gitOperation,
       upstream: await inspectUpstream(cwd, branch.trim()),
       headCommit: commit ? {
         hash,

@@ -419,6 +419,7 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-workspace-upstream {
   overflow-wrap: anywhere;
 }
+.wb-workspace-operation,
 .wb-workspace-conflicts {
   border-left: 2px solid var(--warning);
   padding-left: 10px;

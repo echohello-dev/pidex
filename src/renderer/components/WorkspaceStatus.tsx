@@ -36,6 +36,14 @@ export function WorkspaceStatus({
     ? `${changeMessage} · ${conflictMessage}`
     : changeMessage;
   const commit = inspected ? details.headCommit : undefined;
+  const operation = inspected ? details.gitOperation : undefined;
+  const operationMessage = operation === 'merge'
+    ? 'Merge in progress'
+    : operation === 'rebase'
+      ? 'Rebase in progress'
+      : operation === 'unavailable'
+        ? 'Git operation status unavailable'
+        : '';
 
   const content = (
     <>
@@ -49,6 +57,16 @@ export function WorkspaceStatus({
         <p role="status">{message}</p>
         {inspected && (
           <>
+            {operation && (
+              <div className="wb-workspace-operation" aria-label="Git operation">
+                <p>{operationMessage}</p>
+                <p className="wb-meta">
+                  {operation === 'unavailable'
+                    ? 'Check the repository state before continuing.'
+                    : 'This operation affects the whole worktree, even with no conflicts in this root. Review it before continuing; Pi can help finish it.'}
+                </p>
+              </div>
+            )}
             {conflicts.length > 0 && (
               <div className="wb-workspace-conflicts" aria-label="Unresolved Git conflicts">
                 <p>Review these files before continuing. Pi can help resolve them.</p>
@@ -104,6 +122,7 @@ export function WorkspaceStatus({
         <details>
           <summary>
             Current workspace changes
+            {operation && <span className="wb-meta">{operationMessage}</span>}
             <span className="wb-meta" title={inspected ? `${details.branch || 'Detached HEAD'} · ${message}` : message}>
               {inspected && <span className="wb-history-status-branch">{details.branch || 'Detached HEAD'}</span>}
               <span>{inspected && ' · '}{inspected && conflicts.length ? conflictMessage : message}</span>
