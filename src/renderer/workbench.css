@@ -419,6 +419,21 @@ html[data-reduced-motion='true'] .wb-shell *::after {
 .wb-workspace-upstream {
   overflow-wrap: anywhere;
 }
+.wb-workspace-conflicts {
+  border-left: 2px solid var(--warning);
+  padding-left: 10px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.wb-workspace-conflicts ul {
+  margin: 4px 0;
+  padding-left: 16px;
+}
+.wb-workspace-conflicts li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .wb-workspace-upstream-note {
   display: block;
 }

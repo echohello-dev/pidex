@@ -53,6 +53,8 @@ These are captures of real Electron interactions with a temporary Git workspace 
 
 The new-session view shows the selected root's branch and changed-file counts before you send a task. A partially staged file counts once overall and appears in both staged and unstaged totals. Use **Review workspace changes** to open Changes and keep your task draft. Counts follow the existing refresh on focus, navigation and every 15 seconds; unavailable folders and failed inspections never appear clean.
 
+Unresolved Git conflicts appear beside the change count before starting or resuming Pi. Workspace status previews the first three conflicted paths within the selected root; open **Review workspace changes** to see all changed files. Saved history keeps the conflict count visible while status is collapsed. Continuation stays available so Pi can help resolve the files. Staging resolved files clears the warning on the next inspection.
+
 Expanded tool cards show output first. Open Input or close Output independently, and copy either section while it is closed. These choices stay with each card while scrolling through the transcript; reopening the transcript resets them.
 
 Each section reports when copying is in progress, succeeds or fails. A failed copy keeps a retry message beside its Copy button, including when the section is closed. Copy again to retry. New streamed text clears the previous copy feedback so Copied always refers to the current text.
