@@ -30,7 +30,7 @@ export type GitUpstream =
   | { state: 'tracked'; name: string; ahead: number; behind: number };
 export type WorkspaceDetails = {
   branch: string;
-  gitOperation?: 'merge' | 'rebase' | 'unavailable';
+  gitOperation?: 'merge' | 'rebase' | 'cherry-pick' | 'revert' | 'unavailable';
   upstream?: GitUpstream;
   headCommit?: { hash: string; subject: string; committedAt: string };
   changes: GitChange[];
@@ -206,13 +206,29 @@ async function inspectGitOperation(cwd: string): Promise<WorkspaceDetails['gitOp
         throw error;
       },
     );
-    const [rebaseMerge, rebaseApply, merge] = await Promise.all([
+    const [rebaseMerge, rebaseApply, merge, cherryPick, revert] = await Promise.all([
       exists('rebase-merge'),
       // git am also uses rebase-apply, but does not create this marker.
       exists('rebase-apply/rebasing'),
       exists('MERGE_HEAD'),
+      exists('CHERRY_PICK_HEAD'),
+      exists('REVERT_HEAD'),
     ]);
-    return rebaseMerge || rebaseApply ? 'rebase' : merge ? 'merge' : undefined;
+    if (rebaseMerge || rebaseApply) return 'rebase';
+    if (merge) return 'merge';
+    if (cherryPick) return 'cherry-pick';
+    if (revert) return 'revert';
+    // A manual commit can clear the current HEAD marker while a sequence
+    // still has commits to apply. The worktree's todo retains that state.
+    const todo = await fs.readFile(path.join(directory, 'sequencer/todo'), 'utf8').catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return '';
+        throw error;
+      },
+    );
+    const command = todo.split('\n').map((line) => line.trim())
+      .find((line) => line && !line.startsWith('#'))?.split(/\s+/)[0];
+    return command === 'pick' ? 'cherry-pick' : command === 'revert' ? 'revert' : undefined;
   } catch {
     return 'unavailable';
   }

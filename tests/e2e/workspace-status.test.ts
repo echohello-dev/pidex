@@ -400,6 +400,69 @@ describe('workspace status in Electron', () => {
     expect(errors).toEqual([]);
   });
 
+  it('shows cherry-picks and reverts before new and saved continuation until abort', async () => {
+    const archive = path.join(fixture, 'sessions/workspace/conflict.jsonl');
+    const original = await fs.readFile(archive, 'utf8');
+    for (const operation of ['cherry-pick', 'revert'] as const) {
+      await select('clean');
+      let target = 'other';
+      if (operation === 'revert') {
+        target = git(clean, 'rev-parse', 'HEAD').toString().trim();
+        for (const file of ['app.ts', longFile]) await fs.writeFile(path.join(clean, file), 'subsequent change\n');
+        git(clean, 'commit', '-am', 'Changes after the commit to revert');
+      }
+      expect(() => git(clean, operation, '--no-edit', target)).toThrow();
+      const message = operation === 'cherry-pick' ? 'Cherry-pick in progress' : 'Revert in progress';
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await expect.poll(() => status().getByLabel('Git operation').textContent()).toContain(message);
+      await page.getByLabel('Message pi').fill(`Help finish this ${operation}.`);
+      expect(await page.getByRole('button', { name: 'Send', exact: true }).isEnabled()).toBe(true);
+      // Staging all conflicts must not make an unfinished operation look complete.
+      for (const file of ['app.ts', longFile]) await fs.writeFile(path.join(clean, file), 'resolved\n');
+      git(clean, 'add', '.');
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await expect.poll(() => status().getByLabel('Unresolved Git conflicts').count()).toBe(0);
+      expect(await status().getByLabel('Git operation').textContent()).toContain(message);
+      await page.evaluate(() => document.fonts.ready);
+      await status().getByLabel('Git operation').scrollIntoViewIfNeeded();
+      await capture(`workspace-${operation}-in-progress.png`);
+      await resizeWindow(900, 600);
+      await status().getByLabel('Git operation').scrollIntoViewIfNeeded();
+      expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+      await capture(`workspace-${operation}-in-progress-narrow.png`);
+      await resizeWindow(1280, 900);
+      await page.getByRole('button', { name: /^Sessions/ }).click();
+      await page.getByRole('tree', { name: 'Session archives', exact: true })
+        .getByRole('treeitem', { name: /Continue parser work/ }).click();
+      await expect.poll(() => status().locator('summary').textContent()).toContain(message);
+      await page.getByLabel('Message pi').fill(`Review the ${operation} before continuing saved work.`);
+      expect(await page.getByRole('button', { name: 'Resume', exact: true }).isEnabled()).toBe(true);
+      await capture(`history-${operation}-in-progress.png`);
+      await resizeWindow(900, 600);
+      await capture(`history-${operation}-in-progress-narrow.png`);
+      await status().locator('summary').click();
+      await status().getByLabel('Git operation').scrollIntoViewIfNeeded();
+      expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+      expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+      expect(await page.locator('.wb-composer').evaluate((el) => el.getBoundingClientRect().bottom))
+        .toBeLessThanOrEqual(await page.locator('.wb-statusbar').evaluate((el) => el.getBoundingClientRect().top));
+      await capture(`history-${operation}-in-progress-expanded-narrow.png`);
+      git(clean, operation, '--abort');
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await expect.poll(() => status().getByLabel('Git operation').count()).toBe(0);
+      expect(await status().locator('summary').textContent()).not.toContain(message);
+      expect(await page.getByLabel('Message pi').inputValue()).toBe(`Review the ${operation} before continuing saved work.`);
+      await resizeWindow(1280, 900);
+      await page.getByRole('button', { name: 'New session', exact: true }).click();
+      expect(await page.getByLabel('Message pi').inputValue()).toBe(`Help finish this ${operation}.`);
+    }
+    expect(await fs.readFile(archive, 'utf8')).toBe(original);
+    const commands = (await fs.readFile(rpcLog, 'utf8').catch(() => ''))
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    expect(commands.every((command) => command.type === 'get_available_models')).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   it('does not describe non-Git folders or missing roots as clean', async () => {
     await select('plain');
     await expect.poll(() => status().textContent()).toContain('Git changes are unavailable for this folder.');

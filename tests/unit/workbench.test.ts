@@ -106,6 +106,85 @@ describe('workspace inspection and preview', () => {
     expect((await inspectWorkspace(root)).headCommit?.subject).toBe('Main change');
   }, 30_000);
 
+  it.each([
+    { operation: 'cherry-pick', sequence: false },
+    { operation: 'cherry-pick', sequence: true },
+    { operation: 'revert', sequence: false },
+    { operation: 'revert', sequence: true },
+  ])('detects $operation with sequence=$sequence in a linked worktree through resolution and cleanup', async ({ operation, sequence }) => {
+    const root = await fixture();
+    const linked = path.join(await fixture(), 'linked worktree');
+    await git(root, ['init', '-b', 'main']);
+    await git(root, ['config', 'user.name', 'Test']);
+    await git(root, ['config', 'user.email', 'test@example.test']);
+    await git(root, ['config', 'commit.gpgsign', 'false']);
+    await fs.mkdir(path.join(root, 'package'));
+    await fs.writeFile(path.join(root, 'package/app.ts'), 'base\n');
+    await git(root, ['add', '.']);
+    await git(root, ['commit', '-m', 'Shared base']);
+    const base = (await git(root, ['rev-parse', 'HEAD'])).trim();
+    await fs.writeFile(path.join(root, 'package/app.ts'), 'source\n');
+    await git(root, ['commit', '-am', 'Source change']);
+    const first = (await git(root, ['rev-parse', 'HEAD'])).trim();
+    await fs.writeFile(path.join(root, 'package/extra.ts'), 'extra\n');
+    await git(root, ['add', '.']);
+    await git(root, ['commit', '-m', 'Another source change']);
+    const second = (await git(root, ['rev-parse', 'HEAD'])).trim();
+    await git(root, ['worktree', 'add', '-b', 'target', linked, operation === 'revert' ? second : base]);
+    const nested = path.join(linked, 'package');
+    await fs.writeFile(path.join(nested, 'app.ts'), 'target\n');
+    await git(linked, ['commit', '-am', 'Conflicting target change']);
+    await expect(git(linked, [operation, '--no-edit', first, ...(sequence ? [second] : [])])).rejects.toThrow();
+    const stopped = await inspectWorkspace(nested);
+    expect(stopped.gitOperation).toBe(operation);
+    expect(stopped.conflicts).toEqual(['app.ts']);
+    expect((await inspectWorkspace(root)).gitOperation).toBeUndefined();
+    await fs.writeFile(path.join(nested, 'app.ts'), 'resolved\n');
+    await git(linked, ['add', '.']);
+    const resolved = await inspectWorkspace(nested);
+    expect(resolved.conflicts).toEqual([]);
+    expect(resolved.gitOperation).toBe(operation);
+    if (sequence) {
+      // Real manual resolution clears *_HEAD, but leaves the sequence active.
+      await git(linked, ['commit', '-m', 'Resolve current operation']);
+      const directory = (await git(linked, ['rev-parse', '--absolute-git-dir'])).trim();
+      const marker = operation === 'revert' ? 'REVERT_HEAD' : 'CHERRY_PICK_HEAD';
+      await expect(fs.stat(path.join(directory, marker))).rejects.toMatchObject({ code: 'ENOENT' });
+      expect((await inspectWorkspace(nested)).gitOperation).toBe(operation);
+      execFileSync('git', [operation, '--continue'], {
+        cwd: linked, env: { ...process.env, GIT_EDITOR: 'true' }, stdio: 'pipe', timeout: 15_000,
+      });
+      expect(await fs.readFile(path.join(nested, 'app.ts'), 'utf8')).toBe('resolved\n');
+      if (operation === 'cherry-pick') expect(await fs.readFile(path.join(nested, 'extra.ts'), 'utf8')).toBe('extra\n');
+      else await expect(fs.stat(path.join(nested, 'extra.ts'))).rejects.toMatchObject({ code: 'ENOENT' });
+    } else {
+      await git(linked, [operation, '--abort']);
+      expect(await fs.readFile(path.join(nested, 'app.ts'), 'utf8')).toBe('target\n');
+    }
+    expect((await inspectWorkspace(nested)).gitOperation).toBeUndefined();
+    expect((await inspectWorkspace(root)).gitOperation).toBeUndefined();
+  }, 30_000);
+
+  it('keeps rebase precedence when it stops while applying a commit', async () => {
+    const root = await fixture();
+    await git(root, ['init', '-b', 'main']);
+    await fs.mkdir(path.join(root, '.git/rebase-merge'));
+    await fs.writeFile(path.join(root, '.git/CHERRY_PICK_HEAD'), 'stopped commit\n');
+    expect((await inspectWorkspace(root)).gitOperation).toBe('rebase');
+  });
+
+  it('keeps changes readable when sequencer state cannot be read', async () => {
+    const root = await fixture();
+    await git(root, ['init', '-b', 'main']);
+    await fs.writeFile(path.join(root, 'new.ts'), 'pending\n');
+    await fs.mkdir(path.join(root, '.git/sequencer'));
+    await fs.symlink('todo', path.join(root, '.git/sequencer/todo'));
+    const result = await inspectWorkspace(root);
+    expect(result.gitOperation).toBe('unavailable');
+    expect(result.gitError).toBeUndefined();
+    expect(result.changes[0]?.path).toBe('new.ts');
+  });
+
   it('does not call a stopped git am a rebase', async () => {
     const root = await fixture();
     await git(root, ['init', '-b', 'main']);
