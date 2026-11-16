@@ -15,6 +15,7 @@ let source: string;
 let rpcLog: string;
 const errors: string[] = [];
 const projectSubject = 'Prepare streaming parser for workspace inspection and preserve the selected root while reviewing a long repository commit subject';
+const longFile = 'src/a long package name/another long folder/café-parser-with-a-long-name.ts';
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' });
 const status = () => page.getByRole('region', { name: 'Workspace Git status' });
 async function capture(name: string) {
@@ -264,7 +265,6 @@ describe('workspace status in Electron', () => {
     git(clean, 'config', 'user.name', 'Test');
     git(clean, 'config', 'user.email', 'test@example.test');
     git(clean, 'config', 'commit.gpgsign', 'false');
-    const longFile = 'src/a long package name/another long folder/café-parser-with-a-long-name.ts';
     await fs.mkdir(path.dirname(path.join(clean, longFile)), { recursive: true });
     await fs.writeFile(path.join(clean, longFile), 'base\n');
     git(clean, 'add', '.');
@@ -334,6 +334,66 @@ describe('workspace status in Electron', () => {
     await page.getByLabel('Workspace group').selectOption({ label: 'clean' });
     await page.getByRole('button', { name: 'New session', exact: true }).click();
     expect(await page.getByLabel('Message pi').inputValue()).toBe('Resolve these files with care.');
+    const commands = (await fs.readFile(rpcLog, 'utf8').catch(() => ''))
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    expect(commands.every((command) => command.type === 'get_available_models')).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  it('keeps merge and rebase state visible after resolving conflicts and clears it after abort', async () => {
+    // The preceding test staged both resolutions, leaving MERGE_HEAD intact.
+    await select('clean');
+    await expect.poll(() => status().getByLabel('Git operation').textContent()).toContain('Merge in progress');
+    expect(await status().getByLabel('Unresolved Git conflicts').count()).toBe(0);
+    await status().getByLabel('Git operation').scrollIntoViewIfNeeded();
+    await capture('workspace-merge-in-progress.png');
+    git(clean, 'merge', '--abort');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Git operation').count()).toBe(0);
+    expect(() => git(clean, 'rebase', '--merge', 'other')).toThrow();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Git operation').textContent()).toContain('Rebase in progress');
+    await page.getByLabel('Message pi').fill('Help finish this rebase.');
+    expect(await page.getByRole('button', { name: 'Send', exact: true }).isEnabled()).toBe(true);
+    await page.evaluate(() => document.fonts.ready);
+    await capture('workspace-rebase-in-progress.png');
+    await resizeWindow(900, 600);
+    await status().getByLabel('Git operation').scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    await capture('workspace-rebase-in-progress-narrow.png');
+    await resizeWindow(1280, 900);
+
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Continue parser work/ }).click();
+    await expect.poll(() => status().locator('summary').textContent()).toContain('Rebase in progress');
+    await page.getByLabel('Message pi').fill('Review the rebase before continuing saved work.');
+    expect(await page.getByRole('button', { name: 'Resume', exact: true }).isEnabled()).toBe(true);
+    await capture('history-rebase-in-progress.png');
+    await resizeWindow(900, 600);
+    await capture('history-rebase-in-progress-narrow.png');
+    await status().locator('summary').click();
+    await status().getByLabel('Git operation').scrollIntoViewIfNeeded();
+    expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.locator('.wb-composer').evaluate((el) => el.getBoundingClientRect().bottom))
+      .toBeLessThanOrEqual(await page.locator('.wb-statusbar').evaluate((el) => el.getBoundingClientRect().top));
+    await capture('history-rebase-in-progress-expanded-narrow.png');
+    for (const file of ['app.ts', longFile]) {
+      await fs.writeFile(path.join(clean, file), 'resolved\n');
+    }
+    git(clean, 'add', '.');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Unresolved Git conflicts').count()).toBe(0);
+    expect(await status().locator('summary').textContent()).toContain('Rebase in progress');
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Review the rebase before continuing saved work.');
+    git(clean, 'rebase', '--abort');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Git operation').count()).toBe(0);
+    expect(await status().locator('summary').textContent()).not.toContain('Rebase in progress');
+    await resizeWindow(1280, 900);
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Help finish this rebase.');
     const commands = (await fs.readFile(rpcLog, 'utf8').catch(() => ''))
       .split('\n').filter(Boolean).map((line) => JSON.parse(line));
     expect(commands.every((command) => command.type === 'get_available_models')).toBe(true);

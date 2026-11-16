@@ -19,6 +19,36 @@ const change: GitChange = {
 afterEach(cleanup);
 
 describe('workspace Git status', () => {
+  it.each([
+    { gitOperation: 'merge' as const, message: 'Merge in progress' },
+    { gitOperation: 'rebase' as const, message: 'Rebase in progress' },
+  ])('shows $message even after all root conflicts have been resolved', ({ gitOperation, message }) => {
+    const onReview = vi.fn();
+    const { container, rerender } = render(<WorkspaceStatus context="history" workspace={workspace} details={{
+      ...details, gitOperation, changes: [{ ...change, staged: true }], conflicts: [],
+    }} ready onReview={onReview} />);
+    expect(container.querySelector('summary')).toHaveTextContent(message);
+    expect(screen.getByLabelText('Git operation')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Current workspace changes'));
+    expect(screen.getByLabelText('Git operation')).toBeVisible();
+    expect(screen.getByLabelText('Git operation')).toHaveTextContent('This operation affects the whole worktree');
+    expect(screen.getByText(/Pi can help finish it/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Review workspace changes' }));
+    expect(onReview).toHaveBeenCalledOnce();
+    rerender(<WorkspaceStatus workspace={workspace} details={{ ...details, gitOperation }} ready onReview={onReview} />);
+    expect(screen.getByLabelText('Git operation')).toHaveTextContent(message);
+    expect(screen.getByRole('status')).toHaveTextContent('No changes in this root');
+    rerender(<WorkspaceStatus workspace={workspace} details={details} ready onReview={onReview} />);
+    expect(screen.queryByLabelText('Git operation')).not.toBeInTheDocument();
+  });
+
+  it('reports unavailable operation state without hiding file changes', () => {
+    render(<WorkspaceStatus workspace={workspace} details={{ ...details, gitOperation: 'unavailable', changes: [change] }} ready onReview={vi.fn()} />);
+    expect(screen.getByLabelText('Git operation')).toHaveTextContent('Git operation status unavailable');
+    expect(screen.getByRole('status')).toHaveTextContent('1 changed file');
+    expect(screen.getByRole('button')).toBeEnabled();
+  });
+
   it('warns about unresolved conflicts, bounds the path preview and keeps review available', () => {
     const onReview = vi.fn();
     const conflicts = ['src/café <parser>.ts', 'deleted.ts', 'src/long/path.ts', 'fourth.ts'];
@@ -151,7 +181,7 @@ describe('workspace Git status', () => {
     { ready: true, availability: 'unavailable' as const, gitError: undefined, message: 'Restore this folder to inspect Git changes.' },
     { ready: true, availability: 'available' as const, gitError: 'Git changes are unavailable for this folder.', message: 'Git changes are unavailable for this folder.' },
   ])('does not claim a clean root when $message', ({ ready, availability, gitError, message }) => {
-    render(<WorkspaceStatus workspace={{ ...workspace, availability }} details={{ ...details, gitError, headCommit, conflicts: ['stale.ts'], upstream: { state: 'tracked', name: 'origin/main', ahead: 1, behind: 2 } }} ready={ready} onReview={vi.fn()} />);
+    render(<WorkspaceStatus workspace={{ ...workspace, availability }} details={{ ...details, gitError, headCommit, gitOperation: 'merge', conflicts: ['stale.ts'], upstream: { state: 'tracked', name: 'origin/main', ahead: 1, behind: 2 } }} ready={ready} onReview={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent(message);
     expect(screen.getByRole('button')).toBeDisabled();
     expect(screen.queryByText('No changes in this root')).not.toBeInTheDocument();
@@ -159,6 +189,8 @@ describe('workspace Git status', () => {
     expect(screen.queryByLabelText('Current repository commit')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Upstream comparison')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Unresolved Git conflicts')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Git operation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Merge in progress')).not.toBeInTheDocument();
     expect(screen.queryByText(/unresolved conflict/)).not.toBeInTheDocument();
   });
 });

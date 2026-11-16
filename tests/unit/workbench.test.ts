@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { execFileSync } from 'child_process';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -51,6 +52,7 @@ describe('workspace inspection and preview', () => {
     await expect(git(root, ['merge', 'other'])).rejects.toThrow();
 
     const whole = await inspectWorkspace(root);
+    expect(whole.gitOperation).toBe('merge');
     expect(whole.conflicts).toEqual(paths);
     expect(whole.changes.map((change) => change.path)).toEqual(paths);
     expect(whole.changes.every((change) => !change.staged)).toBe(true);
@@ -62,12 +64,80 @@ describe('workspace inspection and preview', () => {
     await git(nested, ['add', '.']);
     const resolved = await inspectWorkspace(nested);
     expect(resolved.conflicts).toEqual([]);
+    expect(resolved.gitOperation).toBe('merge');
     expect(resolved.changes).toHaveLength(1);
     expect(resolved.changes[0].staged).toBe(true);
     expect((await inspectWorkspace(root)).conflicts).toEqual(['sibling.ts']);
     await git(root, ['merge', '--abort']);
     expect((await inspectWorkspace(root)).conflicts).toEqual([]);
+    expect((await inspectWorkspace(nested)).gitOperation).toBeUndefined();
   }, 15_000);
+
+  it.each(['--merge', '--apply'])('detects a %s rebase in a linked worktree and nested root, then clears it on completion', async (backend) => {
+    const root = await fixture();
+    const linked = path.join(await fixture(), 'linked worktree');
+    await git(root, ['init', '-b', 'main']);
+    await git(root, ['config', 'user.name', 'Test']);
+    await git(root, ['config', 'user.email', 'test@example.test']);
+    await git(root, ['config', 'commit.gpgsign', 'false']);
+    await fs.mkdir(path.join(root, 'package'));
+    await fs.writeFile(path.join(root, 'package/app.ts'), 'base\n');
+    await git(root, ['add', '.']);
+    await git(root, ['commit', '-m', 'Shared base']);
+    await git(root, ['worktree', 'add', '-b', 'feature', linked]);
+    await fs.writeFile(path.join(linked, 'package/app.ts'), 'feature\n');
+    await git(linked, ['commit', '-am', 'Feature change']);
+    await fs.writeFile(path.join(root, 'package/app.ts'), 'main\n');
+    await git(root, ['commit', '-am', 'Main change']);
+    await expect(git(linked, ['rebase', backend, 'main'])).rejects.toThrow();
+    const nested = path.join(linked, 'package');
+    expect((await inspectWorkspace(nested)).gitOperation).toBe('rebase');
+    expect((await inspectWorkspace(linked)).gitOperation).toBe('rebase');
+    expect((await inspectWorkspace(root)).gitOperation).toBeUndefined();
+    await fs.writeFile(path.join(nested, 'app.ts'), 'resolved\n');
+    await git(linked, ['add', '.']);
+    const resolved = await inspectWorkspace(nested);
+    expect(resolved.conflicts).toEqual([]);
+    expect(resolved.gitOperation).toBe('rebase');
+    execFileSync('git', ['rebase', '--continue'], {
+      cwd: linked, env: { ...process.env, GIT_EDITOR: 'true' }, stdio: 'pipe', timeout: 15_000,
+    });
+    expect((await inspectWorkspace(nested)).gitOperation).toBeUndefined();
+    expect((await inspectWorkspace(root)).headCommit?.subject).toBe('Main change');
+  }, 30_000);
+
+  it('does not call a stopped git am a rebase', async () => {
+    const root = await fixture();
+    await git(root, ['init', '-b', 'main']);
+    await git(root, ['config', 'user.name', 'Test']);
+    await git(root, ['config', 'user.email', 'test@example.test']);
+    await git(root, ['config', 'commit.gpgsign', 'false']);
+    await fs.writeFile(path.join(root, 'app.ts'), 'base\n');
+    await git(root, ['add', '.']);
+    await git(root, ['commit', '-m', 'Shared base']);
+    await fs.writeFile(path.join(root, 'app.ts'), 'patch\n');
+    await git(root, ['commit', '-am', 'Patch change']);
+    const patch = await git(root, ['format-patch', '-1', '--stdout']);
+    await git(root, ['switch', '-c', 'other', 'HEAD~1']);
+    await fs.writeFile(path.join(root, 'app.ts'), 'other\n');
+    await git(root, ['commit', '-am', 'Other change']);
+    const patchFile = path.join(await fixture(), 'patch.mbox');
+    await fs.writeFile(patchFile, patch);
+    await expect(git(root, ['am', patchFile])).rejects.toThrow();
+    expect((await inspectWorkspace(root)).gitOperation).toBeUndefined();
+    await git(root, ['am', '--abort']);
+  });
+
+  it('keeps changes readable when Git operation markers cannot be inspected', async () => {
+    const root = await fixture();
+    await git(root, ['init', '-b', 'main']);
+    await fs.writeFile(path.join(root, 'new.ts'), 'pending\n');
+    await fs.symlink('MERGE_HEAD', path.join(root, '.git/MERGE_HEAD'));
+    const result = await inspectWorkspace(root);
+    expect(result.gitError).toBeUndefined();
+    expect(result.gitOperation).toBe('unavailable');
+    expect(result.changes[0]?.path).toBe('new.ts');
+  });
 
   it('compares local upstream refs from nested roots and refreshes ahead, behind and diverged counts without fetching', async () => {
     const root = await fixture();
