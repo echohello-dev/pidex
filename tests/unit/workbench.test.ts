@@ -29,6 +29,46 @@ afterEach(async () => {
 });
 
 describe('workspace inspection and preview', () => {
+  it('finds unresolved merge conflicts with literal root-relative paths and clears them after staging resolutions', async () => {
+    const root = await fixture();
+    const nested = path.join(root, 'package');
+    await fs.mkdir(nested);
+    await git(root, ['init', '-b', 'main']);
+    await git(root, ['config', 'user.name', 'Test']);
+    await git(root, ['config', 'user.email', 'test@example.test']);
+    await git(root, ['config', 'commit.gpgsign', 'false']);
+    const paths = ['package/café\nparser.ts', 'sibling.ts'];
+    const write = (text: string) => Promise.all(paths.map((file) => fs.writeFile(path.join(root, file), text)));
+    await write('base\n');
+    await git(root, ['add', '.']);
+    await git(root, ['commit', '-m', 'Shared base']);
+    await git(root, ['switch', '-c', 'other']);
+    await write('other\n');
+    await git(root, ['commit', '-am', 'Other changes']);
+    await git(root, ['switch', 'main']);
+    await write('main\n');
+    await git(root, ['commit', '-am', 'Main changes']);
+    await expect(git(root, ['merge', 'other'])).rejects.toThrow();
+
+    const whole = await inspectWorkspace(root);
+    expect(whole.conflicts).toEqual(paths);
+    expect(whole.changes.map((change) => change.path)).toEqual(paths);
+    expect(whole.changes.every((change) => !change.staged)).toBe(true);
+    const result = await inspectWorkspace(nested);
+    expect(result.gitError).toBeUndefined();
+    expect(result.conflicts).toEqual(['café\nparser.ts']);
+    expect(result.changes.some((change) => change.path === 'café\nparser.ts')).toBe(true);
+    await fs.writeFile(path.join(nested, 'café\nparser.ts'), 'resolved\n');
+    await git(nested, ['add', '.']);
+    const resolved = await inspectWorkspace(nested);
+    expect(resolved.conflicts).toEqual([]);
+    expect(resolved.changes).toHaveLength(1);
+    expect(resolved.changes[0].staged).toBe(true);
+    expect((await inspectWorkspace(root)).conflicts).toEqual(['sibling.ts']);
+    await git(root, ['merge', '--abort']);
+    expect((await inspectWorkspace(root)).conflicts).toEqual([]);
+  }, 15_000);
+
   it('compares local upstream refs from nested roots and refreshes ahead, behind and diverged counts without fetching', async () => {
     const root = await fixture();
     const nested = path.join(root, 'package');

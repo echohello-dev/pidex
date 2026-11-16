@@ -260,6 +260,86 @@ describe('workspace status in Electron', () => {
     expect(errors).toEqual([]);
   });
 
+  it('warns before new and saved continuation, keeps drafts and clears conflicts after resolution', async () => {
+    git(clean, 'config', 'user.name', 'Test');
+    git(clean, 'config', 'user.email', 'test@example.test');
+    git(clean, 'config', 'commit.gpgsign', 'false');
+    const longFile = 'src/a long package name/another long folder/café-parser-with-a-long-name.ts';
+    await fs.mkdir(path.dirname(path.join(clean, longFile)), { recursive: true });
+    await fs.writeFile(path.join(clean, longFile), 'base\n');
+    git(clean, 'add', '.');
+    const commit = (subject: string) => git(clean, '-c', 'user.name=Test', '-c', 'user.email=test@example.test',
+      '-c', 'commit.gpgsign=false', 'commit', '-am', subject);
+    commit('Add parser');
+    git(clean, 'switch', '-c', 'other');
+    for (const file of ['app.ts', longFile]) await fs.writeFile(path.join(clean, file), 'other\n');
+    commit('Other changes');
+    git(clean, 'switch', 'main');
+    for (const file of ['app.ts', longFile]) await fs.writeFile(path.join(clean, file), 'main\n');
+    commit('Main changes');
+    expect(() => git(clean, 'merge', 'other')).toThrow();
+    const archive = path.join(fixture, 'sessions/workspace/conflict.jsonl');
+    await fs.writeFile(archive, [
+      { type: 'session', version: 3, id: 'conflict', cwd: clean, timestamp: new Date().toISOString() },
+      { type: 'message', id: 'request', parentId: null, message: { role: 'user', content: [{ type: 'text', text: 'Continue parser work' }] } },
+    ].map((record) => JSON.stringify(record)).join('\n') + '\n');
+    await page.getByLabel('Workspace group').selectOption({ label: 'clean' });
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().textContent()).toContain('2 unresolved conflicts');
+    expect(await status().textContent()).toContain('main · 0 staged · 2 unstaged · 0 untracked');
+    expect(await status().getByText(longFile, { exact: true }).isVisible()).toBe(true);
+    await page.getByLabel('Message pi').fill('Resolve these files with care.');
+    expect(await page.getByRole('button', { name: 'Send', exact: true }).isEnabled()).toBe(true);
+    await page.evaluate(() => document.fonts.ready);
+    await status().scrollIntoViewIfNeeded();
+    await capture('workspace-conflicts.png');
+    await resizeWindow(900, 600);
+    await status().getByLabel('Unresolved Git conflicts').scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    await capture('workspace-conflicts-narrow.png');
+    await resizeWindow(1280, 900);
+    await status().getByRole('button', { name: 'Review workspace changes' }).click();
+    await page.getByRole('heading', { name: 'Changes review', exact: true }).waitFor();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Resolve these files with care.');
+    await page.getByRole('button', { name: /^Sessions/ }).click();
+    await page.getByRole('tree', { name: 'Session archives', exact: true })
+      .getByRole('treeitem', { name: /Continue parser work/ }).click();
+    await expect.poll(() => status().locator('summary').textContent()).toContain('2 unresolved conflicts');
+    await page.getByLabel('Message pi').fill('Help resolve the conflicts before continuing.');
+    expect(await page.getByRole('button', { name: 'Resume', exact: true }).isEnabled()).toBe(true);
+    await capture('history-conflicts.png');
+    await resizeWindow(900, 600);
+    const summaryStatus = status().locator('summary .wb-meta > span').last();
+    expect(await summaryStatus.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await capture('history-conflicts-narrow.png');
+    await status().locator('summary').click();
+    await status().getByLabel('Unresolved Git conflicts').waitFor();
+    await status().getByLabel('Unresolved Git conflicts').scrollIntoViewIfNeeded();
+    expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
+    expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.locator('.wb-composer').evaluate((el) => el.getBoundingClientRect().bottom))
+      .toBeLessThanOrEqual(await page.locator('.wb-statusbar').evaluate((el) => el.getBoundingClientRect().top));
+    await capture('history-conflicts-expanded-narrow.png');
+    for (const file of ['app.ts', longFile]) await fs.writeFile(path.join(clean, file), 'resolved\n');
+    git(clean, 'add', '.');
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => status().getByLabel('Unresolved Git conflicts').count()).toBe(0);
+    expect(await status().textContent()).toContain('main · 2 staged · 0 unstaged · 0 untracked');
+    expect(await status().locator('summary').textContent()).not.toContain('unresolved conflict');
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Help resolve the conflicts before continuing.');
+    await resizeWindow(1280, 900);
+    await page.getByLabel('Workspace group').selectOption({ label: 'project' });
+    expect(await status().getByLabel('Unresolved Git conflicts').count()).toBe(0);
+    await page.getByLabel('Workspace group').selectOption({ label: 'clean' });
+    await page.getByRole('button', { name: 'New session', exact: true }).click();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Resolve these files with care.');
+    const commands = (await fs.readFile(rpcLog, 'utf8').catch(() => ''))
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    expect(commands.every((command) => command.type === 'get_available_models')).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   it('does not describe non-Git folders or missing roots as clean', async () => {
     await select('plain');
     await expect.poll(() => status().textContent()).toContain('Git changes are unavailable for this folder.');

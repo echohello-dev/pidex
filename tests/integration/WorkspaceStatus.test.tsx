@@ -19,6 +19,39 @@ const change: GitChange = {
 afterEach(cleanup);
 
 describe('workspace Git status', () => {
+  it('warns about unresolved conflicts, bounds the path preview and keeps review available', () => {
+    const onReview = vi.fn();
+    const conflicts = ['src/café <parser>.ts', 'deleted.ts', 'src/long/path.ts', 'fourth.ts'];
+    const { container, rerender } = render(<WorkspaceStatus workspace={workspace} details={{
+      ...details, changes: [change], conflicts,
+    }} ready onReview={onReview} />);
+    expect(screen.getByRole('status')).toHaveTextContent('1 changed file · 4 unresolved conflicts');
+    expect(screen.getByLabelText('Unresolved Git conflicts')).toBeVisible();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByTitle(conflicts[0])).toHaveTextContent(conflicts[0]);
+    expect(container.querySelector('parser')).toBeNull();
+    expect(screen.getByText('1 more in workspace changes.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Review workspace changes' }));
+    expect(onReview).toHaveBeenCalledOnce();
+    rerender(<WorkspaceStatus workspace={workspace} details={{ ...details, conflicts: [conflicts[0]] }} ready onReview={onReview} />);
+    expect(screen.getByRole('status')).toHaveTextContent('1 unresolved conflict');
+    rerender(<WorkspaceStatus workspace={workspace} details={{ ...details, conflicts: [] }} ready onReview={onReview} />);
+    expect(screen.queryByLabelText('Unresolved Git conflicts')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('No changes in this root');
+  });
+
+  it('keeps conflict counts visible in collapsed history and reveals paths on expansion', () => {
+    const { container } = render(<WorkspaceStatus context="history" workspace={workspace} details={{
+      ...details, changes: [change], conflicts: ['app.ts'],
+    }} ready onReview={vi.fn()} />);
+    expect(container.querySelector('summary')).toHaveTextContent('1 unresolved conflict');
+    expect(container.querySelector('summary')).not.toHaveTextContent('1 changed file');
+    expect(screen.getByText('app.ts')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Current workspace changes'));
+    expect(screen.getByText('app.ts')).toBeVisible();
+    expect(screen.getByText('Review these files before continuing. Pi can help resolve them.')).toBeVisible();
+  });
+
   it('shows local upstream counts and refreshes them without claiming to fetch', () => {
     const { rerender } = render(<WorkspaceStatus workspace={workspace} details={{ ...details,
       upstream: { state: 'tracked', name: 'origin/feature/status', ahead: 2, behind: 3 },
@@ -118,12 +151,14 @@ describe('workspace Git status', () => {
     { ready: true, availability: 'unavailable' as const, gitError: undefined, message: 'Restore this folder to inspect Git changes.' },
     { ready: true, availability: 'available' as const, gitError: 'Git changes are unavailable for this folder.', message: 'Git changes are unavailable for this folder.' },
   ])('does not claim a clean root when $message', ({ ready, availability, gitError, message }) => {
-    render(<WorkspaceStatus workspace={{ ...workspace, availability }} details={{ ...details, gitError, headCommit, upstream: { state: 'tracked', name: 'origin/main', ahead: 1, behind: 2 } }} ready={ready} onReview={vi.fn()} />);
+    render(<WorkspaceStatus workspace={{ ...workspace, availability }} details={{ ...details, gitError, headCommit, conflicts: ['stale.ts'], upstream: { state: 'tracked', name: 'origin/main', ahead: 1, behind: 2 } }} ready={ready} onReview={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent(message);
     expect(screen.getByRole('button')).toBeDisabled();
     expect(screen.queryByText('No changes in this root')).not.toBeInTheDocument();
     expect(screen.queryByText(/old-branch|feature\/status/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Current repository commit')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Upstream comparison')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Unresolved Git conflicts')).not.toBeInTheDocument();
+    expect(screen.queryByText(/unresolved conflict/)).not.toBeInTheDocument();
   });
 });

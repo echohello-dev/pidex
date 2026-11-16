@@ -33,6 +33,7 @@ export type WorkspaceDetails = {
   upstream?: GitUpstream;
   headCommit?: { hash: string; subject: string; committedAt: string };
   changes: GitChange[];
+  conflicts?: string[];
   files: string[];
   gitError?: string;
   filesTruncated?: boolean;
@@ -196,7 +197,7 @@ async function inspectUpstream(cwd: string, branch: string): Promise<GitUpstream
 export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
   const { files, filesTruncated } = await listFiles(cwd);
   try {
-    const [branch, working, staged, untracked, commit] = await Promise.all([
+    const [branch, working, staged, untracked, commit, conflicts] = await Promise.all([
       git(cwd, ['branch', '--show-current']),
       git(cwd, [
         'diff',
@@ -226,8 +227,16 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
       // An unborn or unreadable HEAD must not hide otherwise valid changes.
       git(cwd, ['log', '-1', '--no-show-signature', '--format=%H%x00%cI%x00%s', 'HEAD', '--'])
         .catch(() => ''),
+      git(cwd, [
+        'diff', '--no-ext-diff', '--no-textconv', '--name-only',
+        '--diff-filter=U', '-z', '--relative', '--', '.',
+      ]),
     ]);
     const [hash, committedAt, subject] = commit.split('\0');
+    const conflictPaths = new Set(conflicts.split('\0').filter(Boolean));
+    // Unmerged files can have both an unmerged marker and a patch in numstat.
+    // They belong in the working copy once, not among staged resolutions.
+    const workingChanges = new Map(parseNumstat(working, false).map((change) => [change.path, change]));
     return {
       branch: branch.trim(),
       upstream: await inspectUpstream(cwd, branch.trim()),
@@ -238,9 +247,10 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
       } : undefined,
       files,
       filesTruncated,
+      conflicts: [...conflictPaths],
       changes: [
-        ...parseNumstat(working, false),
-        ...parseNumstat(staged, true),
+        ...workingChanges.values(),
+        ...parseNumstat(staged, true).filter((change) => !conflictPaths.has(change.path)),
         ...untracked
           .split('\0')
           .filter(Boolean)

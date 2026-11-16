@@ -20,7 +20,8 @@ export function WorkspaceStatus({
   const staged = changes.filter((change) => change.staged).length;
   const unstaged = changes.filter((change) => !change.staged && !change.untracked).length;
   const untracked = changes.filter((change) => change.untracked).length;
-  const message = unavailable
+  const conflicts = details.conflicts ?? [];
+  const changeMessage = unavailable
     ? 'Restore this folder to inspect Git changes.'
     : !ready
       ? 'Checking Git changes…'
@@ -30,6 +31,10 @@ export function WorkspaceStatus({
           ? `${count} changed ${count === 1 ? 'file' : 'files'}`
           : 'No changes in this root';
   const inspected = !unavailable && ready && !details.gitError;
+  const conflictMessage = `${conflicts.length} unresolved ${conflicts.length === 1 ? 'conflict' : 'conflicts'}`;
+  const message = inspected && conflicts.length
+    ? `${changeMessage} · ${conflictMessage}`
+    : changeMessage;
   const commit = inspected ? details.headCommit : undefined;
 
   const content = (
@@ -44,6 +49,19 @@ export function WorkspaceStatus({
         <p role="status">{message}</p>
         {inspected && (
           <>
+            {conflicts.length > 0 && (
+              <div className="wb-workspace-conflicts" aria-label="Unresolved Git conflicts">
+                <p>Review these files before continuing. Pi can help resolve them.</p>
+                <ul>
+                  {conflicts.slice(0, 3).map((file) => (
+                    <li key={file} title={file}>{file}</li>
+                  ))}
+                </ul>
+                {conflicts.length > 3 && (
+                  <p className="wb-meta">{conflicts.length - 3} more in workspace changes.</p>
+                )}
+              </div>
+            )}
             <p className="wb-meta">
               {details.branch || 'Detached HEAD'} · {staged} staged · {unstaged} unstaged · {untracked} untracked
             </p>
@@ -88,7 +106,7 @@ export function WorkspaceStatus({
             Current workspace changes
             <span className="wb-meta" title={inspected ? `${details.branch || 'Detached HEAD'} · ${message}` : message}>
               {inspected && <span className="wb-history-status-branch">{details.branch || 'Detached HEAD'}</span>}
-              <span>{inspected && ' · '}{message}</span>
+              <span>{inspected && ' · '}{inspected && conflicts.length ? conflictMessage : message}</span>
             </span>
           </summary>
           <div className="wb-workspace-status">{content}</div>
