@@ -233,6 +233,10 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
       ]),
     ]);
     const [hash, committedAt, subject] = commit.split('\0');
+    const conflictPaths = new Set(conflicts.split('\0').filter(Boolean));
+    // Unmerged files can have both an unmerged marker and a patch in numstat.
+    // They belong in the working copy once, not among staged resolutions.
+    const workingChanges = new Map(parseNumstat(working, false).map((change) => [change.path, change]));
     return {
       branch: branch.trim(),
       upstream: await inspectUpstream(cwd, branch.trim()),
@@ -243,10 +247,10 @@ export async function inspectWorkspace(cwd: string): Promise<WorkspaceDetails> {
       } : undefined,
       files,
       filesTruncated,
-      conflicts: conflicts.split('\0').filter(Boolean),
+      conflicts: [...conflictPaths],
       changes: [
-        ...parseNumstat(working, false),
-        ...parseNumstat(staged, true),
+        ...workingChanges.values(),
+        ...parseNumstat(staged, true).filter((change) => !conflictPaths.has(change.path)),
         ...untracked
           .split('\0')
           .filter(Boolean)

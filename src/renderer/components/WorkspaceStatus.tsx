@@ -106,7 +106,7 @@ export function WorkspaceStatus({
             Current workspace changes
             <span className="wb-meta" title={inspected ? `${details.branch || 'Detached HEAD'} · ${message}` : message}>
               {inspected && <span className="wb-history-status-branch">{details.branch || 'Detached HEAD'}</span>}
-              <span>{inspected && ' · '}{message}</span>
+              <span>{inspected && ' · '}{inspected && conflicts.length ? conflictMessage : message}</span>
             </span>
           </summary>
           <div className="wb-workspace-status">{content}</div>

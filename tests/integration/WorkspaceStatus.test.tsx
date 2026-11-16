@@ -45,6 +45,7 @@ describe('workspace Git status', () => {
       ...details, changes: [change], conflicts: ['app.ts'],
     }} ready onReview={vi.fn()} />);
     expect(container.querySelector('summary')).toHaveTextContent('1 unresolved conflict');
+    expect(container.querySelector('summary')).not.toHaveTextContent('1 changed file');
     expect(screen.getByText('app.ts')).not.toBeVisible();
     fireEvent.click(screen.getByText('Current workspace changes'));
     expect(screen.getByText('app.ts')).toBeVisible();

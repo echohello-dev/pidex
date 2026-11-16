@@ -50,18 +50,24 @@ describe('workspace inspection and preview', () => {
     await git(root, ['commit', '-am', 'Main changes']);
     await expect(git(root, ['merge', 'other'])).rejects.toThrow();
 
-    expect((await inspectWorkspace(root)).conflicts).toEqual(paths);
+    const whole = await inspectWorkspace(root);
+    expect(whole.conflicts).toEqual(paths);
+    expect(whole.changes.map((change) => change.path)).toEqual(paths);
+    expect(whole.changes.every((change) => !change.staged)).toBe(true);
     const result = await inspectWorkspace(nested);
     expect(result.gitError).toBeUndefined();
     expect(result.conflicts).toEqual(['café\nparser.ts']);
     expect(result.changes.some((change) => change.path === 'café\nparser.ts')).toBe(true);
     await fs.writeFile(path.join(nested, 'café\nparser.ts'), 'resolved\n');
     await git(nested, ['add', '.']);
-    expect((await inspectWorkspace(nested)).conflicts).toEqual([]);
+    const resolved = await inspectWorkspace(nested);
+    expect(resolved.conflicts).toEqual([]);
+    expect(resolved.changes).toHaveLength(1);
+    expect(resolved.changes[0].staged).toBe(true);
     expect((await inspectWorkspace(root)).conflicts).toEqual(['sibling.ts']);
     await git(root, ['merge', '--abort']);
     expect((await inspectWorkspace(root)).conflicts).toEqual([]);
-  });
+  }, 15_000);
 
   it('compares local upstream refs from nested roots and refreshes ahead, behind and diverged counts without fetching', async () => {
     const root = await fixture();

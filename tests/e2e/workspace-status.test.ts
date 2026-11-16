@@ -287,6 +287,7 @@ describe('workspace status in Electron', () => {
     await page.getByRole('button', { name: 'New session', exact: true }).click();
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect.poll(() => status().textContent()).toContain('2 unresolved conflicts');
+    expect(await status().textContent()).toContain('main · 0 staged · 2 unstaged · 0 untracked');
     expect(await status().getByText(longFile, { exact: true }).isVisible()).toBe(true);
     await page.getByLabel('Message pi').fill('Resolve these files with care.');
     expect(await page.getByRole('button', { name: 'Send', exact: true }).isEnabled()).toBe(true);
@@ -308,9 +309,12 @@ describe('workspace status in Electron', () => {
     await page.getByLabel('Message pi').fill('Help resolve the conflicts before continuing.');
     expect(await page.getByRole('button', { name: 'Resume', exact: true }).isEnabled()).toBe(true);
     await capture('history-conflicts.png');
+    await resizeWindow(900, 600);
+    const summaryStatus = status().locator('summary .wb-meta > span').last();
+    expect(await summaryStatus.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await capture('history-conflicts-narrow.png');
     await status().locator('summary').click();
     await status().getByLabel('Unresolved Git conflicts').waitFor();
-    await resizeWindow(900, 600);
     await status().getByLabel('Unresolved Git conflicts').scrollIntoViewIfNeeded();
     expect(await page.locator('.wb-transcript').evaluate((el) => el.clientHeight)).toBeGreaterThan(40);
     expect(await page.evaluate(() => document.body.scrollWidth <= innerWidth)).toBe(true);
@@ -321,6 +325,7 @@ describe('workspace status in Electron', () => {
     git(clean, 'add', '.');
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect.poll(() => status().getByLabel('Unresolved Git conflicts').count()).toBe(0);
+    expect(await status().textContent()).toContain('main · 2 staged · 0 unstaged · 0 untracked');
     expect(await status().locator('summary').textContent()).not.toContain('unresolved conflict');
     expect(await page.getByLabel('Message pi').inputValue()).toBe('Help resolve the conflicts before continuing.');
     await resizeWindow(1280, 900);
