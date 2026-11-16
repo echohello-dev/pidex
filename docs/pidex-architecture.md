@@ -45,6 +45,8 @@ New sessions start a Pi subprocess in the selected root and apply its saved mode
 
 Groups organize roots for navigation. Switching group/root leaves processes running and restores the target root's view and drafts. A launch finishing after navigation becomes a background tab; its original unsent prompt is not submitted elsewhere. Open sessions are reachable across groups. Late root requests cannot replace another root's files/defaults/history. No simultaneous multi-cwd execution or sibling instruction loading is added.
 
+Each open tab tracks unread activity in memory. A running-to-idle transition or first runtime exit marks the tab unread when its transcript is not the current view. Opening the transcript acknowledges it; repeated end/exit events do not create another marker. This tracks navigation inside the window, without OS focus detection or desktop notifications.
+
 Main requests `get_state`, `get_messages`, and available commands. The renderer converts the returned messages into user, assistant, and tool entries. Subsequent Pi events arrive through `pidex:session:event`; `timeline.ts` applies text/thinking deltas and tool start/update/end events. Main forwards the RPC events rather than translating them into a second event protocol.
 
 Pi requests carry IDs and have 30-second timeouts. Stdout is split on newline only. A missing executable produces an error in the window; `PIDEX_PI` can select an absolute executable path. Discovery also checks common Bun, Homebrew, mise, and PATH directories.

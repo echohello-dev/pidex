@@ -27,6 +27,7 @@ export type SessionTab = {
   commands: SlashCommand[];
   running: boolean;
   exited: boolean;
+  unread: boolean;
 };
 type Preview = {
   info: SessionInfo;
@@ -100,6 +101,9 @@ export function useWorkbench() {
   const ws = workspaces.find((w) => w.dirName === selected);
   const active =
     tabs.find((t) => t.runtimeId === activeId && t.cwd === ws?.cwd) ?? null;
+  const visibleSessionId = view === 'session' ? active?.runtimeId : undefined;
+  const visibleSession = useRef(visibleSessionId);
+  visibleSession.current = visibleSessionId;
   const draftKey =
     view === 'history'
       ? `preview:${preview?.info.file ?? ''}:${preview?.entryId ?? ''}`
@@ -155,6 +159,7 @@ export function useWorkbench() {
   useEffect(() => {
     if (!api) return;
     const offEvent = api.onSessionEvent(({ sessionId, event }) => {
+      const visible = visibleSession.current;
       setTabs((prev) =>
         prev.map((tab) => {
           if (tab.runtimeId !== sessionId) return tab;
@@ -163,11 +168,15 @@ export function useWorkbench() {
             ...tab,
             entries: next.entries,
             running: next.running ?? tab.running,
+            unread: tab.runtimeId === visible
+              ? false
+              : tab.unread || (tab.running && next.running === false),
           };
         }),
       );
     });
     const offExit = api.onSessionExit(({ sessionId }) => {
+      const visible = visibleSession.current;
       exitedSessions.current.add(sessionId);
       setTabs((prev) =>
         prev.map((tab) =>
@@ -177,6 +186,9 @@ export function useWorkbench() {
                 entries: applyEvent(tab.entries, { type: 'agent_end' }).entries,
                 running: false,
                 exited: true,
+                unread: tab.runtimeId === visible
+                  ? false
+                  : tab.unread || !tab.exited,
               }
             : tab,
         ),
@@ -187,6 +199,15 @@ export function useWorkbench() {
       offExit();
     };
   }, [api]);
+
+  useEffect(() => {
+    if (!visibleSessionId) return;
+    setTabs((prev) => prev.map((tab) =>
+      tab.runtimeId === visibleSessionId && tab.unread
+        ? { ...tab, unread: false }
+        : tab,
+    ));
+  }, [visibleSessionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -450,6 +471,7 @@ export function useWorkbench() {
         commands: [],
         running: Boolean(result.state?.isStreaming),
         exited: exitedSessions.current.has(id),
+        unread: false,
       };
       setTabs((prev) =>
         prev.some((t) => t.runtimeId === id)
