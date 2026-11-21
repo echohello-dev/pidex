@@ -108,6 +108,7 @@ describe('background session activity in Electron', () => {
   });
 
   it('marks a runtime exit while Changes is open and preserves the exited transcript on acknowledgement', async () => {
+    await page.getByLabel('Message pi').fill('Keep my unsent recovery draft');
     await page.getByRole('button', { name: /^Changes/ }).click();
     // Terminate only the deterministic subprocess created by this test.
     const runtime = (await prompts()).find((record) => record.message === task)!;
@@ -121,6 +122,82 @@ describe('background session activity in Electron', () => {
     await expect.poll(() => session().locator('.wb-session-unread').count()).toBe(0);
     expect(await session().textContent()).toContain('Exited');
     expect(await prompts()).toHaveLength(1);
+    expect(errors).toEqual([]);
+  });
+
+  it('previews the exited archive at native desktop and minimum sizes without relaunching Pi', async () => {
+    const runtime = (await prompts())[0];
+    const original = await fs.readFile(runtime.sessionFile, 'utf8');
+    const preview = page.getByRole('button', { name: 'Preview saved session', exact: true });
+    await preview.waitFor();
+    await capture('exited-session-recovery.png');
+    await resize(900, 600);
+    const bounds = await preview.boundingBox();
+    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
+    expect((await page.locator('.wb-transcript').boundingBox())!.height).toBeGreaterThan(60);
+    expect(await page.getByLabel('Message pi').isDisabled()).toBe(true);
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep my unsent recovery draft');
+    await capture('exited-session-recovery-minimum.png');
+    await preview.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'Resume', exact: true }).waitFor();
+    await page.locator('.wb-transcript').getByText(task, { exact: true }).waitFor();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('');
+    expect(await fs.readFile(runtime.sessionFile, 'utf8')).toBe(original);
+    expect(await prompts()).toHaveLength(1);
+    const records = (await fs.readFile(rpcLog, 'utf8')).split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    expect(new Set(records.map((record) => record.runtimePid)).size).toBe(1);
+    await capture('exited-session-saved-preview-minimum.png');
+    await session().click();
+    await page.getByRole('region', { name: 'Session recovery' }).waitFor();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep my unsent recovery draft');
+    await resize(1280, 840);
+    expect(errors).toEqual([]);
+  });
+
+  it('reports a missing exited archive without previewing unrelated saved history', async () => {
+    const runtime = (await prompts())[0];
+    const original = await fs.readFile(runtime.sessionFile, 'utf8');
+    const unrelated = path.join(path.dirname(runtime.sessionFile), 'unrelated.jsonl');
+    await fs.writeFile(unrelated, original.replaceAll(task, 'Unrelated saved task'));
+    await fs.unlink(runtime.sessionFile);
+    try {
+      await page.getByRole('button', { name: 'Preview saved session', exact: true }).click();
+      await page.getByRole('alert').getByText('The saved archive for this exited session could not be found.', { exact: false }).waitFor();
+      expect(await page.getByRole('region', { name: 'Session recovery' }).isVisible()).toBe(true);
+      expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep my unsent recovery draft');
+      expect(await page.locator('.wb-transcript').textContent()).not.toContain('Unrelated saved task');
+      expect(await prompts()).toHaveLength(1);
+      await capture('exited-session-missing-archive.png');
+    } finally {
+      await fs.writeFile(runtime.sessionFile, original);
+      await fs.unlink(unrelated);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it('resumes the exact exited archive only after explicit continuation', async () => {
+    const runtime = (await prompts())[0];
+    await page.getByRole('button', { name: 'Preview saved session', exact: true }).click();
+    await page.getByRole('button', { name: 'Resume', exact: true }).waitFor();
+    await page.getByLabel('Message pi').fill('Continue the recovered API task');
+    await capture('exited-session-saved-preview.png');
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
+    await page.getByRole('button', { name: 'Stop', exact: true }).waitFor();
+    await expect.poll(async () => (await prompts()).length).toBe(2);
+    const continued = (await prompts())[1];
+    expect(continued).toMatchObject({
+      message: 'Continue the recovered API task', cwd: runtime.cwd, sessionFile: runtime.sessionFile,
+    });
+    expect(continued.runtimePid).not.toBe(runtime.runtimePid);
+    await page.getByRole('button', { name: 'Stop', exact: true }).click();
+    await session().filter({ hasText: 'Exited' }).click();
+    expect(await page.getByLabel('Message pi').inputValue()).toBe('Keep my unsent recovery draft');
     expect(errors).toEqual([]);
   });
 });

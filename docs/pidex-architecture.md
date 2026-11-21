@@ -51,7 +51,7 @@ Main requests `get_state`, `get_messages`, and available commands. The renderer 
 
 Pi requests carry IDs and have 30-second timeouts. Stdout is split on newline only. A missing executable produces an error in the window; `PIDEX_PI` can select an absolute executable path. Discovery also checks common Bun, Homebrew, mise, and PATH directories.
 
-Closing a session terminates its process. Window closure and app shutdown dispose of all active processes. Process exits are reported to the renderer. The UI remains available, but automatic process restart is not implemented.
+Closing a session terminates its process. Window closure and app shutdown dispose of all active processes. Process exits are reported to the renderer. An exited transcript keeps its unsent draft and offers a read-only preview of its exact saved archive before explicit resume or fork. Recovery refreshes archive metadata and reports missing history without choosing another conversation. The UI remains available, but automatic process restart is not implemented.
 
 ## IPC
 

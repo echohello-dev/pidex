@@ -477,9 +477,27 @@ function App() {
                           </EmptyState>
                         )}
                       </Transcript>
+                      {active.exited && (
+                        <section className="wb-exited-recovery" aria-label="Session recovery">
+                          <p className="wb-meta">
+                            {active.file
+                              ? 'Pi exited. Preview saved history to resume or fork. This tab keeps your transcript and unsent draft.'
+                              : 'Pi exited without providing a saved archive. Your transcript and unsent draft remain in this tab.'}
+                          </p>
+                          {active.file && (
+                            <BracketButton
+                              primary
+                              disabled={b.busy}
+                              onClick={() => void b.previewExitedSession()}
+                            >
+                              Preview saved session
+                            </BracketButton>
+                          )}
+                        </section>
+                      )}
                       {composer(
                         active.exited
-                          ? 'Session exited. Start a new session to continue.'
+                          ? 'Session exited. Your unsent draft is kept here.'
                           : active.running
                             ? 'Add a follow-up while pi works…'
                             : 'Continue this session…',

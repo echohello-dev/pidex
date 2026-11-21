@@ -96,6 +96,7 @@ export function useWorkbench() {
   const currentCwd = useRef('');
   const previewSeq = useRef(0);
   const opening = useRef(false);
+  const recovering = useRef(false);
   const sending = useRef(false);
   const exitedSessions = useRef(new Set<string>());
   const ws = workspaces.find((w) => w.dirName === selected);
@@ -561,6 +562,30 @@ export function useWorkbench() {
     navigate('history');
     return showPreview(info);
   };
+  const previewExitedSession = async () => {
+    if (
+      view !== 'session' || !active?.exited || !active.file || !ws ||
+      busy || opening.current || recovering.current
+    ) return;
+    const token = generation.current;
+    recovering.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const list = await api.sessions(ws.dirName);
+      if (token !== generation.current) return;
+      setSessions(list);
+      const saved = list.find((info) => info.file === active.file && info.cwd === active.cwd);
+      if (!saved)
+        throw new Error('The saved archive for this exited session could not be found. Its transcript and unsent draft are still available in this tab.');
+      await previewSavedSession(saved);
+    } catch (error) {
+      if (token === generation.current) report(error);
+    } finally {
+      recovering.current = false;
+      setBusy(false);
+    }
+  };
   useEffect(() => {
     if (view !== 'history' || previewLoading) return;
     if (preview && !preview.loaded)
@@ -802,6 +827,7 @@ export function useWorkbench() {
     selectWorkspace,
     addWorkspace,
     previewSavedSession,
+    previewExitedSession,
     closeSession,
     forkSession,
     prepareHandoff,

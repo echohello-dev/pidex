@@ -698,6 +698,20 @@ html[data-reduced-motion='true'] .wb-shell *::after {
   min-height: 0;
   min-width: 0;
 }
+.wb-exited-recovery {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.wb-exited-recovery p {
+  flex: 1 1 220px;
+  margin: 0;
+}
 .wb-transcript {
   display: flex;
   flex: 1;
