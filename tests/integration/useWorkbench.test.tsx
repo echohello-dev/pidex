@@ -63,6 +63,101 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('exited session recovery', () => {
+  const source = {
+    cwd: '/code/api', id: 'saved', file: '/sessions/exited.jsonl',
+    title: 'Saved task', model: '', timestamp: '', messageCount: 1,
+  };
+  async function exitedFixture(file: string | undefined = source.file) {
+    const fixture = Object.assign(apiFixture(), {
+      openSession: vi.fn<PidexApi['openSession']>().mockResolvedValue({
+        sessionId: 'runtime', state: { sessionFile: file },
+      }),
+      sessionCommands: vi.fn().mockResolvedValue({ commands: [] }),
+      sendPrompt: vi.fn().mockResolvedValue({ success: true }),
+    });
+    fixture.sessionTree.mockResolvedValue({ data: { leafId: 'latest', canContinue: true, nodes: [] } });
+    fixture.previewSession.mockResolvedValue({ data: [
+      { role: 'user', content: [{ type: 'text', text: 'Saved request' }] },
+    ] });
+    const hook = renderHook(useWorkbench);
+    await waitFor(() => expect(hook.result.current.detailsRoot).toBe('api'));
+    await act(async () => { await hook.result.current.send('Original task'); });
+    await waitFor(() => expect(hook.result.current.busy).toBe(false));
+    act(() => {
+      hook.result.current.onDraft('Keep this unsent follow-up');
+      fixture.onSessionExit.mock.calls[0][0]({ sessionId: 'runtime' });
+    });
+    await waitFor(() => expect(hook.result.current.tabs[0].exited).toBe(true));
+    // Let the exit-triggered workspace refresh settle before arranging lookup results.
+    await act(async () => {});
+    return { ...hook, fixture };
+  }
+
+  it('refreshes and previews only the exited archive without starting Pi or losing drafts', async () => {
+    const { result, fixture } = await exitedFixture();
+    fixture.sessions.mockResolvedValue([{ ...source, file: '/sessions/unrelated.jsonl' }, source]);
+    await act(async () => { await result.current.previewExitedSession(); });
+    expect(result.current.view).toBe('history');
+    expect(result.current.preview).toMatchObject({ info: source, entryId: 'latest', ready: true });
+    expect(fixture.sessionTree).toHaveBeenCalledExactlyOnceWith(source.file);
+    expect(fixture.previewSession).toHaveBeenCalledExactlyOnceWith(source.file, 'latest');
+    expect(fixture.openSession).toHaveBeenCalledTimes(1);
+    expect(fixture.sendPrompt).toHaveBeenCalledTimes(1);
+    act(() => result.current.onDraft('Separate saved-history draft'));
+    act(() => result.current.activateTab(result.current.tabs[0]));
+    expect(result.current.draft).toBe('Keep this unsent follow-up');
+    await act(async () => { await result.current.previewExitedSession(); });
+    expect(result.current.draft).toBe('Separate saved-history draft');
+  });
+
+  it.each(['missing', 'wrong root', 'failed lookup', 'unreadable'])(
+    'keeps the transcript and draft when the saved archive is %s', async (kind) => {
+      const { result, fixture } = await exitedFixture();
+      if (kind === 'failed lookup') fixture.sessions.mockRejectedValue(new Error('History unavailable'));
+      else fixture.sessions.mockResolvedValue(kind === 'missing'
+        ? [{ ...source, file: '/sessions/unrelated.jsonl' }]
+        : [{ ...source, cwd: kind === 'wrong root' ? '/code/web' : source.cwd }]);
+      if (kind === 'unreadable') fixture.sessionTree.mockResolvedValue({ error: 'Archive unreadable' });
+      await act(async () => { await result.current.previewExitedSession(); });
+      expect(result.current.error).toContain(kind === 'failed lookup' ? 'History unavailable'
+        : kind === 'unreadable' ? 'Archive unreadable' : 'could not be found');
+      expect(result.current.preview?.ready).not.toBe(true);
+      act(() => result.current.activateTab(result.current.tabs[0]));
+      expect(result.current.draft).toBe('Keep this unsent follow-up');
+      expect(result.current.active?.entries).toContainEqual(expect.objectContaining({ kind: 'user', text: 'Original task' }));
+      expect(result.current.busy).toBe(false);
+      expect(fixture.openSession).toHaveBeenCalledTimes(1);
+      expect(fixture.sendPrompt).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['root', 'view', 'tab'])('ignores delayed recovery after switching %s', async (destination) => {
+    const { result, fixture } = await exitedFixture();
+    const pending = deferred<Awaited<ReturnType<PidexApi['sessions']>>>();
+    fixture.sessions.mockReturnValueOnce(pending.promise);
+    let lookup!: Promise<void>;
+    act(() => { lookup = result.current.previewExitedSession(); });
+    if (destination === 'root') act(() => result.current.selectWorkspace(catalog.roots[1]));
+    else if (destination === 'view') act(() => result.current.navigate('changes'));
+    else act(() => result.current.activateTab(result.current.tabs[0]));
+    await act(async () => { pending.resolve([source]); await lookup; });
+    expect(result.current.view).toBe(destination === 'root' ? 'new' : destination === 'view' ? 'changes' : 'session');
+    expect(result.current.error).toBe('');
+    expect(fixture.sessionTree).not.toHaveBeenCalled();
+    expect(result.current.busy).toBe(false);
+  });
+
+  it('does not guess an archive when Pi provided no path', async () => {
+    const { result, fixture } = await exitedFixture('');
+    fixture.sessions.mockClear().mockResolvedValue([source]);
+    await act(async () => { await result.current.previewExitedSession(); });
+    expect(fixture.sessions).not.toHaveBeenCalled();
+    expect(result.current.view).toBe('session');
+    expect(fixture.sessionTree).not.toHaveBeenCalled();
+  });
+});
+
 describe('unread session activity', () => {
   function runtimeFixture() {
     const fixture = apiFixture();
